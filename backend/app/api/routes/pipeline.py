@@ -17,8 +17,10 @@ class _RejectBody(BaseModel):
     reason: str = "Rejected by user"
 
 
+# ── Background tasks ───────────────────────────────────────────────────────────
+
 def _run_pipeline_background(run_id: uuid.UUID) -> None:
-    """Background task: Requirement Agent → Gap Analysis Agent (sequential)."""
+    """Steps 1+2: Requirement Agent → Gap Analysis Agent (auto-chained)."""
     from app.agents.gap_analysis_agent import GapAnalysisAgentRunner
     from app.agents.requirement_agent import RequirementAgentRunner
     from sqlmodel import Session as _Session
@@ -29,6 +31,30 @@ def _run_pipeline_background(run_id: uuid.UUID) -> None:
     with _Session(engine) as session:
         GapAnalysisAgentRunner(session).run(run_id)
 
+
+def _run_ba_agent_background(run_id: uuid.UUID) -> None:
+    """Step 3: BA Agent — triggered by Gate 1 approval."""
+    from app.agents.ba_agent import BAAgentRunner
+    from sqlmodel import Session as _Session
+
+    with _Session(engine) as session:
+        BAAgentRunner(session).run(run_id)
+
+
+# ── Gate approval helpers ──────────────────────────────────────────────────────
+
+# Maps step_name → next step to create on approval
+_NEXT_STEP: dict[str, str | None] = {
+    "gap_analysis": "ba_documents",   # Gate 1: approve → run BA Agent
+    "ba_documents": None,              # Gate 2: approve → completed (Sprint 11 chains SA)
+}
+
+_NEXT_BACKGROUND: dict[str, object] = {
+    "ba_documents": _run_ba_agent_background,
+}
+
+
+# ── Routes ─────────────────────────────────────────────────────────────────────
 
 @router.post("/{project_id}/pipeline/runs", response_model=PipelineRunResponse, status_code=201)
 def start_pipeline_run(
@@ -76,9 +102,9 @@ def approve_step(
     project_id: uuid.UUID,
     run_id: uuid.UUID,
     step_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
 ):
-    """Gate 1: human approves gap analysis. Sprint 10 will chain to BA Agent."""
     run = session.exec(
         select(PipelineRun).where(
             PipelineRun.id == run_id,
@@ -94,10 +120,29 @@ def approve_step(
     if not step or step.pipeline_run_id != run_id:
         raise HTTPException(status_code=404, detail={"error_code": "NOT_FOUND", "message": "Step not found"})
 
-    run.status = PipelineRunStatus.completed
-    run.completed_at = datetime.utcnow()
-    session.commit()
-    return {"status": "approved", "run_id": str(run_id)}
+    next_step_name = _NEXT_STEP.get(step.step_name)
+
+    if next_step_name is not None:
+        # Create next step and fire its background agent
+        next_step = PipelineStep(
+            pipeline_run_id=run_id,
+            step_name=next_step_name,
+            status=PipelineStepStatus.pending,
+        )
+        session.add(next_step)
+        run.status = PipelineRunStatus.running
+        run.current_step = None
+        session.commit()
+        background_fn = _NEXT_BACKGROUND.get(next_step_name)
+        if background_fn:
+            background_tasks.add_task(background_fn, run_id)
+        return {"status": "approved", "next": next_step_name}
+    else:
+        # Final gate — no more agents (Sprint 11 will chain SA Agent here)
+        run.status = PipelineRunStatus.completed
+        run.completed_at = datetime.utcnow()
+        session.commit()
+        return {"status": "approved", "run_id": str(run_id)}
 
 
 @router.post("/{project_id}/pipeline/runs/{run_id}/steps/{step_id}/reject", status_code=200)
@@ -108,7 +153,6 @@ def reject_step(
     body: _RejectBody,
     session: Session = Depends(get_session),
 ):
-    """Gate 1: human rejects gap analysis — marks run as failed."""
     run = session.exec(
         select(PipelineRun).where(
             PipelineRun.id == run_id,
@@ -138,4 +182,4 @@ def rerun_step(
     step_id: uuid.UUID,
     session: Session = Depends(get_session),
 ):
-    raise HTTPException(status_code=501, detail={"error_code": "NOT_IMPLEMENTED", "message": "Step rerun — Sprint 10"})
+    raise HTTPException(status_code=501, detail={"error_code": "NOT_IMPLEMENTED", "message": "Step rerun — Sprint 11"})

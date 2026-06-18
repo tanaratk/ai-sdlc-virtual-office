@@ -1,6 +1,6 @@
 # AI-SDLC Virtual Office — Progress Tracker
 
-**Last Updated:** 2026-06-18 (Sprint 9 complete)  
+**Last Updated:** 2026-06-18 (Sprint 10 complete)  
 **Project:** ai-sdlc-virtual-office  
 **Repo:** https://github.com/tanaratk/ai-sdlc-virtual-office  
 **Working Directory:** D:\AI_Office
@@ -39,14 +39,15 @@
 | 7 | Frontend Skeleton | ✅ Done |
 | 8 | Requirement Agent MVP | ✅ Done |
 | 9 | Gap Analysis Agent MVP | ✅ Done |
-| 10–20 | Agent MVP + Features | 🔲 |
+| 10 | BA Agent MVP | ✅ Done |
+| 11–20 | Agent MVP + Features | 🔲 |
 
 ## Next Sprint
 
-**Sprint 10 — BA Agent MVP**
-- Implement BA Agent runtime (load approved gap_analysis_report → generate BRD, FSD, User Stories)
-- Chain from Gate 1 approval → BA Agent
-- Human review Gate 2: approve/reject BA documents
+**Sprint 11 — Solution Architect Agent MVP**
+- Implement SA Agent runtime (read approved BRD+FSD → generate Architecture, DB Design, API Spec)
+- Chain from Gate 2 approval → SA Agent
+- Gate 3: approve/reject SA documents
 
 ---
 
