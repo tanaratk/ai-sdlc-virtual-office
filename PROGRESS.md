@@ -1,6 +1,6 @@
 # AI-SDLC Virtual Office — Progress Tracker
 
-**Last Updated:** 2026-06-18  
+**Last Updated:** 2026-06-18 (Sprint 6 complete)  
 **Project:** ai-sdlc-virtual-office  
 **Repo:** https://github.com/tanaratk/ai-sdlc-virtual-office  
 **Working Directory:** D:\AI_Office
@@ -35,18 +35,19 @@
 | 3 | Database Design | ✅ Done |
 | 4 | API Design | ✅ Done |
 | 5 | Workflow Design | ✅ Done |
-| 6 | Backend Skeleton | 🔲 |
+| 6 | Backend Skeleton | ✅ Done |
 | 7 | Frontend Skeleton | 🔲 |
 | 8–20 | Agent MVP + Features | 🔲 |
 
 ## Next Sprint
 
-**Sprint 6 — Backend Skeleton**
-- Initialize FastAPI project structure (`backend/`)
-- SQLModel table definitions (Python)
-- Alembic migration files
-- Docker Compose (`infra/docker-compose.yml`)
-- Database `ai_sdlc` created for real
+**Sprint 7 — Frontend Skeleton**
+- Initialize React + Vite + TypeScript + Tailwind project (`frontend/`)
+- shadcn/ui setup
+- Route structure (React Router)
+- Basic layout shell (sidebar, topbar)
+- API client stub (`src/api/`)
+- Vitest + Playwright setup
 
 ---
 
