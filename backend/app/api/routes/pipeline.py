@@ -41,16 +41,27 @@ def _run_ba_agent_background(run_id: uuid.UUID) -> None:
         BAAgentRunner(session).run(run_id)
 
 
+def _run_sa_agent_background(run_id: uuid.UUID) -> None:
+    """Step 4: SA Agent — triggered by Gate 2 approval."""
+    from app.agents.sa_agent import SAAgentRunner
+    from sqlmodel import Session as _Session
+
+    with _Session(engine) as session:
+        SAAgentRunner(session).run(run_id)
+
+
 # ── Gate approval helpers ──────────────────────────────────────────────────────
 
 # Maps step_name → next step to create on approval
 _NEXT_STEP: dict[str, str | None] = {
     "gap_analysis": "ba_documents",   # Gate 1: approve → run BA Agent
-    "ba_documents": None,              # Gate 2: approve → completed (Sprint 11 chains SA)
+    "ba_documents": "sa_documents",   # Gate 2: approve → run SA Agent
+    "sa_documents": None,             # Gate 3: approve → completed (Sprint 12 chains UX)
 }
 
 _NEXT_BACKGROUND: dict[str, object] = {
     "ba_documents": _run_ba_agent_background,
+    "sa_documents": _run_sa_agent_background,
 }
 
 
