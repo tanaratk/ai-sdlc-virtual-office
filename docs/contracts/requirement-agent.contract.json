@@ -1,0 +1,176 @@
+{
+  "agent": {
+    "id": "requirement-agent",
+    "name": "Requirement Agent",
+    "role": "requirement_analyst",
+    "version": "1.0.0",
+    "description": "Collects, reads, and summarizes requirements from various input sources into a structured Requirement Summary document.",
+    "home_zone": "requirement_room",
+    "model_provider": "ollama",
+    "default_model": "qwen3:8b"
+  },
+
+  "input": {
+    "description": "One or more requirement sources provided by the user",
+    "required_fields": [
+      {
+        "field": "project_id",
+        "type": "string (UUID)",
+        "description": "ID of the project this requirement belongs to"
+      },
+      {
+        "field": "input_type",
+        "type": "enum",
+        "allowed_values": [
+          "manual_text",
+          "meeting_transcript",
+          "chat_log",
+          "markdown_document",
+          "email_content",
+          "audio_transcript"
+        ],
+        "description": "Type of the requirement source"
+      },
+      {
+        "field": "content",
+        "type": "string",
+        "description": "Raw requirement text or transcript to be processed"
+      }
+    ],
+    "optional_fields": [
+      {
+        "field": "title",
+        "type": "string",
+        "description": "Short label for this input (e.g. 'Kick-off meeting 2026-06-18')"
+      },
+      {
+        "field": "source_owner",
+        "type": "string",
+        "description": "Person or team who provided this input"
+      },
+      {
+        "field": "source_date",
+        "type": "string (ISO 8601)",
+        "description": "Date the source was created or recorded"
+      },
+      {
+        "field": "tags",
+        "type": "array of strings",
+        "description": "Labels for categorisation (e.g. ['finance', 'approval-flow'])"
+      },
+      {
+        "field": "priority",
+        "type": "enum",
+        "allowed_values": ["low", "medium", "high", "critical"],
+        "description": "Business priority of this input"
+      }
+    ],
+    "constraints": [
+      "content must not be empty",
+      "content maximum length: 32,000 characters per call",
+      "project_id must reference an existing project"
+    ]
+  },
+
+  "output": {
+    "description": "Structured Requirement Summary document saved to the documents table",
+    "document_type": "requirement_summary",
+    "format": "markdown",
+    "template_ref": "docs/templates/requirement-summary.template.md",
+    "sections": [
+      {
+        "section": "business_objective",
+        "required": true,
+        "description": "High-level goal the system must achieve"
+      },
+      {
+        "section": "scope",
+        "required": true,
+        "sub_sections": ["in_scope", "out_of_scope"]
+      },
+      {
+        "section": "functional_requirements",
+        "required": true,
+        "format": "table",
+        "columns": ["ID", "Requirement", "Source", "Priority"]
+      },
+      {
+        "section": "non_functional_requirements",
+        "required": true,
+        "format": "table",
+        "columns": ["ID", "Requirement", "Category", "Priority"]
+      },
+      {
+        "section": "stakeholders",
+        "required": false,
+        "format": "table",
+        "columns": ["Role", "Responsibility", "Involvement"]
+      },
+      {
+        "section": "assumptions",
+        "required": true,
+        "format": "list"
+      },
+      {
+        "section": "constraints",
+        "required": true,
+        "format": "list"
+      },
+      {
+        "section": "business_rules",
+        "required": false,
+        "format": "list"
+      },
+      {
+        "section": "open_questions",
+        "required": true,
+        "format": "numbered_list",
+        "description": "Items needing clarification before design can proceed"
+      }
+    ],
+    "metadata": {
+      "agent_id": "requirement-agent",
+      "pipeline_step": "requirement_summary",
+      "version": 1,
+      "status": "draft"
+    }
+  },
+
+  "responsibilities": [
+    "Summarise the main requirements from the provided input",
+    "Separate business objectives from technical details",
+    "Identify and list in-scope and out-of-scope items",
+    "Extract assumptions and constraints explicitly stated or implied",
+    "Identify stakeholders mentioned in the input",
+    "List preliminary business rules",
+    "Raise open questions for anything ambiguous or missing",
+    "Do NOT invent information — mark gaps as 'Need clarification'"
+  ],
+
+  "handoff": {
+    "on_success": {
+      "next_agent": "gap-analysis-agent",
+      "trigger": "document_created",
+      "payload_fields": ["project_id", "document_id", "content_markdown"]
+    },
+    "on_failure": {
+      "action": "notify_user",
+      "message": "Requirement Agent failed to produce a summary. Please review the input and retry."
+    }
+  },
+
+  "pipeline_step": {
+    "step_name": "requirement_summary",
+    "step_order": 1,
+    "total_steps": 10,
+    "timeout_seconds": 120
+  },
+
+  "office_behaviour": {
+    "idle_zone": "requirement_room",
+    "active_zone": "requirement_room",
+    "status_on_start": "working",
+    "status_on_complete": "done",
+    "chat_bubble_on_handoff": "Requirement summary ready. Passing to Gap Analysis Agent."
+  }
+}
