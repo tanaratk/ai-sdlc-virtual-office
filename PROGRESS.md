@@ -1,6 +1,6 @@
 # AI-SDLC Virtual Office — Progress Tracker
 
-**Last Updated:** 2026-06-18 (Sprint 6 complete)  
+**Last Updated:** 2026-06-18 (Sprint 7 complete)  
 **Project:** ai-sdlc-virtual-office  
 **Repo:** https://github.com/tanaratk/ai-sdlc-virtual-office  
 **Working Directory:** D:\AI_Office
@@ -36,18 +36,16 @@
 | 4 | API Design | ✅ Done |
 | 5 | Workflow Design | ✅ Done |
 | 6 | Backend Skeleton | ✅ Done |
-| 7 | Frontend Skeleton | 🔲 |
+| 7 | Frontend Skeleton | ✅ Done |
 | 8–20 | Agent MVP + Features | 🔲 |
 
 ## Next Sprint
 
-**Sprint 7 — Frontend Skeleton**
-- Initialize React + Vite + TypeScript + Tailwind project (`frontend/`)
-- shadcn/ui setup
-- Route structure (React Router)
-- Basic layout shell (sidebar, topbar)
-- API client stub (`src/api/`)
-- Vitest + Playwright setup
+**Sprint 8 — Requirement Agent MVP**
+- Implement Requirement Agent runtime (load contract → build prompt → call Ollama → validate JSON → save)
+- Backend: `POST /projects/{id}/pipeline/runs` fully wired
+- Frontend: Agent Console calls real backend, shows live status
+- Every requirement gets an FR/NFR/BR ID
 
 ---
 
