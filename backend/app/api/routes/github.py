@@ -33,8 +33,8 @@ class GitHubSettingUpsert(BaseModel):
 
 
 class GitHubSettingResponse(BaseModel):
-    id: str
-    project_id: str
+    id: uuid.UUID
+    project_id: uuid.UUID
     repo_owner: str
     repo_name: str
     default_branch: str
@@ -53,8 +53,8 @@ class GitHubVerifyResponse(BaseModel):
 
 
 class GitHubIssueResponse(BaseModel):
-    id: str
-    project_id: str
+    id: uuid.UUID
+    project_id: uuid.UUID
     issue_number: int
     issue_url: str
     title: str

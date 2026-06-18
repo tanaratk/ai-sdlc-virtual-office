@@ -26,7 +26,7 @@ call_router = APIRouter()
 # ── Schemas ────────────────────────────────────────────────────────────────────
 
 class McpToolResponse(BaseModel):
-    id: str
+    id: uuid.UUID
     tool_name: str
     display_name: str
     description: str
@@ -43,10 +43,10 @@ class McpToolUpdate(BaseModel):
 
 
 class McpToolCallResponse(BaseModel):
-    id: str
-    project_id: str
+    id: uuid.UUID
+    project_id: uuid.UUID
     tool_name: str
-    agent_id: Optional[str]
+    agent_id: Optional[uuid.UUID]
     status: str
     input_json: Optional[dict[str, Any]]
     output_json: Optional[dict[str, Any]]

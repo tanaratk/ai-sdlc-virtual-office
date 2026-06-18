@@ -339,6 +339,9 @@ def _render_api_spec(data: APISpecOutput, project_id: str, doc_id: str) -> str:
             res_rows += f"| `{f.name}` | {f.type} | {req_str} | {f.description} |\n"
 
         ref = f" ← {ep.requirement_ref}" if ep.requirement_ref else ""
+        _req_hdr = "| Field | Type | Required | Description |\n|---|---|---|---|\n"
+        _req_block = (_req_hdr + req_rows) if req_rows else "> No request body."
+        _res_block = (_req_hdr + res_rows) if res_rows else "> No response fields defined."
         endpoints_section += f"""
 ### {ep.id}{ref} — `{ep.method} {data.base_url}{ep.path}`
 
@@ -346,11 +349,11 @@ def _render_api_spec(data: APISpecOutput, project_id: str, doc_id: str) -> str:
 
 **Request Fields:**
 
-{"| Field | Type | Required | Description |\n|---|---|---|---|\n" + req_rows if req_rows else "> No request body."}
+{_req_block}
 
 **Response Fields:**
 
-{"| Field | Type | Required | Description |\n|---|---|---|---|\n" + res_rows if res_rows else "> No response fields defined."}
+{_res_block}
 
 ---
 """

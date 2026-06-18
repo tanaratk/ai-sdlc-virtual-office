@@ -128,6 +128,7 @@ def _render_markdown(
 
     recs = "\n".join(f"{i+1}. {r}" for i, r in enumerate(data.recommendations)) \
         if data.recommendations else "> No additional recommendations."
+    summary_table = summary_rows if summary_rows else "| (none) | 0 |\n"
 
     return f"""\
 # Gap Analysis Report
@@ -156,7 +157,7 @@ def _render_markdown(
 
 | Category | Count |
 |---|---|
-{summary_rows if summary_rows else "| (none) | 0 |\n"}
+{summary_table}
 **Total gaps found: {len(data.gaps)}**
 
 ---

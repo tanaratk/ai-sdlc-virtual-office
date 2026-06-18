@@ -160,6 +160,8 @@ def _render_screen_spec(data: UXAgentOutput, project_id: str, doc_id: str) -> st
 
         actions_str = "\n".join(f"- `{a}`" for a in s.actions) if s.actions else "> No actions defined."
         nav_str = "\n".join(f"- {n}" for n in s.navigation) if s.navigation else "> No navigation defined."
+        _fld_hdr = "| Field | Type | Required | Validation | Description |\n|---|---|---|---|---|\n"
+        _fld_block = (_fld_hdr + field_rows) if field_rows else "> No input fields on this screen."
 
         screens_detail += f"""
 ### {s.id} — {s.name}
@@ -171,7 +173,7 @@ def _render_screen_spec(data: UXAgentOutput, project_id: str, doc_id: str) -> st
 
 **Fields:**
 
-{"| Field | Type | Required | Validation | Description |\n|---|---|---|---|---|\n" + field_rows if field_rows else "> No input fields on this screen."}
+{_fld_block}
 
 **Actions:**
 

@@ -17,37 +17,6 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # ── Enums ──────────────────────────────────────────────────────────────────
-    op.execute("CREATE TYPE project_status AS ENUM ('active', 'archived', 'completed')")
-    op.execute("CREATE TYPE input_type AS ENUM ('manual_text', 'meeting_transcript', 'chat_log', 'markdown_document', 'email_content', 'audio_transcript')")
-    op.execute("CREATE TYPE agent_status AS ENUM ('idle', 'working', 'done', 'error')")
-    op.execute("CREATE TYPE sprite_direction AS ENUM ('up', 'down', 'left', 'right')")
-    op.execute("CREATE TYPE model_provider AS ENUM ('ollama', 'openai')")
-    op.execute("CREATE TYPE task_status AS ENUM ('pending', 'in_progress', 'done', 'failed', 'cancelled')")
-    op.execute("CREATE TYPE task_priority AS ENUM ('low', 'medium', 'high', 'critical')")
-    op.execute("CREATE TYPE pipeline_run_status AS ENUM ('pending', 'running', 'waiting_for_user', 'completed', 'failed', 'cancelled')")
-    op.execute("CREATE TYPE pipeline_step_status AS ENUM ('pending', 'running', 'completed', 'failed', 'skipped')")
-    op.execute("""CREATE TYPE document_type AS ENUM (
-        'requirement_summary', 'gap_analysis_report', 'brd', 'fsd', 'user_story',
-        'architecture_design', 'database_design', 'api_spec', 'screen_spec',
-        'code_task_list', 'test_cases', 'uat_script', 'change_impact_report',
-        'compiled_documents', 'project_summary', 'delivery_report'
-    )""")
-    op.execute("CREATE TYPE document_status AS ENUM ('draft', 'review', 'approved', 'rejected', 'superseded')")
-    op.execute("CREATE TYPE actor_type AS ENUM ('agent', 'user', 'system')")
-    op.execute("CREATE TYPE message_type AS ENUM ('handoff', 'chat', 'notification', 'system')")
-    op.execute("""CREATE TYPE event_type AS ENUM (
-        'task_started', 'task_completed', 'task_failed',
-        'agent_moved', 'document_created', 'document_approved', 'document_rejected',
-        'pipeline_step_started', 'pipeline_step_completed',
-        'handoff_sent', 'user_message'
-    )""")
-    op.execute("CREATE TYPE link_type AS ENUM ('derived_from', 'implements', 'tests', 'conflicts_with')")
-    op.execute("CREATE TYPE artifact_type AS ENUM ('requirement_input', 'document', 'task', 'pipeline_step')")
-    op.execute("CREATE TYPE memory_type AS ENUM ('context', 'decision', 'fact', 'instruction')")
-    op.execute("CREATE TYPE sprint_status AS ENUM ('not_started', 'in_progress', 'done', 'overdue')")
-    op.execute("CREATE TYPE milestone_status AS ENUM ('not_started', 'in_progress', 'done', 'overdue')")
-
     # ── Batch 1: No FK dependencies ────────────────────────────────────────────
     op.create_table(
         "projects",
@@ -90,7 +59,7 @@ def upgrade() -> None:
     op.create_table(
         "llm_settings",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-        sa.Column("provider", sa.Enum("ollama", "openai", name="model_provider"), nullable=False),
+        sa.Column("provider", sa.Enum("ollama", "openai", name="model_provider", create_type=False), nullable=False),
         sa.Column("base_url", sa.Text),
         sa.Column("model_name", sa.String(100), nullable=False),
         sa.Column("api_key_encrypted", sa.Text),
@@ -249,7 +218,7 @@ def upgrade() -> None:
         sa.Column("task_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("tasks.id", ondelete="SET NULL")),
         sa.Column("sender_type", sa.Enum("agent", "user", "system", name="actor_type"), nullable=False),
         sa.Column("sender_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("receiver_type", sa.Enum("agent", "user", "system", name="actor_type"), nullable=False),
+        sa.Column("receiver_type", sa.Enum("agent", "user", "system", name="actor_type", create_type=False), nullable=False),
         sa.Column("receiver_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("content", sa.Text, nullable=False),
         sa.Column("message_type", sa.Enum("handoff", "chat", "notification", "system", name="message_type"), nullable=False, server_default="chat"),
@@ -284,7 +253,7 @@ def upgrade() -> None:
         sa.Column("project_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("projects.id", ondelete="CASCADE"), nullable=False),
         sa.Column("source_type", sa.Enum("requirement_input", "document", "task", "pipeline_step", name="artifact_type"), nullable=False),
         sa.Column("source_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("target_type", sa.Enum("requirement_input", "document", "task", "pipeline_step", name="artifact_type"), nullable=False),
+        sa.Column("target_type", sa.Enum("requirement_input", "document", "task", "pipeline_step", name="artifact_type", create_type=False), nullable=False),
         sa.Column("target_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("link_type", sa.Enum("derived_from", "implements", "tests", "conflicts_with", name="link_type"), nullable=False),
         sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=False, server_default=sa.text("now()")),

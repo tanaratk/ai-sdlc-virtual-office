@@ -174,10 +174,9 @@ export function TraceabilityMatrix({ projectId }: TraceabilityMatrixProps) {
                         <td key={dt} className="px-2 py-2 text-center">
                           {doc ? (
                             linked ? (
-                              <CheckCircle2
-                                className="h-3.5 w-3.5 text-green-500 mx-auto"
-                                title={`Linked to ${doc.title}`}
-                              />
+                              <span title={`Linked to ${doc.title}`}>
+                                <CheckCircle2 className="h-3.5 w-3.5 text-green-500 mx-auto" />
+                              </span>
                             ) : (
                               <span
                                 className="inline-block h-2 w-2 rounded-full bg-yellow-400 mx-auto"
@@ -185,10 +184,9 @@ export function TraceabilityMatrix({ projectId }: TraceabilityMatrixProps) {
                               />
                             )
                           ) : (
-                            <XCircle
-                              className="h-3 w-3 text-muted-foreground/30 mx-auto"
-                              title="No document generated yet"
-                            />
+                            <span title="No document generated yet">
+                              <XCircle className="h-3 w-3 text-muted-foreground/30 mx-auto" />
+                            </span>
                           )}
                         </td>
                       );
