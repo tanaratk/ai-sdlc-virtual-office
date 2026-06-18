@@ -1,0 +1,239 @@
+{
+  "agent": {
+    "id": "gap-analysis-agent",
+    "name": "Gap Analysis Agent",
+    "role": "gap_analyst",
+    "version": "1.0.0",
+    "description": "Reviews the Requirement Summary produced by the Requirement Agent and identifies missing, ambiguous, conflicting, or incomplete requirements before BA documentation begins.",
+    "home_zone": "gap_analysis_room",
+    "model_provider": "ollama",
+    "default_model": "qwen3:8b"
+  },
+
+  "input": {
+    "description": "Requirement Summary document from the Requirement Agent plus optional prior-version for comparison",
+    "required_fields": [
+      {
+        "field": "project_id",
+        "type": "string (UUID)",
+        "description": "ID of the project being analysed"
+      },
+      {
+        "field": "requirement_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the Requirement Summary document to analyse"
+      },
+      {
+        "field": "content_markdown",
+        "type": "string",
+        "description": "Full markdown content of the Requirement Summary"
+      }
+    ],
+    "optional_fields": [
+      {
+        "field": "previous_document_id",
+        "type": "string (UUID)",
+        "description": "ID of a prior Requirement Summary version for change-comparison gap analysis"
+      },
+      {
+        "field": "previous_content_markdown",
+        "type": "string",
+        "description": "Markdown content of the previous version (required when previous_document_id is provided)"
+      },
+      {
+        "field": "context_notes",
+        "type": "string",
+        "description": "Additional context or focus areas supplied by the user (e.g. 'focus on approval flow gaps')"
+      }
+    ],
+    "constraints": [
+      "content_markdown must not be empty",
+      "content_markdown maximum length: 32,000 characters per call",
+      "project_id must reference an existing project",
+      "requirement_document_id must reference a document of type requirement_summary"
+    ]
+  },
+
+  "output": {
+    "description": "Structured Gap Analysis Report saved to the documents table",
+    "document_type": "gap_analysis_report",
+    "format": "markdown",
+    "template_ref": "docs/templates/gap-analysis-report.template.md",
+    "sections": [
+      {
+        "section": "gap_summary",
+        "required": true,
+        "description": "Executive summary: total gaps found, severity breakdown, and recommendation to proceed or hold"
+      },
+      {
+        "section": "critical_gaps",
+        "required": true,
+        "format": "table",
+        "columns": ["Gap ID", "Description", "Impact", "Severity", "Question"]
+      },
+      {
+        "section": "ambiguous_requirements",
+        "required": true,
+        "format": "table",
+        "columns": ["Req ID", "Ambiguity", "Suggested Clarification"]
+      },
+      {
+        "section": "conflicts",
+        "required": true,
+        "format": "table",
+        "columns": ["Conflict ID", "Source A", "Source B", "Recommendation"]
+      },
+      {
+        "section": "duplicate_requirements",
+        "required": false,
+        "format": "table",
+        "columns": ["Dup ID", "Requirement A", "Requirement B", "Action"]
+      },
+      {
+        "section": "dependency_gaps",
+        "required": false,
+        "format": "table",
+        "columns": ["Dep ID", "Dependency", "Missing Detail", "Impact"]
+      },
+      {
+        "section": "integration_gaps",
+        "required": false,
+        "format": "table",
+        "columns": ["Int ID", "System / API", "Missing Detail", "Risk"]
+      },
+      {
+        "section": "data_gaps",
+        "required": false,
+        "format": "table",
+        "columns": ["Data ID", "Entity / Field", "Missing Detail", "Impact"]
+      },
+      {
+        "section": "security_gaps",
+        "required": false,
+        "format": "table",
+        "columns": ["Sec ID", "Area", "Missing Detail", "Risk Level"]
+      },
+      {
+        "section": "approval_gaps",
+        "required": false,
+        "format": "table",
+        "columns": ["Appr ID", "Approval Point", "Missing Detail (Level / Role / SLA / Escalation)"],
+        "trigger_rule": "Raise an Approval Gap whenever a requirement mentions approval, authorisation, or sign-off but does not specify: Approval Level, Approver Role, SLA, or Escalation Rule"
+      },
+      {
+        "section": "reporting_gaps",
+        "required": false,
+        "format": "table",
+        "columns": ["Rep ID", "Report / Dashboard", "Missing Detail", "Audience"]
+      },
+      {
+        "section": "risk_list",
+        "required": true,
+        "format": "table",
+        "columns": ["Risk ID", "Description", "Likelihood", "Impact", "Mitigation"]
+      },
+      {
+        "section": "clarification_questions",
+        "required": true,
+        "format": "numbered_list",
+        "description": "Prioritised list of questions to be answered by the user or BA before work continues"
+      },
+      {
+        "section": "recommendations",
+        "required": true,
+        "format": "list",
+        "description": "Actionable recommendations (e.g. 'Hold BA phase until approval flow is clarified')"
+      }
+    ],
+    "metadata": {
+      "agent_id": "gap-analysis-agent",
+      "pipeline_step": "gap_analysis",
+      "version": 1,
+      "status": "draft"
+    }
+  },
+
+  "gap_categories": [
+    "missing",
+    "ambiguous",
+    "conflict",
+    "duplicate",
+    "dependency",
+    "risk",
+    "out_of_scope_risk",
+    "integration_gap",
+    "data_gap",
+    "security_gap",
+    "approval_gap",
+    "reporting_gap"
+  ],
+
+  "severity_levels": [
+    {
+      "level": "critical",
+      "definition": "Blocks design or development from starting; must be resolved before BA phase"
+    },
+    {
+      "level": "high",
+      "definition": "Significant risk to scope or quality; should be resolved before BA phase"
+    },
+    {
+      "level": "medium",
+      "definition": "Notable gap that may cause rework; should be clarified during BA phase"
+    },
+    {
+      "level": "low",
+      "definition": "Minor ambiguity or assumption that can be resolved during development"
+    }
+  ],
+
+  "responsibilities": [
+    "Review every functional and non-functional requirement for completeness",
+    "Identify Missing requirements not stated but implied by business context",
+    "Flag Ambiguous requirements that have more than one reasonable interpretation",
+    "Detect Conflicts between two or more requirements",
+    "Spot Duplicate requirements that describe the same behaviour",
+    "Identify unclear Dependencies between requirements or external systems",
+    "Check for Integration gaps where an external system is mentioned but not specified",
+    "Check for Data gaps where entities or fields are mentioned but not defined",
+    "Check for Security gaps (authentication, authorisation, encryption, audit)",
+    "Apply the Approval Gap rule to every approval-related requirement",
+    "Check for Reporting gaps where dashboards or reports are implied but not specified",
+    "Generate a prioritised list of clarification questions for the user or BA",
+    "Do NOT resolve gaps silently — every gap must be visible in the report"
+  ],
+
+  "handoff": {
+    "on_success": {
+      "next_agent": "ba-agent",
+      "trigger": "document_created",
+      "payload_fields": [
+        "project_id",
+        "requirement_document_id",
+        "gap_document_id",
+        "content_markdown",
+        "critical_gap_count"
+      ],
+      "condition": "Proceed to BA Agent. If critical_gap_count > 0, flag for user review before BA phase."
+    },
+    "on_failure": {
+      "action": "notify_user",
+      "message": "Gap Analysis Agent failed to produce a report. Please review the Requirement Summary and retry."
+    }
+  },
+
+  "pipeline_step": {
+    "step_name": "gap_analysis",
+    "step_order": 2,
+    "total_steps": 10,
+    "timeout_seconds": 180
+  },
+
+  "office_behaviour": {
+    "idle_zone": "gap_analysis_room",
+    "active_zone": "gap_analysis_room",
+    "status_on_start": "working",
+    "status_on_complete": "done",
+    "chat_bubble_on_handoff": "Gap analysis complete. {critical_gap_count} critical gap(s) found. Passing to BA Agent."
+  }
+}
