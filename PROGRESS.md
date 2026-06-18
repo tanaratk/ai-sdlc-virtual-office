@@ -1,6 +1,6 @@
 # AI-SDLC Virtual Office — Progress Tracker
 
-**Last Updated:** 2026-06-18 (Sprint 21 — Documentation Agent MVP complete)  
+**Last Updated:** 2026-06-18 (Sprint 22 — PM Agent MVP complete — 10-step pipeline DONE)  
 **Project:** ai-sdlc-virtual-office  
 **Repo:** https://github.com/tanaratk/ai-sdlc-virtual-office  
 **Working Directory:** D:\AI_Office
@@ -51,13 +51,12 @@
 | 19 | MCP MVP | ✅ Done |
 | 20 | Change Impact Agent MVP | ✅ Done |
 | 21 | Documentation Agent MVP | ✅ Done |
+| 22 | PM Agent MVP | ✅ Done |
 
 ## Next Sprint
 
-**Sprint 22 — PM Agent MVP** (Step 10: project summary + delivery report)
+**Sprint 23 — Docker + CI/CD** (infra: docker-compose verify + GitHub Actions)
 - Or **Sprint 17 — RAG MVP** (deferred — no active use case yet)
-- Trigger when: real project document hits LLM context-window limit
-- OR: need cross-project search / company knowledge base
 
 ---
 
