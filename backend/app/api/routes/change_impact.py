@@ -2,7 +2,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlmodel import Session
 
@@ -17,7 +17,7 @@ router = APIRouter()
 
 class ChangeImpactRequest(BaseModel):
     change_description: str = Field(..., min_length=10)
-    changed_requirement_ids: list[str] = Field(..., min_items=1)
+    changed_requirement_ids: list[str] = Field(..., min_length=1)
     context_notes: str = ""
 
 
@@ -44,7 +44,6 @@ class ChangeImpactResponse(BaseModel):
 def run_change_impact(
     project_id: uuid.UUID,
     body: ChangeImpactRequest,
-    background_tasks: BackgroundTasks,
     session: Annotated[Session, Depends(get_session)],
 ) -> ChangeImpactResponse:
     project = session.get(Project, project_id)

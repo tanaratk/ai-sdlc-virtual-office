@@ -21,8 +21,6 @@ from app.db.models import (
     DocumentStatus,
     DocumentType,
     EventType,
-    PipelineRun,
-    PipelineRunStatus,
 )
 from app.llm.client import call_ollama, extract_json
 
@@ -240,6 +238,11 @@ TEST CASES (if available):
 
 # ── Markdown renderer ──────────────────────────────────────────────────────────
 
+def _cell(s: str) -> str:
+    """Escape pipe characters so they don't break Markdown table columns."""
+    return s.replace("|", "\\|")
+
+
 def _render_report(
     output: ChangeImpactOutput,
     project_id: str,
@@ -258,8 +261,8 @@ def _render_report(
         if not output.affected_artifacts:
             return "| — | — | — | — |\n"
         return "".join(
-            f"| {a.artifact_type} | {a.affected_section} "
-            f"| {a.nature} | {a.effort_days}d |\n"
+            f"| {_cell(a.artifact_type)} | {_cell(a.affected_section)} "
+            f"| {_cell(a.nature)} | {a.effort_days}d |\n"
             for a in output.affected_artifacts
         )
 
@@ -268,7 +271,8 @@ def _render_report(
             return ""
         rows = "| FSD ID | Current Text | Required Change | Priority |\n|---|---|---|---|\n"
         rows += "".join(
-            f"| {i.artifact_id} | {i.current_text} | {i.required_change} | {i.priority} |\n"
+            f"| {_cell(i.artifact_id)} | {_cell(i.current_text)} "
+            f"| {_cell(i.required_change)} | {_cell(i.priority)} |\n"
             for i in output.fsd_impacts
         )
         return f"\n### FSD Impact\n\n{rows}"
@@ -278,9 +282,9 @@ def _render_report(
             return ""
         rows = "| API ID | Endpoint | Change Type | Breaking? | Migration? |\n|---|---|---|---|---|\n"
         rows += "".join(
-            f"| {i.api_id} | `{i.endpoint}` | {i.change_type} "
-            f"| {'⚠️ Yes' if i.breaking_change else 'No'} "
-            f"| {'⚠️ Yes' if i.migration_required else 'No'} |\n"
+            f"| {_cell(i.api_id)} | `{_cell(i.endpoint)}` | {_cell(i.change_type)} "
+            f"| {'Yes' if i.breaking_change else 'No'} "
+            f"| {'Yes' if i.migration_required else 'No'} |\n"
             for i in output.api_impacts
         )
         return f"\n### API Impact\n\n{rows}"
@@ -290,8 +294,8 @@ def _render_report(
             return ""
         rows = "| DB ID | Table / Column | Change Type | Migration? |\n|---|---|---|---|\n"
         rows += "".join(
-            f"| {i.db_id} | `{i.table_column}` | {i.change_type} "
-            f"| {'⚠️ Yes' if i.migration_required else 'No'} |\n"
+            f"| {_cell(i.db_id)} | `{_cell(i.table_column)}` | {_cell(i.change_type)} "
+            f"| {'Yes' if i.migration_required else 'No'} |\n"
             for i in output.database_impacts
         )
         return f"\n### Database Impact\n\n{rows}"
@@ -301,7 +305,8 @@ def _render_report(
             return ""
         rows = "| UI ID | Screen | Affected Component | Required Change |\n|---|---|---|---|\n"
         rows += "".join(
-            f"| {i.ui_id} | {i.screen} | {i.affected_component} | {i.required_change} |\n"
+            f"| {_cell(i.ui_id)} | {_cell(i.screen)} "
+            f"| {_cell(i.affected_component)} | {_cell(i.required_change)} |\n"
             for i in output.screen_impacts
         )
         return f"\n### Screen Impact\n\n{rows}"
@@ -311,7 +316,7 @@ def _render_report(
             return ""
         rows = "| TC ID | Test Description | Action |\n|---|---|---|\n"
         rows += "".join(
-            f"| {i.tc_id} | {i.test_description} | {i.action} |\n"
+            f"| {_cell(i.tc_id)} | {_cell(i.test_description)} | {_cell(i.action)} |\n"
             for i in output.test_case_impacts
         )
         return f"\n### Test Case Impact\n\n{rows}"
@@ -320,7 +325,7 @@ def _render_report(
         if not output.effort_estimate:
             return "| — | — | — | — |\n"
         return "".join(
-            f"| {e.layer} | {e.tasks_affected} | {e.estimated_days}d | {e.notes} |\n"
+            f"| {_cell(e.layer)} | {e.tasks_affected} | {e.estimated_days}d | {_cell(e.notes)} |\n"
             for e in output.effort_estimate
         )
 
@@ -328,7 +333,8 @@ def _render_report(
         if not output.risk_assessment:
             return "| — | — | — | — |\n"
         return "".join(
-            f"| {r.risk} | {r.likelihood} | {r.impact} | {r.mitigation} |\n"
+            f"| {_cell(r.risk)} | {_cell(r.likelihood)} "
+            f"| {_cell(r.impact)} | {_cell(r.mitigation)} |\n"
             for r in output.risk_assessment
         )
 
@@ -474,18 +480,6 @@ class ChangeImpactAgentRunner:
                 created_by_agent_id=agent_row.id if agent_row else None,
             )
             self.session.add(report_doc)
-
-            # Find active pipeline run to log against (if any)
-            active_run = self.session.exec(
-                select(PipelineRun).where(
-                    PipelineRun.project_id == project_id,
-                    PipelineRun.status.in_([
-                        PipelineRunStatus.running,
-                        PipelineRunStatus.waiting_for_user,
-                        PipelineRunStatus.completed,
-                    ]),
-                ).order_by(PipelineRun.created_at.desc())
-            ).first()
 
             self._log_activity(
                 project_id, agent_row,
