@@ -1,0 +1,226 @@
+{
+  "agent": {
+    "id": "change-impact-agent",
+    "name": "Change Impact Agent",
+    "role": "change_analyst",
+    "version": "1.0.0",
+    "description": "Analyses the impact of a requirement change across all downstream artifacts (BRD, FSD, User Stories, Architecture, DB Design, API Spec, Screen Spec, Test Cases) and produces a Change Impact Report with effort estimates.",
+    "home_zone": "change_impact_room",
+    "model_provider": "ollama",
+    "default_model": "qwen3:8b"
+  },
+
+  "input": {
+    "description": "The changed requirement and all downstream document IDs for impact analysis",
+    "required_fields": [
+      {
+        "field": "project_id",
+        "type": "string (UUID)",
+        "description": "ID of the project"
+      },
+      {
+        "field": "change_description",
+        "type": "string",
+        "description": "Clear description of what changed in the requirement (what was there before, what it is now)"
+      },
+      {
+        "field": "changed_requirement_ids",
+        "type": "array of strings",
+        "description": "List of FR/NFR/BR IDs that changed (e.g. ['FR-005', 'FR-011'])"
+      },
+      {
+        "field": "requirement_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the current (updated) Requirement Summary document"
+      },
+      {
+        "field": "requirement_content_markdown",
+        "type": "string",
+        "description": "Full markdown content of the current Requirement Summary"
+      }
+    ],
+    "optional_fields": [
+      {
+        "field": "brd_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the BRD document to analyse for impact"
+      },
+      {
+        "field": "fsd_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the FSD document to analyse for impact"
+      },
+      {
+        "field": "fsd_content_markdown",
+        "type": "string",
+        "description": "Full markdown content of the FSD"
+      },
+      {
+        "field": "api_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the API Specification to analyse for impact"
+      },
+      {
+        "field": "api_content_markdown",
+        "type": "string",
+        "description": "Full markdown content of the API Specification"
+      },
+      {
+        "field": "database_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the Database Design document to analyse for impact"
+      },
+      {
+        "field": "screen_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the Screen Specification to analyse for impact"
+      },
+      {
+        "field": "test_case_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the Test Cases document to analyse for impact"
+      },
+      {
+        "field": "context_notes",
+        "type": "string",
+        "description": "Additional context about why the change was made"
+      }
+    ],
+    "constraints": [
+      "change_description must not be empty",
+      "changed_requirement_ids must contain at least one ID",
+      "requirement_content_markdown must not be empty",
+      "Combined input must not exceed 32,000 characters per call"
+    ]
+  },
+
+  "output": {
+    "description": "Change Impact Report saved to the documents table",
+    "documents": [
+      {
+        "document_type": "change_impact_report",
+        "format": "markdown",
+        "template_ref": "docs/templates/change-impact-report.template.md",
+        "sections": [
+          {
+            "section": "change_summary",
+            "required": true,
+            "description": "What changed, why it changed, and overall impact severity (Low / Medium / High / Critical)"
+          },
+          {
+            "section": "affected_artifacts",
+            "required": true,
+            "format": "table",
+            "columns": ["Artifact Type", "Document ID", "Affected Section/ID", "Nature of Change", "Effort (days)"]
+          },
+          {
+            "section": "brd_impact",
+            "required": false,
+            "format": "table",
+            "columns": ["BR ID", "Current Text", "Required Change", "Priority"]
+          },
+          {
+            "section": "fsd_impact",
+            "required": false,
+            "format": "table",
+            "columns": ["FSD ID", "Current Text", "Required Change", "Priority"]
+          },
+          {
+            "section": "api_impact",
+            "required": false,
+            "format": "table",
+            "columns": ["API ID", "Endpoint", "Change Type", "Breaking Change?", "Migration Required?"]
+          },
+          {
+            "section": "database_impact",
+            "required": false,
+            "format": "table",
+            "columns": ["DB ID", "Table / Column", "Change Type", "Migration Script Required?"]
+          },
+          {
+            "section": "screen_impact",
+            "required": false,
+            "format": "table",
+            "columns": ["UI ID", "Screen", "Affected Component", "Required Change"]
+          },
+          {
+            "section": "test_case_impact",
+            "required": false,
+            "format": "table",
+            "columns": ["TC ID", "Test Description", "Action Required (Update / Add / Delete)"]
+          },
+          {
+            "section": "effort_estimate",
+            "required": true,
+            "format": "table",
+            "columns": ["Layer", "Tasks Affected", "Estimated Days", "Notes"]
+          },
+          {
+            "section": "risk_assessment",
+            "required": true,
+            "format": "table",
+            "columns": ["Risk", "Likelihood", "Impact", "Mitigation"]
+          },
+          {
+            "section": "recommendations",
+            "required": true,
+            "format": "list",
+            "description": "Actionable recommendations (e.g. 'Re-run BA Agent for FSD sections 3.2–3.4')"
+          }
+        ],
+        "metadata": {
+          "agent_id": "change-impact-agent",
+          "pipeline_step": "change_impact",
+          "version": 1,
+          "status": "draft"
+        }
+      }
+    ]
+  },
+
+  "responsibilities": [
+    "Identify every downstream artifact affected by the changed requirement IDs",
+    "Assess impact on BRD, FSD, User Stories, Architecture, DB Design, API Spec, Screen Spec, and Test Cases",
+    "Flag any API changes that are breaking (require client-side updates or migrations)",
+    "Flag any database changes that require a migration script",
+    "Estimate implementation effort per layer in days",
+    "Recommend which upstream agents need to be re-run",
+    "Do NOT resolve or implement any changes — analysis and recommendations only",
+    "Do NOT assess impact on documents not provided as input"
+  ],
+
+  "handoff": {
+    "on_success": {
+      "next_agent": "none",
+      "trigger": "document_created",
+      "payload_fields": [
+        "project_id",
+        "change_impact_document_id",
+        "affected_artifact_count",
+        "total_effort_days",
+        "has_breaking_api_change",
+        "has_db_migration"
+      ],
+      "condition": "Notify user. No automatic next agent — user decides which agents to re-run based on the report."
+    },
+    "on_failure": {
+      "action": "notify_user",
+      "message": "Change Impact Agent failed to produce a report. Please check the input documents and retry."
+    }
+  },
+
+  "pipeline_step": {
+    "step_name": "change_impact",
+    "step_order": 8,
+    "total_steps": 10,
+    "timeout_seconds": 240
+  },
+
+  "office_behaviour": {
+    "idle_zone": "change_impact_room",
+    "active_zone": "change_impact_room",
+    "status_on_start": "working",
+    "status_on_complete": "done",
+    "chat_bubble_on_handoff": "Impact analysis complete: {affected_artifact_count} artifact(s) affected, ~{total_effort_days} day(s) estimated. Review required."
+  }
+}

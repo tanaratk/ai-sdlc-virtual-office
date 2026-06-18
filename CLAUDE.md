@@ -77,8 +77,7 @@ ai-sdlc-virtual-office/
 └── README.md
 ```
 
-> **Note:** Agent contracts live in `docs/agents/` (not `docs/contracts/`).
-> The old `docs/contracts/` folder will be renamed in Sprint 1.
+> **Note:** Agent contracts live in `docs/agents/` — the old `docs/contracts/` folder was removed in Sprint 1.
 
 ---
 

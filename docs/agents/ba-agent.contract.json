@@ -1,0 +1,170 @@
+{
+  "agent": {
+    "id": "ba-agent",
+    "name": "BA Agent",
+    "role": "business_analyst",
+    "version": "1.0.0",
+    "description": "Transforms the approved Requirement Summary and Gap Analysis Report into structured BA documents: Business Requirements Document (BRD), Functional Specification Document (FSD), and User Stories.",
+    "home_zone": "ba_room",
+    "model_provider": "ollama",
+    "default_model": "qwen3:8b"
+  },
+
+  "input": {
+    "description": "Approved Requirement Summary and Gap Analysis Report from upstream agents",
+    "required_fields": [
+      {
+        "field": "project_id",
+        "type": "string (UUID)",
+        "description": "ID of the project being documented"
+      },
+      {
+        "field": "requirement_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved Requirement Summary document"
+      },
+      {
+        "field": "requirement_content_markdown",
+        "type": "string",
+        "description": "Full markdown content of the approved Requirement Summary"
+      },
+      {
+        "field": "gap_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved Gap Analysis Report document"
+      },
+      {
+        "field": "gap_content_markdown",
+        "type": "string",
+        "description": "Full markdown content of the approved Gap Analysis Report"
+      }
+    ],
+    "optional_fields": [
+      {
+        "field": "context_notes",
+        "type": "string",
+        "description": "Additional guidance from the user (e.g. 'focus on approval workflows')"
+      },
+      {
+        "field": "excluded_fr_ids",
+        "type": "array of strings",
+        "description": "FR IDs explicitly excluded from this run (e.g. ['FR-019', 'FR-020'])"
+      }
+    ],
+    "constraints": [
+      "requirement_content_markdown must not be empty",
+      "gap_content_markdown must not be empty",
+      "Combined input must not exceed 32,000 characters per call",
+      "requirement_document_id must reference a document with status approved",
+      "gap_document_id must reference a document with status approved"
+    ]
+  },
+
+  "output": {
+    "description": "Three BA documents saved to the documents table: BRD, FSD, and User Stories",
+    "documents": [
+      {
+        "document_type": "brd",
+        "format": "markdown",
+        "template_ref": "docs/templates/brd.template.md",
+        "sections": [
+          { "section": "executive_summary", "required": true },
+          { "section": "business_objectives", "required": true, "format": "table", "columns": ["ID", "Objective", "Priority", "Success Metric"] },
+          { "section": "stakeholders", "required": true, "format": "table", "columns": ["Role", "Responsibility", "Involvement"] },
+          { "section": "business_requirements", "required": true, "format": "table", "columns": ["BR ID", "Requirement", "Priority", "FR Ref"] },
+          { "section": "business_rules", "required": true, "format": "table", "columns": ["Rule ID", "Rule", "Source"] },
+          { "section": "assumptions_and_constraints", "required": true },
+          { "section": "success_criteria", "required": true, "format": "list" }
+        ],
+        "metadata": {
+          "agent_id": "ba-agent",
+          "pipeline_step": "brd",
+          "version": 1,
+          "status": "draft"
+        }
+      },
+      {
+        "document_type": "fsd",
+        "format": "markdown",
+        "template_ref": "docs/templates/fsd.template.md",
+        "sections": [
+          { "section": "overview", "required": true },
+          { "section": "functional_specifications", "required": true, "format": "table", "columns": ["FSD ID", "FR Ref", "Feature", "Description", "Acceptance Criteria"] },
+          { "section": "business_rules", "required": true, "format": "table", "columns": ["Rule ID", "Rule", "Applies To"] },
+          { "section": "data_requirements", "required": true, "format": "table", "columns": ["Entity", "Fields", "Validation Rules"] },
+          { "section": "integration_requirements", "required": false, "format": "table", "columns": ["System", "Direction", "Protocol", "Notes"] },
+          { "section": "non_functional_requirements", "required": true, "format": "table", "columns": ["NFR ID", "Category", "Requirement", "Priority"] },
+          { "section": "open_items", "required": true, "format": "table", "columns": ["Item ID", "Description", "Owner", "Due By"] }
+        ],
+        "metadata": {
+          "agent_id": "ba-agent",
+          "pipeline_step": "fsd",
+          "version": 1,
+          "status": "draft"
+        }
+      },
+      {
+        "document_type": "user_story",
+        "format": "markdown",
+        "template_ref": "docs/templates/user-story.template.md",
+        "sections": [
+          { "section": "user_story_list", "required": true, "format": "table", "columns": ["Story ID", "As a", "I want to", "So that", "Priority", "FR Ref"] },
+          { "section": "acceptance_criteria", "required": true, "description": "One sub-section per story with Given / When / Then format" },
+          { "section": "story_map", "required": false, "description": "Group stories by Epic and feature area" }
+        ],
+        "metadata": {
+          "agent_id": "ba-agent",
+          "pipeline_step": "user_story",
+          "version": 1,
+          "status": "draft"
+        }
+      }
+    ]
+  },
+
+  "responsibilities": [
+    "Translate every FR in the Requirement Summary into one or more FSD specifications",
+    "Create Business Requirements (BR-XXX) from business objectives — distinct from functional specs",
+    "Write User Stories in 'As a <role>, I want to <action>, so that <benefit>' format",
+    "Provide Given/When/Then acceptance criteria for every User Story",
+    "Reference FR-XXX IDs in every FSD specification and User Story",
+    "Include all gaps from the Gap Analysis Report as open items in the FSD",
+    "Do NOT invent requirements not present in the input documents",
+    "Do NOT resolve open questions — carry them forward as FSD open items"
+  ],
+
+  "handoff": {
+    "on_success": {
+      "next_agent": "architect-agent",
+      "trigger": "documents_created",
+      "payload_fields": [
+        "project_id",
+        "brd_document_id",
+        "fsd_document_id",
+        "user_story_document_id",
+        "fsd_content_markdown",
+        "user_story_count"
+      ],
+      "condition": "All three documents (BRD, FSD, User Stories) must be created before handoff. Human review required."
+    },
+    "on_failure": {
+      "action": "notify_user",
+      "message": "BA Agent failed to produce one or more documents. Please review the Requirement Summary and Gap Analysis inputs and retry."
+    }
+  },
+
+  "pipeline_step": {
+    "step_name": "ba_documentation",
+    "step_order": 3,
+    "total_steps": 10,
+    "timeout_seconds": 300
+  },
+
+  "office_behaviour": {
+    "idle_zone": "ba_room",
+    "active_zone": "ba_room",
+    "status_on_start": "working",
+    "status_on_complete": "done",
+    "chat_bubble_on_handoff": "BRD, FSD, and {user_story_count} User Stories ready. Waiting for human review before passing to Architect Agent."
+  }
+}

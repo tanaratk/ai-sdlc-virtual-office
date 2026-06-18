@@ -1,0 +1,179 @@
+{
+  "agent": {
+    "id": "developer-agent",
+    "name": "Developer Agent",
+    "role": "developer",
+    "version": "1.0.0",
+    "description": "Generates a prioritised code task list and backend/frontend skeleton plan from all approved upstream documents. Does NOT write production code — produces implementation roadmap only.",
+    "home_zone": "developer_zone",
+    "model_provider": "ollama",
+    "default_model": "qwen3:8b"
+  },
+
+  "input": {
+    "description": "All six upstream approved documents required before any code task generation is permitted",
+    "required_fields": [
+      {
+        "field": "project_id",
+        "type": "string (UUID)",
+        "description": "ID of the project"
+      },
+      {
+        "field": "fsd_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved FSD document (status must be approved)"
+      },
+      {
+        "field": "fsd_content_markdown",
+        "type": "string",
+        "description": "Full markdown content of the approved FSD"
+      },
+      {
+        "field": "architecture_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved Architecture Design document (status must be approved)"
+      },
+      {
+        "field": "database_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved Database Design document (status must be approved)"
+      },
+      {
+        "field": "api_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved API Specification document (status must be approved)"
+      },
+      {
+        "field": "api_content_markdown",
+        "type": "string",
+        "description": "Full markdown content of the approved API Specification"
+      },
+      {
+        "field": "screen_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved Screen Specification document (status must be approved)"
+      },
+      {
+        "field": "screen_content_markdown",
+        "type": "string",
+        "description": "Full markdown content of the approved Screen Specification"
+      },
+      {
+        "field": "user_story_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved User Stories document (status must be approved)"
+      }
+    ],
+    "optional_fields": [
+      {
+        "field": "context_notes",
+        "type": "string",
+        "description": "Developer guidance or sprint scope constraints from the user"
+      }
+    ],
+    "constraints": [
+      "ALL of the following document statuses must be approved before this agent may run: fsd_document_id, architecture_document_id, database_document_id, api_document_id, screen_document_id, user_story_document_id",
+      "If any document status is not approved, return error: UPSTREAM_NOT_APPROVED and list the unapproved document IDs",
+      "Combined input must not exceed 32,000 characters per call",
+      "Agent must NOT generate implementation source code — only task lists and skeleton descriptions"
+    ]
+  },
+
+  "output": {
+    "description": "Code Task List document containing prioritised implementation tasks with file paths and acceptance criteria",
+    "documents": [
+      {
+        "document_type": "code_task_list",
+        "format": "markdown",
+        "template_ref": "docs/templates/code-task-list.template.md",
+        "sections": [
+          {
+            "section": "task_summary",
+            "required": true,
+            "description": "Total tasks, breakdown by layer (backend / frontend / infra), estimated sprint allocation"
+          },
+          {
+            "section": "backend_tasks",
+            "required": true,
+            "format": "table",
+            "columns": ["Task ID", "File / Module", "Description", "API Ref", "DB Ref", "FSD Ref", "Priority", "Story Points"]
+          },
+          {
+            "section": "frontend_tasks",
+            "required": true,
+            "format": "table",
+            "columns": ["Task ID", "Component / Screen", "Description", "UI Ref", "API Ref", "FSD Ref", "Priority", "Story Points"]
+          },
+          {
+            "section": "infra_tasks",
+            "required": false,
+            "format": "table",
+            "columns": ["Task ID", "Description", "Target", "Priority"]
+          },
+          {
+            "section": "skeleton_plan",
+            "required": true,
+            "description": "Proposed folder structure and key file names for backend and frontend (no code — filenames and descriptions only)"
+          },
+          {
+            "section": "dependencies",
+            "required": true,
+            "format": "table",
+            "columns": ["Package", "Version", "Layer", "Purpose"]
+          }
+        ],
+        "metadata": {
+          "agent_id": "developer-agent",
+          "pipeline_step": "code_task_list",
+          "version": 1,
+          "status": "draft"
+        }
+      }
+    ]
+  },
+
+  "responsibilities": [
+    "Verify all six upstream documents are in approved status before starting — abort if any are not",
+    "Generate one backend task per API endpoint defined in the API Specification",
+    "Generate one frontend task per screen defined in the Screen Specification",
+    "Assign task IDs (TASK-BE-001, TASK-FE-001, TASK-INFRA-001)",
+    "Reference API-XXX, DB-XXX, UI-XXX, and FSD-XXX IDs in every task",
+    "Provide story point estimates (Fibonacci: 1, 2, 3, 5, 8, 13)",
+    "List all required npm and pip packages with versions",
+    "Do NOT write any production source code — task descriptions only",
+    "Do NOT include tasks not traceable to an approved FSD specification"
+  ],
+
+  "handoff": {
+    "on_success": {
+      "next_agent": "qa-agent",
+      "trigger": "document_created",
+      "payload_fields": [
+        "project_id",
+        "code_task_document_id",
+        "task_count",
+        "backend_task_count",
+        "frontend_task_count"
+      ]
+    },
+    "on_failure": {
+      "action": "notify_user",
+      "message": "Developer Agent failed. Check that all upstream documents (FSD, Architecture, DB Design, API Spec, Screen Spec, User Stories) are in approved status and retry."
+    }
+  },
+
+  "pipeline_step": {
+    "step_name": "code_task_list",
+    "step_order": 6,
+    "total_steps": 10,
+    "timeout_seconds": 300
+  },
+
+  "office_behaviour": {
+    "idle_zone": "developer_zone",
+    "active_zone": "developer_zone",
+    "status_on_start": "working",
+    "status_on_complete": "done",
+    "chat_bubble_on_handoff": "{task_count} tasks ready ({backend_task_count} backend, {frontend_task_count} frontend). Passing to QA Agent."
+  }
+}

@@ -1,0 +1,201 @@
+{
+  "agent": {
+    "id": "qa-agent",
+    "name": "QA Agent",
+    "role": "qa_engineer",
+    "version": "1.0.0",
+    "description": "Generates test cases and UAT scripts from the approved FSD, User Stories, and API Specification.",
+    "home_zone": "qa_lab",
+    "model_provider": "ollama",
+    "default_model": "qwen3:8b"
+  },
+
+  "input": {
+    "description": "Approved FSD, User Stories, and API Specification from upstream agents",
+    "required_fields": [
+      {
+        "field": "project_id",
+        "type": "string (UUID)",
+        "description": "ID of the project being tested"
+      },
+      {
+        "field": "fsd_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved FSD document"
+      },
+      {
+        "field": "fsd_content_markdown",
+        "type": "string",
+        "description": "Full markdown content of the approved FSD"
+      },
+      {
+        "field": "user_story_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved User Stories document"
+      },
+      {
+        "field": "user_story_content_markdown",
+        "type": "string",
+        "description": "Full markdown content of the approved User Stories"
+      },
+      {
+        "field": "api_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved API Specification document"
+      },
+      {
+        "field": "api_content_markdown",
+        "type": "string",
+        "description": "Full markdown content of the approved API Specification"
+      }
+    ],
+    "optional_fields": [
+      {
+        "field": "screen_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved Screen Specification for UI test case generation"
+      },
+      {
+        "field": "screen_content_markdown",
+        "type": "string",
+        "description": "Full markdown content of the approved Screen Specification"
+      },
+      {
+        "field": "context_notes",
+        "type": "string",
+        "description": "Additional testing focus areas from the user (e.g. 'focus on approval flow edge cases')"
+      }
+    ],
+    "constraints": [
+      "fsd_content_markdown must not be empty",
+      "user_story_content_markdown must not be empty",
+      "Combined input must not exceed 32,000 characters per call",
+      "fsd_document_id must reference a document with status approved",
+      "user_story_document_id must reference a document with status approved",
+      "api_document_id must reference a document with status approved"
+    ]
+  },
+
+  "output": {
+    "description": "Two QA documents: Test Cases and UAT Script",
+    "documents": [
+      {
+        "document_type": "test_cases",
+        "format": "markdown",
+        "template_ref": "docs/templates/test-case.template.md",
+        "sections": [
+          {
+            "section": "test_summary",
+            "required": true,
+            "description": "Total test cases, breakdown by type (functional / API / edge case / negative)"
+          },
+          {
+            "section": "functional_test_cases",
+            "required": true,
+            "format": "table",
+            "columns": ["TC ID", "FSD Ref", "Story Ref", "Test Description", "Precondition", "Steps", "Expected Result", "Priority"]
+          },
+          {
+            "section": "api_test_cases",
+            "required": true,
+            "format": "table",
+            "columns": ["TC ID", "API Ref", "Method", "Endpoint", "Request Body", "Expected Status", "Expected Response", "Priority"]
+          },
+          {
+            "section": "edge_case_tests",
+            "required": true,
+            "format": "table",
+            "columns": ["TC ID", "FSD Ref", "Scenario", "Input", "Expected Behaviour"]
+          },
+          {
+            "section": "negative_tests",
+            "required": true,
+            "format": "table",
+            "columns": ["TC ID", "FSD Ref", "Scenario", "Invalid Input", "Expected Error"]
+          }
+        ],
+        "metadata": {
+          "agent_id": "qa-agent",
+          "pipeline_step": "test_cases",
+          "version": 1,
+          "status": "draft"
+        }
+      },
+      {
+        "document_type": "uat_script",
+        "format": "markdown",
+        "template_ref": "docs/templates/uat-script.template.md",
+        "sections": [
+          {
+            "section": "uat_overview",
+            "required": true,
+            "description": "Objective, scope, target users, acceptance criteria definition"
+          },
+          {
+            "section": "uat_scenarios",
+            "required": true,
+            "format": "table",
+            "columns": ["Scenario ID", "Story Ref", "Scenario Description", "Actor", "Steps", "Expected Outcome", "Pass / Fail"]
+          },
+          {
+            "section": "sign_off_criteria",
+            "required": true,
+            "description": "Minimum pass rate and critical test cases that must pass for UAT sign-off"
+          }
+        ],
+        "metadata": {
+          "agent_id": "qa-agent",
+          "pipeline_step": "uat_script",
+          "version": 1,
+          "status": "draft"
+        }
+      }
+    ]
+  },
+
+  "responsibilities": [
+    "Generate at least one functional test case per FSD specification (FSD-XXX)",
+    "Generate at least one API test case per endpoint in the API Specification",
+    "Generate edge case and negative tests for all critical paths",
+    "Assign TC-XXX IDs to every test case",
+    "Reference FSD-XXX, Story ID, and API-XXX in every test case",
+    "Write UAT scenarios in language understandable by non-technical business users",
+    "Define clear pass/fail criteria for every test case",
+    "Do NOT generate test cases for requirements not present in the FSD",
+    "Do NOT write test code — test case descriptions and steps only"
+  ],
+
+  "handoff": {
+    "on_success": {
+      "next_agent": "change-impact-agent",
+      "trigger": "documents_created",
+      "payload_fields": [
+        "project_id",
+        "test_case_document_id",
+        "uat_document_id",
+        "test_case_count",
+        "uat_scenario_count"
+      ],
+      "condition": "Both documents must be created. Human review required before proceeding."
+    },
+    "on_failure": {
+      "action": "notify_user",
+      "message": "QA Agent failed to produce test documents. Please review the FSD, User Stories, and API Specification inputs and retry."
+    }
+  },
+
+  "pipeline_step": {
+    "step_name": "test_cases",
+    "step_order": 7,
+    "total_steps": 10,
+    "timeout_seconds": 300
+  },
+
+  "office_behaviour": {
+    "idle_zone": "qa_lab",
+    "active_zone": "qa_lab",
+    "status_on_start": "working",
+    "status_on_complete": "done",
+    "chat_bubble_on_handoff": "{test_case_count} test cases and {uat_scenario_count} UAT scenarios ready. Waiting for human review."
+  }
+}

@@ -1,0 +1,159 @@
+{
+  "agent": {
+    "id": "ux-agent",
+    "name": "UX Agent",
+    "role": "ux_designer",
+    "version": "1.0.0",
+    "description": "Designs the screen inventory, screen specifications, and UX flow from the approved FSD and Architecture Design.",
+    "home_zone": "ux_studio",
+    "model_provider": "ollama",
+    "default_model": "qwen3:8b"
+  },
+
+  "input": {
+    "description": "Approved FSD and Architecture Design from upstream agents",
+    "required_fields": [
+      {
+        "field": "project_id",
+        "type": "string (UUID)",
+        "description": "ID of the project being designed"
+      },
+      {
+        "field": "fsd_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved FSD document"
+      },
+      {
+        "field": "fsd_content_markdown",
+        "type": "string",
+        "description": "Full markdown content of the approved FSD"
+      },
+      {
+        "field": "architecture_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved Architecture Design document"
+      },
+      {
+        "field": "api_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved API Specification document"
+      },
+      {
+        "field": "api_content_markdown",
+        "type": "string",
+        "description": "Full markdown content of the approved API Specification"
+      }
+    ],
+    "optional_fields": [
+      {
+        "field": "design_system_notes",
+        "type": "string",
+        "description": "Color palette, typography, or component library constraints (e.g. 'dark theme, shadcn/ui components')"
+      },
+      {
+        "field": "context_notes",
+        "type": "string",
+        "description": "Additional UX guidance from the user"
+      }
+    ],
+    "constraints": [
+      "fsd_content_markdown must not be empty",
+      "api_content_markdown must not be empty",
+      "Combined input must not exceed 32,000 characters per call",
+      "fsd_document_id must reference a document with status approved",
+      "architecture_document_id must reference a document with status approved"
+    ]
+  },
+
+  "output": {
+    "description": "One Screen Specification document covering screen inventory, per-screen specs, and UX navigation flow",
+    "documents": [
+      {
+        "document_type": "screen_spec",
+        "format": "markdown",
+        "template_ref": "docs/templates/screen-spec.template.md",
+        "sections": [
+          {
+            "section": "screen_inventory",
+            "required": true,
+            "format": "table",
+            "columns": ["UI ID", "Screen Name", "Route", "Description", "FR Ref", "Priority"]
+          },
+          {
+            "section": "screen_specifications",
+            "required": true,
+            "description": "One sub-section per screen (UI-001, UI-002, …) containing: purpose, layout zones, components, API endpoints consumed, user actions, empty state, error state"
+          },
+          {
+            "section": "ux_flow",
+            "required": true,
+            "description": "Navigation flow between screens as a numbered walkthrough (e.g. 'Upload → Processing → Review → Approval')"
+          },
+          {
+            "section": "component_inventory",
+            "required": false,
+            "format": "table",
+            "columns": ["Component", "Type", "Used On Screens", "shadcn/ui Equivalent"]
+          },
+          {
+            "section": "design_tokens",
+            "required": false,
+            "format": "table",
+            "columns": ["Token", "Value", "Usage"]
+          }
+        ],
+        "metadata": {
+          "agent_id": "ux-agent",
+          "pipeline_step": "screen_spec",
+          "version": 1,
+          "status": "draft"
+        }
+      }
+    ]
+  },
+
+  "responsibilities": [
+    "Identify every screen required to support the FSD functional specifications",
+    "Assign UI-XXX IDs to each screen",
+    "Reference FR-XXX and FSD-XXX IDs in every screen specification",
+    "Map API endpoints from the API Specification to the screens that consume them",
+    "Define layout zones (header, sidebar, main content, footer) for each screen",
+    "Specify user actions and their outcomes for every interactive element",
+    "Define empty state and error state handling per screen",
+    "Do NOT design detailed HTML/CSS — describe layout and components in prose and tables only",
+    "Do NOT invent screens not traceable to an FSD specification"
+  ],
+
+  "handoff": {
+    "on_success": {
+      "next_agent": "developer-agent",
+      "trigger": "document_created",
+      "payload_fields": [
+        "project_id",
+        "screen_document_id",
+        "screen_content_markdown",
+        "screen_count"
+      ],
+      "condition": "Screen Spec document must be created. Human review and approval required before Developer Agent may start."
+    },
+    "on_failure": {
+      "action": "notify_user",
+      "message": "UX Agent failed to produce the Screen Specification. Please review the FSD and API Specification inputs and retry."
+    }
+  },
+
+  "pipeline_step": {
+    "step_name": "screen_spec",
+    "step_order": 5,
+    "total_steps": 10,
+    "timeout_seconds": 240
+  },
+
+  "office_behaviour": {
+    "idle_zone": "ux_studio",
+    "active_zone": "ux_studio",
+    "status_on_start": "working",
+    "status_on_complete": "done",
+    "chat_bubble_on_handoff": "{screen_count} screens specified. Waiting for human approval before Developer Agent starts."
+  }
+}

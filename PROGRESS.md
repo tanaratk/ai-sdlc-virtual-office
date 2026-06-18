@@ -30,7 +30,7 @@
 | Sprint | Title | Status |
 |---|---|---|
 | 0 | Requirement Intake & Baseline Review | ✅ Done |
-| 1 | Agent Contract Design | 🔲 Next |
+| 1 | Agent Contract Design | ✅ Done |
 | 2 | Prompt & Template Design | 🔲 |
 | 3 | Database Design | ✅ Done (schema.md exists) |
 | 4 | API Design | 🔲 |
@@ -41,9 +41,10 @@
 
 ## Next Sprint
 
-**Sprint 1 — Agent Contract Design**
-- Rename `docs/contracts/` → `docs/agents/`
-- Add contracts for 6 remaining agents: BA, Architect, UX, Developer, QA, Change Impact
+**Sprint 2 — Prompt & Template Design**
+- Create task prompts: `*.task.md` for all 8 agents
+- Create system prompts for 6 remaining agents
+- Create 8 output templates: BRD, FSD, User Story, Architecture Design, Database Design, API Spec, Screen Spec, Test Case, UAT Script, Change Impact Report, Code Task List
 
 ---
 

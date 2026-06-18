@@ -1,0 +1,178 @@
+{
+  "agent": {
+    "id": "architect-agent",
+    "name": "Solution Architect Agent",
+    "role": "solution_architect",
+    "version": "1.0.0",
+    "description": "Designs the technical architecture, database schema, and API specification from approved BA documents (BRD, FSD, User Stories).",
+    "home_zone": "sa_room",
+    "model_provider": "ollama",
+    "default_model": "qwen3:8b"
+  },
+
+  "input": {
+    "description": "Approved BRD, FSD, and User Stories from the BA Agent",
+    "required_fields": [
+      {
+        "field": "project_id",
+        "type": "string (UUID)",
+        "description": "ID of the project being architected"
+      },
+      {
+        "field": "brd_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved BRD document"
+      },
+      {
+        "field": "fsd_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved FSD document"
+      },
+      {
+        "field": "fsd_content_markdown",
+        "type": "string",
+        "description": "Full markdown content of the approved FSD"
+      },
+      {
+        "field": "user_story_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved User Stories document"
+      },
+      {
+        "field": "user_story_content_markdown",
+        "type": "string",
+        "description": "Full markdown content of the approved User Stories"
+      }
+    ],
+    "optional_fields": [
+      {
+        "field": "tech_stack_overrides",
+        "type": "object",
+        "description": "User-specified technology preferences that override defaults (e.g. {\"database\": \"MySQL\"})"
+      },
+      {
+        "field": "context_notes",
+        "type": "string",
+        "description": "Additional architectural guidance or constraints from the user"
+      }
+    ],
+    "constraints": [
+      "fsd_content_markdown must not be empty",
+      "Combined input must not exceed 32,000 characters per call",
+      "fsd_document_id must reference a document with status approved",
+      "user_story_document_id must reference a document with status approved"
+    ]
+  },
+
+  "output": {
+    "description": "Three architecture documents: System Architecture Design, Database Design, and API Specification",
+    "documents": [
+      {
+        "document_type": "architecture_design",
+        "format": "markdown",
+        "template_ref": "docs/templates/architecture-design.template.md",
+        "sections": [
+          { "section": "system_overview", "required": true },
+          { "section": "architecture_diagram_description", "required": true, "description": "Text description of component diagram (C4 Level 2)" },
+          { "section": "component_list", "required": true, "format": "table", "columns": ["Component", "Type", "Responsibility", "Technology"] },
+          { "section": "technology_stack", "required": true, "format": "table", "columns": ["Layer", "Technology", "Version", "Rationale"] },
+          { "section": "integration_design", "required": false, "format": "table", "columns": ["System", "Protocol", "Auth Method", "Notes"] },
+          { "section": "deployment_design", "required": true, "description": "Docker Compose services and environment variables" },
+          { "section": "security_design", "required": true, "description": "Auth approach, secrets management, input validation strategy" },
+          { "section": "architecture_decisions", "required": true, "format": "table", "columns": ["Decision", "Options Considered", "Chosen", "Rationale"] }
+        ],
+        "metadata": {
+          "agent_id": "architect-agent",
+          "pipeline_step": "architecture_design",
+          "version": 1,
+          "status": "draft"
+        }
+      },
+      {
+        "document_type": "database_design",
+        "format": "markdown",
+        "template_ref": "docs/templates/database-design.template.md",
+        "sections": [
+          { "section": "erd_description", "required": true, "description": "Entity relationship overview in text; link to ERD diagram file" },
+          { "section": "table_list", "required": true, "format": "table", "columns": ["Table Name", "Description", "Key Entities"] },
+          { "section": "table_specifications", "required": true, "description": "One sub-section per table with columns, types, constraints, FK relationships" },
+          { "section": "enum_types", "required": true, "format": "table", "columns": ["Enum Name", "Values"] },
+          { "section": "indexes", "required": true, "format": "table", "columns": ["Table", "Index Name", "Columns", "Type", "Purpose"] },
+          { "section": "migration_notes", "required": false, "format": "list" }
+        ],
+        "metadata": {
+          "agent_id": "architect-agent",
+          "pipeline_step": "database_design",
+          "version": 1,
+          "status": "draft"
+        }
+      },
+      {
+        "document_type": "api_spec",
+        "format": "markdown",
+        "template_ref": "docs/templates/api-spec.template.md",
+        "sections": [
+          { "section": "api_overview", "required": true, "description": "Base URL, auth method, versioning strategy, content type" },
+          { "section": "endpoint_list", "required": true, "format": "table", "columns": ["API ID", "Method", "Path", "Description", "Auth Required", "FR Ref"] },
+          { "section": "endpoint_details", "required": true, "description": "One sub-section per endpoint with request body, response body, error codes" },
+          { "section": "common_schemas", "required": true, "description": "Shared request/response models referenced across endpoints" },
+          { "section": "error_codes", "required": true, "format": "table", "columns": ["HTTP Code", "Error Code", "Message", "When Raised"] }
+        ],
+        "metadata": {
+          "agent_id": "architect-agent",
+          "pipeline_step": "api_spec",
+          "version": 1,
+          "status": "draft"
+        }
+      }
+    ]
+  },
+
+  "responsibilities": [
+    "Design a component architecture aligned with the FSD functional specifications",
+    "Reference FSD-XXX and FR-XXX IDs in architecture decisions",
+    "Define every database table required by the FSD data requirements",
+    "Assign DB-XXX IDs to every table and field",
+    "Define every API endpoint required by the FSD — assign API-XXX IDs",
+    "Default tech stack: FastAPI + PostgreSQL + React + Vite + TypeScript unless overridden",
+    "Include deployment design using Docker Compose",
+    "Do NOT design tables or endpoints not traceable to a requirement",
+    "Limit scope to Architecture + DB + API — do NOT design code modules or test cases"
+  ],
+
+  "handoff": {
+    "on_success": {
+      "next_agent": "ux-agent",
+      "trigger": "documents_created",
+      "payload_fields": [
+        "project_id",
+        "architecture_document_id",
+        "database_document_id",
+        "api_document_id",
+        "api_content_markdown",
+        "table_count",
+        "endpoint_count"
+      ],
+      "condition": "All three documents must be created before handoff. Human review required."
+    },
+    "on_failure": {
+      "action": "notify_user",
+      "message": "Architect Agent failed to produce one or more documents. Please review the FSD and User Story inputs and retry."
+    }
+  },
+
+  "pipeline_step": {
+    "step_name": "architecture_design",
+    "step_order": 4,
+    "total_steps": 10,
+    "timeout_seconds": 300
+  },
+
+  "office_behaviour": {
+    "idle_zone": "sa_room",
+    "active_zone": "sa_room",
+    "status_on_start": "working",
+    "status_on_complete": "done",
+    "chat_bubble_on_handoff": "Architecture ready: {table_count} tables, {endpoint_count} API endpoints. Waiting for human review before passing to UX Agent."
+  }
+}
