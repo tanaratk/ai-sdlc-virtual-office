@@ -20,17 +20,16 @@
 | 7a | Template — Requirement Summary | `docs/templates/requirement-summary.template.md` | ✅ Done |
 | 7b | Template — Gap Analysis Report | `docs/templates/gap-analysis-report.template.md` | ✅ Done |
 | 8 | Database Schema Design | `docs/database/schema.md` | ✅ Done |
+| 9 | UI Design ใน Figma | https://www.figma.com/design/fwTNT7ztQLI1Hj0Bj0EaJb | ✅ Done |
 
 ---
 
 ## Next Task
 
-**Task 9 — UI Design in Figma (partial)**
+**Task 10 — README.md**
 
-- Figma file: https://www.figma.com/design/fwTNT7ztQLI1Hj0Bj0EaJb
-- Dashboard ✅, Upload ✅, Agent Console ✅
-- Document Viewer ❌ blocked — Figma MCP hit Starter plan rate limit
-- To resume: upgrade Figma plan OR build Document Viewer manually in Figma
+- File to create: `README.md` at repo root
+- Must cover: project overview, tech stack, folder structure, how to run locally, agent pipeline summary
 
 ---
 
@@ -38,7 +37,6 @@
 
 | # | Task | Output |
 |---|------|--------|
-| 9 | UI Design ใน Figma (Document Viewer remaining) | https://www.figma.com/design/fwTNT7ztQLI1Hj0Bj0EaJb |
 | 10 | README.md | Project overview + how to run |
 
 ---
