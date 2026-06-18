@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, BookOpen, Bot, Building2, FileText, GitBranch, Github, Upload, Wrench, Zap } from "lucide-react";
+import { ArrowLeft, BookOpen, Bot, Building2, ClipboardList, FileText, GitBranch, Github, Upload, Wrench, Zap } from "lucide-react";
 import { projectApi } from "@/services/projectApi";
 import { sourceApi } from "@/services/sourceApi";
 
@@ -123,6 +123,15 @@ export default function ProjectWorkspace() {
           <BookOpen className="h-6 w-6 text-primary" />
           <span className="text-sm font-medium">Compile Docs</span>
           <span className="text-xs text-muted-foreground">Bundle all pipeline docs</span>
+        </Link>
+
+        <Link
+          to={`/projects/${projectId}/pm`}
+          className="flex flex-col items-center gap-2 rounded-lg border bg-white p-6 text-center hover:border-primary transition-colors"
+        >
+          <ClipboardList className="h-6 w-6 text-primary" />
+          <span className="text-sm font-medium">PM Summary</span>
+          <span className="text-xs text-muted-foreground">Final step — delivery report</span>
         </Link>
       </div>
     </div>

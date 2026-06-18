@@ -13,6 +13,7 @@ from app.api.routes import (
     messages,
     milestones,
     pipeline,
+    pm,
     projects,
     settings,
     sprints,
@@ -37,6 +38,7 @@ api_router.include_router(milestones.router, prefix="/projects", tags=["Mileston
 api_router.include_router(traceability.router, prefix="/projects", tags=["Traceability"])
 api_router.include_router(change_impact.router, prefix="/projects", tags=["Change Impact"])
 api_router.include_router(documentation.router, prefix="/projects", tags=["Documentation"])
+api_router.include_router(pm.router, prefix="/projects", tags=["PM Agent"])
 api_router.include_router(github.router, prefix="/projects", tags=["GitHub"])
 api_router.include_router(mcp.tool_router, tags=["MCP"])
 api_router.include_router(mcp.call_router, prefix="/projects", tags=["MCP"])
