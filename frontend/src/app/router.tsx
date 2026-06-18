@@ -15,6 +15,7 @@ export const router = createBrowserRouter([
     element: <AppLayout />,
     children: [
       { index: true, element: <Dashboard /> },
+      { path: "projects", element: <Dashboard /> },
       { path: "projects/:projectId", element: <ProjectWorkspace /> },
       { path: "projects/:projectId/intake", element: <RequirementIntake /> },
       { path: "projects/:projectId/agents", element: <AgentConsolePage /> },

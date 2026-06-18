@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Play } from "lucide-react";
 import type { PipelineRun, PipelineStep } from "@/types/workflow";
 import { AgentRunStatus } from "./AgentRunStatus";

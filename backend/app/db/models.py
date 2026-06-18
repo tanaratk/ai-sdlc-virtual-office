@@ -3,8 +3,8 @@ from datetime import date, datetime
 from enum import Enum
 from typing import Any, Optional
 
+import sqlalchemy as sa
 from sqlalchemy import Column, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
 
@@ -191,7 +191,7 @@ class RequirementInput(SQLModel, table=True):
     source_owner: Optional[str] = Field(default=None, max_length=255)
     source_date: Optional[datetime] = Field(default=None)
     metadata_json: Optional[dict[str, Any]] = Field(
-        default=None, sa_column=Column(JSONB)
+        default=None, sa_column=Column(sa.JSON)
     )
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -283,7 +283,7 @@ class PipelineStep(SQLModel, table=True):
     agent_id: Optional[uuid.UUID] = Field(default=None, foreign_key="agents.id")
     status: PipelineStepStatus = Field(default=PipelineStepStatus.pending)
     input_json: Optional[dict[str, Any]] = Field(
-        default=None, sa_column=Column(JSONB)
+        default=None, sa_column=Column(sa.JSON)
     )
     output_document_id: Optional[uuid.UUID] = Field(
         default=None, foreign_key="documents.id"
@@ -307,7 +307,7 @@ class Message(SQLModel, table=True):
     content: str
     message_type: MessageType = Field(default=MessageType.chat)
     metadata_json: Optional[dict[str, Any]] = Field(
-        default=None, sa_column=Column(JSONB)
+        default=None, sa_column=Column(sa.JSON)
     )
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -322,7 +322,7 @@ class ActivityLog(SQLModel, table=True):
     event_type: EventType
     message: str
     metadata_json: Optional[dict[str, Any]] = Field(
-        default=None, sa_column=Column(JSONB)
+        default=None, sa_column=Column(sa.JSON)
     )
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
