@@ -1,6 +1,6 @@
 # AI-SDLC Virtual Office — Progress Tracker
 
-**Last Updated:** 2026-06-18 (Sprint 7 complete)  
+**Last Updated:** 2026-06-18 (Sprint 8 complete)  
 **Project:** ai-sdlc-virtual-office  
 **Repo:** https://github.com/tanaratk/ai-sdlc-virtual-office  
 **Working Directory:** D:\AI_Office
@@ -37,15 +37,15 @@
 | 5 | Workflow Design | ✅ Done |
 | 6 | Backend Skeleton | ✅ Done |
 | 7 | Frontend Skeleton | ✅ Done |
-| 8–20 | Agent MVP + Features | 🔲 |
+| 8 | Requirement Agent MVP | ✅ Done |
+| 9–20 | Agent MVP + Features | 🔲 |
 
 ## Next Sprint
 
-**Sprint 8 — Requirement Agent MVP**
-- Implement Requirement Agent runtime (load contract → build prompt → call Ollama → validate JSON → save)
-- Backend: `POST /projects/{id}/pipeline/runs` fully wired
-- Frontend: Agent Console calls real backend, shows live status
-- Every requirement gets an FR/NFR/BR ID
+**Sprint 9 — Gap Analysis Agent MVP**
+- Implement Gap Analysis Agent runtime (load requirement_summary → detect gaps → save gap_analysis_report)
+- Human review Gate 1: approve/reject gap report
+- Frontend: Gate UI for reviewer to approve or reject
 
 ---
 

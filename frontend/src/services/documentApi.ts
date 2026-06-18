@@ -1,11 +1,11 @@
-import type { Document } from "@/types/document";
+import type { Document, DocumentSummary } from "@/types/document";
 import type { PaginatedResponse } from "@/types/workflow";
 import apiClient from "./apiClient";
 
 export const documentApi = {
   list: (projectId: string, page = 1, pageSize = 20) =>
     apiClient
-      .get<PaginatedResponse<Document>>(`/projects/${projectId}/documents`, {
+      .get<PaginatedResponse<DocumentSummary>>(`/projects/${projectId}/documents`, {
         params: { page, page_size: pageSize },
       })
       .then((r) => r.data),

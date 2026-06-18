@@ -3,9 +3,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { documentApi } from "@/services/documentApi";
 import { DocumentViewer } from "@/components/document/DocumentViewer";
-import type { Document } from "@/types/document";
+import type { DocumentType } from "@/types/document";
 
-const DOC_TYPE_LABELS: Record<Document["document_type"], string> = {
+const DOC_TYPE_LABELS: Record<DocumentType, string> = {
   requirement_summary: "Req Summary",
   gap_analysis_report: "Gap Analysis",
   brd: "BRD",
@@ -35,18 +35,27 @@ export default function DocumentReview() {
     enabled: !!projectId,
   });
 
-  const selectedDoc = data?.items.find((d) => d.id === selectedId) ?? null;
+  // Fetch full document (with content_markdown) separately when selected
+  const { data: selectedDoc, isLoading: isDocLoading } = useQuery({
+    queryKey: ["document", projectId, selectedId],
+    queryFn: () => documentApi.get(projectId!, selectedId!),
+    enabled: !!projectId && !!selectedId,
+  });
 
   const approveMutation = useMutation({
     mutationFn: () => documentApi.approve(projectId!, selectedId!),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["documents", projectId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["documents", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["document", projectId, selectedId] });
+    },
   });
 
   const rejectMutation = useMutation({
     mutationFn: () => documentApi.reject(projectId!, selectedId!, "Rejected by reviewer"),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["documents", projectId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["documents", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["document", projectId, selectedId] });
+    },
   });
 
   return (
@@ -71,13 +80,19 @@ export default function DocumentReview() {
       </aside>
 
       <div className="flex-1 min-h-0">
-        {selectedDoc ? (
+        {selectedId && isDocLoading && (
+          <div className="flex h-full items-center justify-center">
+            <p className="text-sm text-muted-foreground">Loading document…</p>
+          </div>
+        )}
+        {selectedDoc && !isDocLoading && (
           <DocumentViewer
             document={selectedDoc}
             onApprove={approveMutation.mutate}
             onReject={rejectMutation.mutate}
           />
-        ) : (
+        )}
+        {!selectedId && (
           <div className="flex h-full items-center justify-center rounded-lg border border-dashed">
             <p className="text-sm text-muted-foreground">Select a document to review</p>
           </div>

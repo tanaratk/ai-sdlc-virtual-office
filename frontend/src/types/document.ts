@@ -18,16 +18,19 @@ export type DocumentType =
 
 export type DocumentStatus = "draft" | "review" | "approved" | "rejected" | "superseded";
 
-export interface Document {
+export interface DocumentSummary {
   id: string;
   project_id: string;
   document_type: DocumentType;
   title: string;
-  content_markdown: string;
   version: number;
   status: DocumentStatus;
-  created_by_agent_id: string | null;
-  approved_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface Document extends DocumentSummary {
+  content_markdown: string;
+  created_by_agent_id: string | null;
+  approved_by: string | null;
 }
