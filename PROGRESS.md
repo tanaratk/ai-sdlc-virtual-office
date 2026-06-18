@@ -17,16 +17,17 @@
 | 4 | Gap Analysis Agent Contract | `docs/contracts/gap-analysis-agent.contract.json` | ✅ Done |
 | 5 | Requirement Agent System Prompt | `docs/prompts/requirement-agent.system.md` | ✅ Done |
 | 6 | Gap Analysis Agent System Prompt | `docs/prompts/gap-analysis-agent.system.md` | ✅ Done |
+| 7a | Template — Requirement Summary | `docs/templates/requirement-summary.template.md` | ✅ Done |
 
 ---
 
 ## Next Task
 
-**Task 7a — Template: Requirement Summary**
+**Task 7b — Template: Gap Analysis Report**
 
-- File to create: `docs/templates/requirement-summary.template.md`
-- Base content: Requirement Agent contract output sections + system prompt section list
-- Must cover: all 9 sections (Business Objective, Scope, FRs, NFRs, Stakeholders, Assumptions, Constraints, Business Rules, Open Questions) with table structures and placeholder rows
+- File to create: `docs/templates/gap-analysis-report.template.md`
+- Base content: Gap Analysis Agent contract output sections
+- Must cover: all 14 sections with table structures and placeholder rows, matching column definitions in the contract
 
 ---
 
@@ -34,7 +35,7 @@
 
 | # | Task | Output |
 |---|------|--------|
-| 7a | Template — Requirement Summary | `docs/templates/requirement-summary.template.md` |
+| 7b | Template — Gap Analysis Report | `docs/templates/gap-analysis-report.template.md` |
 | 7b | Template — Gap Analysis Report | `docs/templates/gap-analysis-report.template.md` |
 | 8 | Database Schema Design | `docs/database/schema.md` |
 | 9 | UI Design ใน Figma | Dashboard, Upload, Agent Console, Document Viewer |
