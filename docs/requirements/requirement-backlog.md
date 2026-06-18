@@ -35,6 +35,11 @@
 | FR-022 | Project management: Create Project, list projects, select active project | Critical | MVP 1 | Open |
 | FR-023 | LLM provider config: Ollama (base URL + model) and OpenAI (API key + model) | Critical | MVP 1 | Open |
 | FR-024 | Log every agent run: agent name, input reference, prompt version, model, status, started_at, completed_at, error, output reference | Critical | MVP 1 | Open |
+| FR-025 | Dashboard must display a Sprint Timeline view showing all sprints with sprint name, planned start date, planned end date, actual end date, duration, and status (Not Started / In Progress / Done / Overdue) | High | MVP 1 | Open |
+| FR-026 | System must allow Project Admin to define MVP milestones with name, target date, and linked sprints; milestones must be shown on the timeline with visual indicators | High | MVP 1 | Open |
+| FR-027 | System must alert users when a sprint deadline is approaching (≤3 days remaining) or overdue; alerts must appear in the dashboard header and in the PM Agent's summary output | High | MVP 1 | Open |
+| FR-028 | PM Agent must include in its output: current sprint name, sprint progress (tasks done / total), days remaining to sprint deadline, next MVP milestone date, and list of overdue items | High | MVP 2 | Open |
+| FR-029 | Project Admin must be able to update sprint start/end dates and move tasks between sprints via the Sprint Management screen | Medium | MVP 2 | Open |
 
 ---
 

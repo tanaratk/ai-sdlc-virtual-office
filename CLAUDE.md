@@ -222,6 +222,7 @@ Every artifact must reference a requirement ID where possible.
 | `PROGRESS.md` | Always — first thing every session |
 | `ai-dlc-development-sprint-skill.md` | Before starting any sprint |
 | `docs/requirements/requirement-backlog.md` | Before creating contracts or prompts |
+| `docs/product/timeline.md` | Sprint schedule, MVP milestones, Gantt — check before estimating work |
 | `docs/requirements/open-questions.md` | Before making assumptions in implementation |
 | `docs/database/schema.md` | Before writing any DB models or migrations |
 | `Requirement Spec/AI-SDLC-Working-Office-Spec.md` | When spec detail is needed for a specific section |

@@ -68,6 +68,11 @@ Build a web-based 2D virtual office where AI agents collaborate through the full
 | FR-022 | System must support project management: Create Project, view all projects, select active project | Spec §7.1 | Critical |
 | FR-023 | System must support LLM provider configuration: Ollama (base URL + model) and OpenAI (API key + model) | Spec §9.2.6 | Critical |
 | FR-024 | System must log every agent run with: agent name, input reference, prompt version, model name, status, started_at, completed_at, error message, output reference | Sprint Skill §Rule 5 | Critical |
+| FR-025 | Dashboard must display a Sprint Timeline view: sprint name, planned start/end date, actual end date, duration, status (Not Started / In Progress / Done / Overdue) | Timeline | High |
+| FR-026 | System must allow Project Admin to define MVP milestones with name, target date, and linked sprints; milestones shown on timeline with visual indicators | Timeline | High |
+| FR-027 | System must alert users when a sprint deadline is approaching (≤3 days) or overdue; alerts appear in dashboard header and PM Agent output | Timeline | High |
+| FR-028 | PM Agent output must include: current sprint name, progress (tasks done/total), days to deadline, next MVP milestone date, overdue items | Timeline | High |
+| FR-029 | Project Admin can update sprint start/end dates and move tasks between sprints via Sprint Management screen | Timeline | Medium |
 
 ---
 
