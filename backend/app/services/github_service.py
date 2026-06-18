@@ -115,28 +115,40 @@ def create_branch(
     return {"branch": branch_name, "sha": sha}
 
 
-def list_issues(repo: GitHubRepo, state: str = "open") -> list[dict]:
-    """List issues in the repo (first page, 30 max)."""
+def list_issues(repo: GitHubRepo, state: str = "open", limit: int = 100) -> list[dict]:
+    """List issues in the repo, paginating up to `limit` results."""
     url = f"{_BASE}/repos/{repo.owner}/{repo.name}/issues"
+    per_page = min(limit, 100)
+    collected: list[dict] = []
+    page = 1
+
     with httpx.Client(timeout=_TIMEOUT) as client:
-        resp = client.get(
-            url,
-            headers=repo._headers,
-            params={"state": state, "per_page": 30},
-        )
-    if not resp.is_success:
-        raise GitHubServiceError(f"GitHub API error {resp.status_code}")
-    return [
-        {
-            "number": i["number"],
-            "title": i["title"],
-            "url": i["html_url"],
-            "state": i["state"],
-            "labels": [lb["name"] for lb in i.get("labels", [])],
-        }
-        for i in resp.json()
-        if "pull_request" not in i  # exclude PRs
-    ]
+        while len(collected) < limit:
+            resp = client.get(
+                url,
+                headers=repo._headers,
+                params={"state": state, "per_page": per_page, "page": page},
+            )
+            if not resp.is_success:
+                raise GitHubServiceError(f"GitHub API error {resp.status_code}")
+            batch = resp.json()
+            if not batch:
+                break
+            for i in batch:
+                if "pull_request" in i:
+                    continue
+                collected.append({
+                    "number": i["number"],
+                    "title": i["title"],
+                    "url": i["html_url"],
+                    "state": i["state"],
+                    "labels": [lb["name"] for lb in i.get("labels", [])],
+                })
+                if len(collected) >= limit:
+                    break
+            page += 1
+
+    return collected
 
 
 # ── Markdown task parser ────────────────────────────────────────────────────────

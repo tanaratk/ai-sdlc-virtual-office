@@ -31,6 +31,10 @@ from app.llm.client import call_ollama, extract_json
 logger = logging.getLogger(__name__)
 
 AGENT_NAME = "requirement-agent"
+
+
+def _cell(s: str) -> str:
+    return str(s).replace("|", "\\|")
 STEP_NAME = "requirement_summary"
 TIMEOUT_SECONDS = 120.0
 
@@ -142,21 +146,21 @@ def _render_markdown(
     fr_table = "| ID | Requirement | Source | Priority |\n|---|---|---|---|\n"
     if data.functional_requirements:
         for fr in data.functional_requirements:
-            fr_table += f"| {fr.id} | {fr.requirement} | {fr.source} | {fr.priority} |\n"
+            fr_table += f"| {_cell(fr.id)} | {_cell(fr.requirement)} | {_cell(fr.source)} | {_cell(fr.priority)} |\n"
     else:
         fr_table = "> No functional requirements found in source."
 
     nfr_table = "| ID | Requirement | Category | Priority |\n|---|---|---|---|\n"
     if data.non_functional_requirements:
         for nfr in data.non_functional_requirements:
-            nfr_table += f"| {nfr.id} | {nfr.requirement} | {nfr.category} | {nfr.priority} |\n"
+            nfr_table += f"| {_cell(nfr.id)} | {_cell(nfr.requirement)} | {_cell(nfr.category)} | {_cell(nfr.priority)} |\n"
     else:
         nfr_table = "> No NFRs stated. Recommend defining SLA, security, and access control requirements."
 
     sh_table = "| Role | Responsibility | Involvement |\n|---|---|---|\n"
     if data.stakeholders:
         for sh in data.stakeholders:
-            sh_table += f"| {sh.role} | {sh.responsibility} | {sh.involvement} |\n"
+            sh_table += f"| {_cell(sh.role)} | {_cell(sh.responsibility)} | {_cell(sh.involvement)} |\n"
     else:
         sh_table = "> No stakeholders explicitly mentioned. Recommend confirming with project sponsor."
 

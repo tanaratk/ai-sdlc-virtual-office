@@ -32,6 +32,25 @@ class PipelineService:
                 detail={"error_code": "NO_INPUTS", "message": "No requirement inputs found. Upload at least one requirement before running the pipeline."},
             )
 
+        active_run = self.session.exec(
+            select(PipelineRun).where(
+                PipelineRun.project_id == project_id,
+                PipelineRun.status.in_([  # type: ignore[union-attr]
+                    PipelineRunStatus.pending,
+                    PipelineRunStatus.running,
+                    PipelineRunStatus.waiting_for_user,
+                ]),
+            ).limit(1)
+        ).first()
+        if active_run:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error_code": "RUN_IN_PROGRESS",
+                    "message": f"A pipeline run is already active (status: {active_run.status.value}). Wait for it to complete or fail before starting a new one.",
+                },
+            )
+
         run = PipelineRun(project_id=project_id, status=PipelineRunStatus.pending)
         self.session.add(run)
         self.session.flush()
