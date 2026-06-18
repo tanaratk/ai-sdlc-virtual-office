@@ -90,7 +90,7 @@ ai-sdlc-virtual-office/
 | 3 | BA Agent | BRD + FSD + User Stories |
 | 4 | Solution Architect Agent | Architecture + DB Design + API Spec |
 | 5 | UX Agent | Screen Inventory + Screen Spec + UX Flow |
-| 6 | Developer Agent | Code task list + skeleton code |
+| 6 | Developer Agent | Code task list + skeleton plan |
 | 7 | QA Agent | Test Cases + UAT Scripts |
 | 8 | Change Impact Agent | Change Impact Report |
 | 9 | Documentation Agent | Compiled project documents |
