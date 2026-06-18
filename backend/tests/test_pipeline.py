@@ -1,4 +1,4 @@
-"""Tests for pipeline routes and the Requirement Agent runner (mocked LLM)."""
+"""Tests for the full 2-agent pipeline: Requirement Agent → Gap Analysis Agent."""
 import json
 import uuid
 from unittest.mock import patch
@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 # ── helpers ────────────────────────────────────────────────────────────────────
 
 def _create_project(client: TestClient) -> dict:
-    r = client.post("/api/v1/projects", json={"name": "Sprint-8 project", "created_by": "tester"})
+    r = client.post("/api/v1/projects", json={"name": "Sprint-9 project", "created_by": "tester"})
     assert r.status_code == 201
     return r.json()
 
@@ -28,7 +28,13 @@ def _create_input(client: TestClient, project_id: str) -> dict:
     return r.json()
 
 
-_MOCK_LLM_OUTPUT = json.dumps({
+def _run_pipeline(client: TestClient, project_id: str) -> dict:
+    r = client.post(f"/api/v1/projects/{project_id}/pipeline/runs")
+    assert r.status_code == 201
+    return r.json()
+
+
+_MOCK_REQ_OUTPUT = json.dumps({
     "business_objective": "Enable employees to submit and track expense reimbursement requests digitally.",
     "in_scope": ["Expense submission", "Manager approval", "Email notifications"],
     "out_of_scope": ["Mobile app", "Third-party accounting integration"],
@@ -44,19 +50,44 @@ _MOCK_LLM_OUTPUT = json.dumps({
         {"role": "Employee", "responsibility": "Submit expense requests", "involvement": "User"},
         {"role": "Manager", "responsibility": "Approve or reject requests", "involvement": "Approver"},
     ],
-    "assumptions": ["Users have email access", "Managers are pre-configured in the system"],
+    "assumptions": ["Users have email access"],
     "constraints": ["Must integrate with existing email server"],
-    "business_rules": [
-        {"id": "BR-001", "rule": "Expenses above 50,000 THB require CFO approval"},
+    "business_rules": [{"id": "BR-001", "rule": "Expenses above 50,000 THB require CFO approval"}],
+    "open_questions": ["What is the maximum expense amount?"],
+})
+
+_MOCK_GAP_OUTPUT = json.dumps({
+    "overall_assessment": "Requirements are mostly complete but missing security and notification detail.",
+    "completeness_score": 70,
+    "gaps": [
+        {
+            "id": "GAP-001",
+            "category": "missing_security_requirement",
+            "severity": "High",
+            "description": "No authentication or authorization requirement stated.",
+            "related_requirement_id": None,
+            "question": "How should users authenticate? Is role-based access control required?",
+        },
+        {
+            "id": "GAP-002",
+            "category": "missing_non_functional_requirement",
+            "severity": "Medium",
+            "description": "No data retention or audit log requirement.",
+            "related_requirement_id": "FR-001",
+            "question": "How long should expense records be retained?",
+        },
     ],
-    "open_questions": [
-        "What is the maximum expense amount that can be submitted?",
-        "Who configures manager assignments?",
+    "recommendations": [
+        "Add authentication and authorization requirements.",
+        "Define data retention policy.",
     ],
 })
 
+# Both agents return valid mock output
+_BOTH_LLM_OUTPUTS = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT]
 
-# ── tests ──────────────────────────────────────────────────────────────────────
+
+# ── guard tests (no LLM) ───────────────────────────────────────────────────────
 
 def test_start_pipeline_no_inputs(client: TestClient):
     project = _create_project(client)
@@ -77,54 +108,147 @@ def test_list_runs_empty(client: TestClient):
     assert r.json() == []
 
 
-@patch("app.llm.client.call_ollama", return_value=_MOCK_LLM_OUTPUT)
-def test_pipeline_run_creates_document(mock_llm, client: TestClient):
+# ── full pipeline (2 agents) ───────────────────────────────────────────────────
+
+@patch("app.llm.client.call_ollama", side_effect=_BOTH_LLM_OUTPUTS)
+def test_full_pipeline_creates_two_documents(mock_llm, client: TestClient):
     project = _create_project(client)
     _create_input(client, project["id"])
+    run = _run_pipeline(client, project["id"])
 
-    r = client.post(f"/api/v1/projects/{project['id']}/pipeline/runs")
-    assert r.status_code == 201
-    run = r.json()
-    assert run["project_id"] == project["id"]
-    assert run["status"] in ("pending", "running", "completed")
+    final_run = client.get(f"/api/v1/projects/{project['id']}/pipeline/runs/{run['id']}").json()
+    assert final_run["status"] == "waiting_for_user"
 
-    # Background task runs synchronously in TestClient
-    runs = client.get(f"/api/v1/projects/{project['id']}/pipeline/runs").json()
-    assert len(runs) >= 1
-
-    # After background task completes the run should be completed
-    run_id = run["id"]
-    final_run = client.get(f"/api/v1/projects/{project['id']}/pipeline/runs/{run_id}").json()
-    assert final_run["status"] == "completed"
-
-    # Document should be created
     docs = client.get(f"/api/v1/projects/{project['id']}/documents").json()
-    assert docs["total"] == 1
-    assert docs["items"][0]["document_type"] == "requirement_summary"
-    assert docs["items"][0]["status"] == "review"
+    assert docs["total"] == 2
+    doc_types = {d["document_type"] for d in docs["items"]}
+    assert "requirement_summary" in doc_types
+    assert "gap_analysis_report" in doc_types
 
 
-@patch("app.llm.client.call_ollama", return_value=_MOCK_LLM_OUTPUT)
-def test_document_content_has_fr_table(mock_llm, client: TestClient):
+@patch("app.llm.client.call_ollama", side_effect=_BOTH_LLM_OUTPUTS)
+def test_requirement_summary_content(mock_llm, client: TestClient):
     project = _create_project(client)
     _create_input(client, project["id"])
-    client.post(f"/api/v1/projects/{project['id']}/pipeline/runs")
+    _run_pipeline(client, project["id"])
 
     docs = client.get(f"/api/v1/projects/{project['id']}/documents").json()
-    doc_id = docs["items"][0]["id"]
-
-    doc = client.get(f"/api/v1/projects/{project['id']}/documents/{doc_id}").json()
+    req_doc_id = next(d["id"] for d in docs["items"] if d["document_type"] == "requirement_summary")
+    doc = client.get(f"/api/v1/projects/{project['id']}/documents/{req_doc_id}").json()
     assert "FR-001" in doc["content_markdown"]
-    assert "FR-002" in doc["content_markdown"]
     assert "NFR-001" in doc["content_markdown"]
     assert "BR-001" in doc["content_markdown"]
 
 
-@patch("app.llm.client.call_ollama", return_value=_MOCK_LLM_OUTPUT)
-def test_document_approve(mock_llm, client: TestClient):
+@patch("app.llm.client.call_ollama", side_effect=_BOTH_LLM_OUTPUTS)
+def test_gap_analysis_content(mock_llm, client: TestClient):
     project = _create_project(client)
     _create_input(client, project["id"])
-    client.post(f"/api/v1/projects/{project['id']}/pipeline/runs")
+    _run_pipeline(client, project["id"])
+
+    docs = client.get(f"/api/v1/projects/{project['id']}/documents").json()
+    gap_doc_id = next(d["id"] for d in docs["items"] if d["document_type"] == "gap_analysis_report")
+    doc = client.get(f"/api/v1/projects/{project['id']}/documents/{gap_doc_id}").json()
+    assert "GAP-001" in doc["content_markdown"]
+    assert "GAP-002" in doc["content_markdown"]
+    assert doc["status"] == "review"
+
+
+@patch("app.llm.client.call_ollama", side_effect=_BOTH_LLM_OUTPUTS)
+def test_list_steps_two_completed(mock_llm, client: TestClient):
+    project = _create_project(client)
+    _create_input(client, project["id"])
+    run = _run_pipeline(client, project["id"])
+
+    steps = client.get(f"/api/v1/projects/{project['id']}/pipeline/runs/{run['id']}/steps").json()
+    assert len(steps) == 2
+    step_names = {s["step_name"] for s in steps}
+    assert step_names == {"requirement_summary", "gap_analysis"}
+    for s in steps:
+        assert s["status"] == "completed"
+
+
+# ── Gate 1: approve / reject ───────────────────────────────────────────────────
+
+@patch("app.llm.client.call_ollama", side_effect=_BOTH_LLM_OUTPUTS)
+def test_approve_gate1(mock_llm, client: TestClient):
+    project = _create_project(client)
+    _create_input(client, project["id"])
+    run = _run_pipeline(client, project["id"])
+    run_id = run["id"]
+
+    # Get the gap_analysis step id
+    steps = client.get(f"/api/v1/projects/{project['id']}/pipeline/runs/{run_id}/steps").json()
+    gap_step = next(s for s in steps if s["step_name"] == "gap_analysis")
+
+    r = client.post(f"/api/v1/projects/{project['id']}/pipeline/runs/{run_id}/steps/{gap_step['id']}/approve")
+    assert r.status_code == 200
+    assert r.json()["status"] == "approved"
+
+    final_run = client.get(f"/api/v1/projects/{project['id']}/pipeline/runs/{run_id}").json()
+    assert final_run["status"] == "completed"
+
+
+@patch("app.llm.client.call_ollama", side_effect=_BOTH_LLM_OUTPUTS)
+def test_reject_gate1(mock_llm, client: TestClient):
+    project = _create_project(client)
+    _create_input(client, project["id"])
+    run = _run_pipeline(client, project["id"])
+    run_id = run["id"]
+
+    steps = client.get(f"/api/v1/projects/{project['id']}/pipeline/runs/{run_id}/steps").json()
+    gap_step = next(s for s in steps if s["step_name"] == "gap_analysis")
+
+    r = client.post(
+        f"/api/v1/projects/{project['id']}/pipeline/runs/{run_id}/steps/{gap_step['id']}/reject",
+        json={"reason": "Gap analysis is incomplete, missing performance requirements"},
+    )
+    assert r.status_code == 200
+    assert r.json()["status"] == "rejected"
+
+    final_run = client.get(f"/api/v1/projects/{project['id']}/pipeline/runs/{run_id}").json()
+    assert final_run["status"] == "failed"
+
+
+@patch("app.llm.client.call_ollama", side_effect=_BOTH_LLM_OUTPUTS)
+def test_approve_wrong_state_returns_400(mock_llm, client: TestClient):
+    """Cannot approve a run that is not waiting_for_user."""
+    project = _create_project(client)
+    _create_input(client, project["id"])
+    run = _run_pipeline(client, project["id"])
+    run_id = run["id"]
+
+    steps = client.get(f"/api/v1/projects/{project['id']}/pipeline/runs/{run_id}/steps").json()
+    gap_step = next(s for s in steps if s["step_name"] == "gap_analysis")
+
+    # Approve once (valid)
+    client.post(f"/api/v1/projects/{project['id']}/pipeline/runs/{run_id}/steps/{gap_step['id']}/approve")
+
+    # Approve again (invalid — run is now completed, not waiting_for_user)
+    r = client.post(f"/api/v1/projects/{project['id']}/pipeline/runs/{run_id}/steps/{gap_step['id']}/approve")
+    assert r.status_code == 400
+    assert r.json()["detail"]["error_code"] == "INVALID_STATE"
+
+
+# ── failure path ───────────────────────────────────────────────────────────────
+
+@patch("app.llm.client.call_ollama", return_value="INVALID JSON {{")
+def test_llm_failure_marks_run_failed(mock_llm, client: TestClient):
+    """When RequirementAgent's LLM call returns bad JSON, run is marked failed."""
+    project = _create_project(client)
+    _create_input(client, project["id"])
+    _run_pipeline(client, project["id"])
+
+    runs = client.get(f"/api/v1/projects/{project['id']}/pipeline/runs").json()
+    assert runs[0]["status"] == "failed"
+
+
+@patch("app.llm.client.call_ollama", side_effect=_BOTH_LLM_OUTPUTS)
+def test_document_content_approve(mock_llm, client: TestClient):
+    """A document can be approved via the document endpoint regardless of pipeline gate."""
+    project = _create_project(client)
+    _create_input(client, project["id"])
+    _run_pipeline(client, project["id"])
 
     docs = client.get(f"/api/v1/projects/{project['id']}/documents").json()
     doc_id = docs["items"][0]["id"]
@@ -132,26 +256,3 @@ def test_document_approve(mock_llm, client: TestClient):
     r = client.post(f"/api/v1/projects/{project['id']}/documents/{doc_id}/approve")
     assert r.status_code == 200
     assert r.json()["status"] == "approved"
-
-
-@patch("app.llm.client.call_ollama", return_value="INVALID JSON {{")
-def test_pipeline_run_llm_failure_marks_failed(mock_llm, client: TestClient):
-    project = _create_project(client)
-    _create_input(client, project["id"])
-    client.post(f"/api/v1/projects/{project['id']}/pipeline/runs")
-
-    runs = client.get(f"/api/v1/projects/{project['id']}/pipeline/runs").json()
-    assert runs[0]["status"] == "failed"
-
-
-def test_list_steps(client: TestClient):
-    project = _create_project(client)
-    _create_input(client, project["id"])
-
-    with patch("app.llm.client.call_ollama", return_value=_MOCK_LLM_OUTPUT):
-        run_resp = client.post(f"/api/v1/projects/{project['id']}/pipeline/runs").json()
-
-    steps = client.get(f"/api/v1/projects/{project['id']}/pipeline/runs/{run_resp['id']}/steps").json()
-    assert len(steps) == 1
-    assert steps[0]["step_name"] == "requirement_summary"
-    assert steps[0]["status"] == "completed"

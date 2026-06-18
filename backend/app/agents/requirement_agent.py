@@ -290,15 +290,22 @@ class RequirementAgentRunner:
             step.output_document_id = doc.id
             step.completed_at = datetime.utcnow()
 
-            run.status = PipelineRunStatus.completed
+            # Create next step — Gap Analysis Agent will pick it up
+            gap_step = PipelineStep(
+                pipeline_run_id=run.id,
+                step_name="gap_analysis",
+                status=PipelineStepStatus.pending,
+            )
+            self.session.add(gap_step)
+
+            # Run continues — do not complete yet
             run.current_step = None
-            run.completed_at = datetime.utcnow()
 
             if agent_row:
-                agent_row.status = AgentStatus.done
+                agent_row.status = AgentStatus.idle
                 agent_row.updated_at = datetime.utcnow()
 
-            self._log_activity(run.project_id, agent_row, f"Requirement summary created. FRs: {len(output.functional_requirements)}, Open questions: {len(output.open_questions)}.")
+            self._log_activity(run.project_id, agent_row, f"Requirement summary created. FRs: {len(output.functional_requirements)}, Open questions: {len(output.open_questions)}. Proceeding to gap analysis.")
             self.session.commit()
             logger.info("RequirementAgent completed run=%s doc=%s", run_id, doc_id)
 
