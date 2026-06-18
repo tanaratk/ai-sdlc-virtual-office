@@ -151,7 +151,7 @@ def approve_step(
             background_tasks.add_task(background_fn, run_id)
         return {"status": "approved", "next": next_step_name}
     else:
-        # Final gate — no more agents (Sprint 11 will chain SA Agent here)
+        # Final gate — no more agents (Sprint 12 chains UX Agent here)
         run.status = PipelineRunStatus.completed
         run.completed_at = datetime.utcnow()
         session.commit()
@@ -197,4 +197,4 @@ def rerun_step(
     step_id: uuid.UUID,
     session: Session = Depends(get_session),
 ):
-    raise HTTPException(status_code=501, detail={"error_code": "NOT_IMPLEMENTED", "message": "Step rerun — Sprint 11"})
+    raise HTTPException(status_code=501, detail={"error_code": "NOT_IMPLEMENTED", "message": "Step rerun — Sprint 12"})

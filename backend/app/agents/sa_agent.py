@@ -525,7 +525,7 @@ class SAAgentRunner:
                 select(Document).where(
                     Document.project_id == project_id,
                     Document.document_type == doc_type,
-                )
+                ).order_by(Document.created_at.desc())
             ).first()
 
         brd = _latest(DocumentType.brd)
