@@ -61,7 +61,7 @@ export default function RAGPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Database className="h-4 w-4" />
-            {stats ? (
+            {stats && stats.total_chunks > 0 ? (
               <span>
                 <strong className="text-foreground">{stats.total_chunks}</strong> chunks
                 {stats.document_types.length > 0 && (

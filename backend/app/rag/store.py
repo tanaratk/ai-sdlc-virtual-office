@@ -14,15 +14,16 @@ _OVERLAP = 50
 
 
 def ingest_project(session: Session, project_id: uuid.UUID) -> int:
-    """Chunk and embed all documents for a project. Returns total chunks created."""
-    # Delete existing chunks so re-ingest is idempotent
-    session.exec(delete(RagChunk).where(RagChunk.project_id == project_id))  # type: ignore[arg-type]
-    session.commit()
+    """Chunk and embed all documents for a project. Returns total chunks created.
 
+    Delete and re-insert happen in one transaction so a mid-ingest Ollama
+    failure never leaves the project with zero searchable chunks.
+    """
     documents = session.exec(
         select(Document).where(Document.project_id == project_id)
     ).all()
 
+    new_chunks: list[RagChunk] = []
     total = 0
     for doc in documents:
         chunks = chunker.chunk_text(doc.content_markdown, _CHUNK_SIZE, _OVERLAP)
@@ -37,17 +38,20 @@ def ingest_project(session: Session, project_id: uuid.UUID) -> int:
                 logger.warning("Embed failed for chunk %d of doc %s: %s", idx, doc.id, exc)
                 embedding_json = None
 
-            chunk = RagChunk(
+            new_chunks.append(RagChunk(
                 project_id=project_id,
                 document_id=doc.id,
                 document_type=doc.document_type.value,
                 chunk_index=idx,
                 chunk_text=text,
                 embedding_json=embedding_json,
-            )
-            session.add(chunk)
+            ))
         total += len(chunks)
 
+    # Atomic swap: delete old chunks and insert new ones in a single commit
+    session.exec(delete(RagChunk).where(RagChunk.project_id == project_id))  # type: ignore[arg-type]
+    for chunk in new_chunks:
+        session.add(chunk)
     session.commit()
     return total
 
@@ -63,7 +67,7 @@ def search(
         query_vec = embedder.embed(query)
     except Exception as exc:
         logger.warning("Embed query failed: %s", exc)
-        return []
+        raise
 
     chunks = session.exec(
         select(RagChunk).where(

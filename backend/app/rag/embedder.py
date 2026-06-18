@@ -30,6 +30,11 @@ def deserialize(text: str) -> list[float]:
 
 
 def cosine_similarity(a: list[float], b: list[float]) -> float:
+    if len(a) != len(b):
+        raise ValueError(
+            f"Vector dimension mismatch: {len(a)} vs {len(b)}. "
+            "Re-ingest documents if the embedding model was changed."
+        )
     dot = sum(x * y for x, y in zip(a, b))
     mag_a = math.sqrt(sum(x * x for x in a))
     mag_b = math.sqrt(sum(x * x for x in b))

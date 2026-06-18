@@ -6,9 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlmodel import Session, func, select
 
-from app.db.models import RagChunk
+from app.db.models import Project, RagChunk
 from app.db.session import get_session
-from app.db.models import Project
 from app.rag import store
 
 router = APIRouter()
@@ -52,7 +51,7 @@ class ChunkStats(BaseModel):
 @router.post(
     "/{project_id}/rag/ingest",
     response_model=IngestResponse,
-    status_code=status.HTTP_201_CREATED,
+    status_code=status.HTTP_200_OK,
     summary="Ingest project documents into RAG store",
     description=(
         "Chunk and embed all documents for a project. "
