@@ -3,6 +3,7 @@ services:
   db:
     image: pgvector/pgvector:pg15
     container_name: ai_sdlc_db
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ai_sdlc_user
       POSTGRES_PASSWORD: password
@@ -22,6 +23,7 @@ services:
       context: ../backend
       dockerfile: Dockerfile
     container_name: ai_sdlc_backend
+    restart: unless-stopped
     ports:
       - "8000:8000"
     environment:
@@ -37,6 +39,19 @@ services:
       - ../backend:/app
     command: >
       sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: ai_sdlc_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000/api/v1
+    depends_on:
+      - backend
 
 volumes:
   pgdata:

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
-from app.db.database import get_session
+from app.db.session import get_session
 from app.db.models import Document, DocumentType, GitHubIssue, GitHubSetting, Project
 from app.services.github_service import (
     GitHubRepo,

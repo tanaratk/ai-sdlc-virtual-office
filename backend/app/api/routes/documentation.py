@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlmodel import Session
 
 from app.agents.documentation_agent import DocumentationAgentRunner
-from app.db.database import get_session
+from app.db.session import get_session
 from app.db.models import Project
 
 router = APIRouter()
