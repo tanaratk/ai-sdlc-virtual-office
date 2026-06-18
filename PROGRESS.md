@@ -32,7 +32,7 @@
 | 0 | Requirement Intake & Baseline Review | ✅ Done |
 | 1 | Agent Contract Design | ✅ Done |
 | 2 | Prompt & Template Design | ✅ Done |
-| 3 | Database Design | ✅ Done (schema.md exists) |
+| 3 | Database Design | ✅ Done |
 | 4 | API Design | 🔲 |
 | 5 | Workflow Design | 🔲 |
 | 6 | Backend Skeleton | 🔲 |
@@ -41,11 +41,10 @@
 
 ## Next Sprint
 
-**Sprint 3 — Database Design (complete)**
-- Add `docs/database/erd.md`
-- Add `docs/database/table-spec.md`
-- Add `docs/database/migration-plan.md`
-- (schema.md already exists)
+**Sprint 4 — API Design**
+- Create `docs/api/api-list.md`
+- Create `docs/api/openapi.yaml`
+- Create `docs/api/request-response-examples.md`
 
 ---
 

@@ -1,9 +1,9 @@
 # Database Schema
 
-**Version:** 1.0.0  
+**Version:** 1.1.0  
 **Database:** PostgreSQL 15+  
 **ORM:** SQLAlchemy (Python / FastAPI backend)  
-**Source:** Spec Section 12
+**Source:** Spec Section 12; Sprint 3 additions: sprints, milestones (FR-025–FR-029)
 
 ---
 
@@ -21,6 +21,8 @@
 10. [traceability_links](#10-traceability_links)
 11. [llm_settings](#11-llm_settings)
 12. [agent_memories](#12-agent_memories)
+13. [sprints](#13-sprints)
+14. [milestones](#14-milestones)
 
 ---
 
@@ -65,6 +67,9 @@ CREATE TYPE link_type           AS ENUM ('derived_from', 'implements', 'tests', 
 CREATE TYPE link_actor_type     AS ENUM ('requirement_input', 'document', 'task', 'pipeline_step');
 
 CREATE TYPE memory_type         AS ENUM ('context', 'decision', 'fact', 'instruction');
+
+CREATE TYPE sprint_status       AS ENUM ('not_started', 'in_progress', 'done', 'overdue');
+CREATE TYPE milestone_status    AS ENUM ('not_started', 'in_progress', 'done', 'overdue');
 ```
 
 ---
@@ -564,6 +569,93 @@ CREATE INDEX idx_agent_memories_agent_id   ON agent_memories(agent_id);
 CREATE INDEX idx_agent_memories_project_id ON agent_memories(project_id);
 CREATE INDEX idx_agent_memories_memory_type ON agent_memories(memory_type);
 CREATE INDEX idx_agent_memories_importance  ON agent_memories(importance_score DESC);
+```
+
+---
+
+## 13. sprints
+
+Sprint schedule per project, supporting FR-025–FR-029 (Timeline feature).
+
+```sql
+CREATE TABLE sprints (
+    id                  UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id          UUID          NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    sprint_number       INTEGER       NOT NULL,
+    name                VARCHAR(255)  NOT NULL,
+    planned_start       DATE          NOT NULL,
+    planned_end         DATE          NOT NULL,
+    actual_end          DATE,
+    status              sprint_status NOT NULL DEFAULT 'not_started',
+    story_points_total  INTEGER       NOT NULL DEFAULT 0,
+    story_points_done   INTEGER       NOT NULL DEFAULT 0,
+    created_at          TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    updated_at          TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    UNIQUE (project_id, sprint_number)
+);
+```
+
+| Column | Type | Nullable | Notes |
+|---|---|---|---|
+| id | UUID | NOT NULL | PK |
+| project_id | UUID | NOT NULL | FK → projects.id |
+| sprint_number | INTEGER | NOT NULL | unique per project, e.g. 0–20 |
+| name | VARCHAR(255) | NOT NULL | e.g. "Sprint 1 — Agent Contract Design" |
+| planned_start | DATE | NOT NULL | |
+| planned_end | DATE | NOT NULL | deadline |
+| actual_end | DATE | NULL | set when status → done |
+| status | sprint_status | NOT NULL | default: `not_started` |
+| story_points_total | INTEGER | NOT NULL | default: 0 |
+| story_points_done | INTEGER | NOT NULL | default: 0 |
+| created_at | TIMESTAMPTZ | NOT NULL | auto |
+| updated_at | TIMESTAMPTZ | NOT NULL | auto |
+
+**Indexes:**
+```sql
+CREATE INDEX idx_sprints_project_id ON sprints(project_id);
+CREATE INDEX idx_sprints_status     ON sprints(status);
+CREATE INDEX idx_sprints_planned_end ON sprints(planned_end);
+```
+
+---
+
+## 14. milestones
+
+MVP milestone tracking per project, supporting FR-026 and FR-028.
+
+```sql
+CREATE TABLE milestones (
+    id          UUID             PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id  UUID             NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    name        VARCHAR(255)     NOT NULL,
+    description TEXT,
+    target_date DATE             NOT NULL,
+    actual_date DATE,
+    status      milestone_status NOT NULL DEFAULT 'not_started',
+    mvp_number  INTEGER          NOT NULL,
+    created_at  TIMESTAMPTZ      NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ      NOT NULL DEFAULT now()
+);
+```
+
+| Column | Type | Nullable | Notes |
+|---|---|---|---|
+| id | UUID | NOT NULL | PK |
+| project_id | UUID | NOT NULL | FK → projects.id |
+| name | VARCHAR(255) | NOT NULL | e.g. "MVP 1 — Requirement Loop" |
+| description | TEXT | NULL | |
+| target_date | DATE | NOT NULL | target completion date |
+| actual_date | DATE | NULL | set when status → done |
+| status | milestone_status | NOT NULL | default: `not_started` |
+| mvp_number | INTEGER | NOT NULL | 1–5 |
+| created_at | TIMESTAMPTZ | NOT NULL | auto |
+| updated_at | TIMESTAMPTZ | NOT NULL | auto |
+
+**Indexes:**
+```sql
+CREATE INDEX idx_milestones_project_id  ON milestones(project_id);
+CREATE INDEX idx_milestones_target_date ON milestones(target_date);
+CREATE INDEX idx_milestones_status      ON milestones(status);
 ```
 
 ---
