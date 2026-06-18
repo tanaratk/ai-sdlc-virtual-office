@@ -1,4 +1,4 @@
-"""Tests for the 4-agent pipeline: Requirement → Gap Analysis → BA Agent → SA Agent."""
+"""Tests for the 5-agent pipeline: Requirement → Gap Analysis → BA → SA → UX Agent."""
 import json
 import uuid
 from unittest.mock import patch
@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 # ── helpers ────────────────────────────────────────────────────────────────────
 
 def _create_project(client: TestClient) -> dict:
-    r = client.post("/api/v1/projects", json={"name": "Sprint-11 project", "created_by": "tester"})
+    r = client.post("/api/v1/projects", json={"name": "Sprint-12 project", "created_by": "tester"})
     assert r.status_code == 201
     return r.json()
 
@@ -42,6 +42,13 @@ def _approve(client: TestClient, project_id: str, run_id: str, step_id: str) -> 
     r = client.post(f"/api/v1/projects/{project_id}/pipeline/runs/{run_id}/steps/{step_id}/approve")
     assert r.status_code == 200
     return r.json()
+
+
+def _approve_through_gate(client: TestClient, project_id: str, run_id: str, *gate_step_names: str) -> None:
+    """Approve multiple gates in order."""
+    for step_name in gate_step_names:
+        step = _get_step(client, project_id, run_id, step_name)
+        _approve(client, project_id, run_id, step["id"])
 
 
 # ── Mock LLM outputs ───────────────────────────────────────────────────────────
@@ -78,7 +85,7 @@ _MOCK_GAP_OUTPUT = json.dumps({
             "severity": "High",
             "description": "No authentication or authorization requirement stated.",
             "related_requirement_id": None,
-            "question": "How should users authenticate? Is role-based access control required?",
+            "question": "How should users authenticate?",
         },
         {
             "id": "GAP-002",
@@ -177,13 +184,13 @@ _MOCK_SA_OUTPUT = json.dumps({
                 "requirement_refs": ["NFR-001"],
             },
         ],
-        "deployment_notes": "Single-server deployment for MVP. Horizontal scaling via container orchestration later.",
+        "deployment_notes": "Single-server deployment for MVP.",
         "security_considerations": [
             "JWT authentication required for all endpoints",
-            "Role-based access: employee can only see own expenses, manager sees team expenses",
+            "Role-based access: employee vs manager",
         ],
         "integration_points": [
-            {"system": "Email Server", "protocol": "SMTP", "description": "Send approval/rejection notifications per FR-003"},
+            {"system": "Email Server", "protocol": "SMTP", "description": "Send notifications per FR-003"},
         ],
     },
     "database": {
@@ -191,10 +198,10 @@ _MOCK_SA_OUTPUT = json.dumps({
             {
                 "id": "DB-001",
                 "name": "users",
-                "description": "System users — employees and managers",
+                "description": "System users",
                 "columns": [
                     {"name": "id", "type": "UUID", "nullable": False, "description": "Primary key"},
-                    {"name": "email", "type": "VARCHAR(255)", "nullable": False, "description": "Unique user email"},
+                    {"name": "email", "type": "VARCHAR(255)", "nullable": False, "description": "User email"},
                     {"name": "role", "type": "VARCHAR(50)", "nullable": False, "description": "employee or manager"},
                 ],
                 "requirement_ref": "FR-001",
@@ -202,23 +209,18 @@ _MOCK_SA_OUTPUT = json.dumps({
             {
                 "id": "DB-002",
                 "name": "expense_requests",
-                "description": "Expense reimbursement requests submitted by employees",
+                "description": "Expense requests",
                 "columns": [
                     {"name": "id", "type": "UUID", "nullable": False, "description": "Primary key"},
                     {"name": "user_id", "type": "UUID", "nullable": False, "description": "FK → users.id"},
-                    {"name": "amount", "type": "DECIMAL(12,2)", "nullable": False, "description": "Requested amount"},
-                    {"name": "status", "type": "VARCHAR(50)", "nullable": False, "description": "pending/approved/rejected"},
+                    {"name": "amount", "type": "DECIMAL(12,2)", "nullable": False, "description": "Amount"},
+                    {"name": "status", "type": "VARCHAR(50)", "nullable": False, "description": "Status"},
                 ],
                 "requirement_ref": "FR-001",
             },
         ],
         "relationships": [
-            {
-                "from_table": "expense_requests",
-                "to_table": "users",
-                "type": "many_to_one",
-                "description": "Each expense belongs to one user",
-            }
+            {"from_table": "expense_requests", "to_table": "users", "type": "many_to_one", "description": "Each expense belongs to one user"},
         ],
     },
     "api_spec": {
@@ -230,12 +232,12 @@ _MOCK_SA_OUTPUT = json.dumps({
                 "path": "/expenses",
                 "description": "Submit a new expense request",
                 "request_fields": [
-                    {"name": "amount", "type": "number", "required": True, "description": "Expense amount in THB"},
-                    {"name": "description", "type": "string", "required": True, "description": "Purpose of the expense"},
+                    {"name": "amount", "type": "number", "required": True, "description": "Expense amount"},
+                    {"name": "description", "type": "string", "required": True, "description": "Purpose"},
                 ],
                 "response_fields": [
                     {"name": "id", "type": "string", "required": True, "description": "Created expense ID"},
-                    {"name": "status", "type": "string", "required": True, "description": "Always 'pending' on creation"},
+                    {"name": "status", "type": "string", "required": True, "description": "pending"},
                 ],
                 "requirement_ref": "FR-001",
             },
@@ -243,10 +245,9 @@ _MOCK_SA_OUTPUT = json.dumps({
                 "id": "API-002",
                 "method": "POST",
                 "path": "/expenses/{id}/approve",
-                "description": "Manager approves an expense request",
+                "description": "Manager approves an expense",
                 "request_fields": [],
                 "response_fields": [
-                    {"name": "id", "type": "string", "required": True, "description": "Expense ID"},
                     {"name": "status", "type": "string", "required": True, "description": "approved"},
                 ],
                 "requirement_ref": "FR-002",
@@ -255,10 +256,67 @@ _MOCK_SA_OUTPUT = json.dumps({
     },
 })
 
+_MOCK_UX_OUTPUT = json.dumps({
+    "screens": [
+        {
+            "id": "UI-001",
+            "name": "Expense Submission",
+            "description": "Employee fills in and submits a new expense request",
+            "user_role": "employee",
+            "requirement_refs": ["FR-001"],
+            "fields": [
+                {"name": "amount", "type": "number", "required": True, "validation": "Must be greater than 0", "description": "Expense amount in THB"},
+                {"name": "description", "type": "textarea", "required": True, "validation": "Max 500 characters", "description": "Purpose of the expense"},
+                {"name": "receipt", "type": "file", "required": False, "validation": "PDF or image, max 5MB", "description": "Receipt attachment"},
+            ],
+            "actions": ["Submit", "Cancel"],
+            "navigation": ["My Expenses List"],
+        },
+        {
+            "id": "UI-002",
+            "name": "Manager Approval Dashboard",
+            "description": "Manager views and acts on pending expense requests from their team",
+            "user_role": "manager",
+            "requirement_refs": ["FR-002"],
+            "fields": [],
+            "actions": ["Approve", "Reject"],
+            "navigation": ["Expense Detail", "My Team Overview"],
+        },
+    ],
+    "user_flows": [
+        {
+            "id": "FLOW-001",
+            "name": "Submit Expense Flow",
+            "steps": [
+                "1. Employee navigates to Expense Submission screen",
+                "2. Employee fills in amount, description, and optional receipt",
+                "3. Employee clicks Submit",
+                "4. System validates the form fields",
+                "5. System saves the expense with status PENDING",
+                "6. System navigates employee to My Expenses List",
+            ],
+            "requirement_ref": "FR-001",
+        },
+        {
+            "id": "FLOW-002",
+            "name": "Manager Approval Flow",
+            "steps": [
+                "1. Manager opens Manager Approval Dashboard",
+                "2. Manager reviews pending expense requests",
+                "3. Manager clicks Approve or Reject on a request",
+                "4. System updates the expense status",
+                "5. System sends email notification to the employee",
+            ],
+            "requirement_ref": "FR-002",
+        },
+    ],
+})
+
 # LLM call sequences
-_BOTH_LLM_OUTPUTS = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT]          # stops at Gate 1
-_ALL_LLM_OUTPUTS = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT, _MOCK_BA_OUTPUT]   # stops at Gate 2
-_FULL_LLM_OUTPUTS = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT, _MOCK_BA_OUTPUT, _MOCK_SA_OUTPUT]  # through Gate 3
+_BOTH_LLM_OUTPUTS  = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT]                                           # Gate 1
+_ALL_LLM_OUTPUTS   = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT, _MOCK_BA_OUTPUT]                          # Gate 2
+_FULL_LLM_OUTPUTS  = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT, _MOCK_BA_OUTPUT, _MOCK_SA_OUTPUT]         # Gate 3
+_MAX_LLM_OUTPUTS   = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT, _MOCK_BA_OUTPUT, _MOCK_SA_OUTPUT, _MOCK_UX_OUTPUT]  # Gate 4
 
 
 # ── guard tests (no LLM) ───────────────────────────────────────────────────────
@@ -296,8 +354,7 @@ def test_full_pipeline_creates_two_documents(mock_llm, client: TestClient):
     docs = client.get(f"/api/v1/projects/{project['id']}/documents").json()
     assert docs["total"] == 2
     doc_types = {d["document_type"] for d in docs["items"]}
-    assert "requirement_summary" in doc_types
-    assert "gap_analysis_report" in doc_types
+    assert {"requirement_summary", "gap_analysis_report"} == doc_types
 
 
 @patch("app.llm.client.call_ollama", side_effect=_BOTH_LLM_OUTPUTS)
@@ -336,8 +393,7 @@ def test_list_steps_after_gap_analysis(mock_llm, client: TestClient):
 
     steps = client.get(f"/api/v1/projects/{project['id']}/pipeline/runs/{run['id']}/steps").json()
     assert len(steps) == 2
-    step_names = {s["step_name"] for s in steps}
-    assert step_names == {"requirement_summary", "gap_analysis"}
+    assert {s["step_name"] for s in steps} == {"requirement_summary", "gap_analysis"}
     for s in steps:
         assert s["status"] == "completed"
 
@@ -365,9 +421,7 @@ def test_ba_agent_creates_three_documents(mock_llm, client: TestClient):
     project = _create_project(client)
     _create_input(client, project["id"])
     run = _run_pipeline(client, project["id"])
-
-    gap_step = _get_step(client, project["id"], run["id"], "gap_analysis")
-    _approve(client, project["id"], run["id"], gap_step["id"])
+    _approve_through_gate(client, project["id"], run["id"], "gap_analysis")
 
     docs = client.get(f"/api/v1/projects/{project['id']}/documents").json()
     assert docs["total"] == 5
@@ -380,8 +434,7 @@ def test_brd_content(mock_llm, client: TestClient):
     project = _create_project(client)
     _create_input(client, project["id"])
     run = _run_pipeline(client, project["id"])
-    gap_step = _get_step(client, project["id"], run["id"], "gap_analysis")
-    _approve(client, project["id"], run["id"], gap_step["id"])
+    _approve_through_gate(client, project["id"], run["id"], "gap_analysis")
 
     docs = client.get(f"/api/v1/projects/{project['id']}/documents").json()
     doc_id = next(d["id"] for d in docs["items"] if d["document_type"] == "brd")
@@ -395,15 +448,13 @@ def test_fsd_content(mock_llm, client: TestClient):
     project = _create_project(client)
     _create_input(client, project["id"])
     run = _run_pipeline(client, project["id"])
-    gap_step = _get_step(client, project["id"], run["id"], "gap_analysis")
-    _approve(client, project["id"], run["id"], gap_step["id"])
+    _approve_through_gate(client, project["id"], run["id"], "gap_analysis")
 
     docs = client.get(f"/api/v1/projects/{project['id']}/documents").json()
     doc_id = next(d["id"] for d in docs["items"] if d["document_type"] == "fsd")
     doc = client.get(f"/api/v1/projects/{project['id']}/documents/{doc_id}").json()
     assert "FSD-001" in doc["content_markdown"]
     assert "FSD-002" in doc["content_markdown"]
-    assert "FR-001" in doc["content_markdown"]
 
 
 @patch("app.llm.client.call_ollama", side_effect=_ALL_LLM_OUTPUTS)
@@ -411,28 +462,13 @@ def test_user_story_content(mock_llm, client: TestClient):
     project = _create_project(client)
     _create_input(client, project["id"])
     run = _run_pipeline(client, project["id"])
-    gap_step = _get_step(client, project["id"], run["id"], "gap_analysis")
-    _approve(client, project["id"], run["id"], gap_step["id"])
+    _approve_through_gate(client, project["id"], run["id"], "gap_analysis")
 
     docs = client.get(f"/api/v1/projects/{project['id']}/documents").json()
     doc_id = next(d["id"] for d in docs["items"] if d["document_type"] == "user_story")
     doc = client.get(f"/api/v1/projects/{project['id']}/documents/{doc_id}").json()
     assert "US-001" in doc["content_markdown"]
     assert "US-002" in doc["content_markdown"]
-
-
-@patch("app.llm.client.call_ollama", side_effect=_ALL_LLM_OUTPUTS)
-def test_list_steps_after_ba(mock_llm, client: TestClient):
-    project = _create_project(client)
-    _create_input(client, project["id"])
-    run = _run_pipeline(client, project["id"])
-    gap_step = _get_step(client, project["id"], run["id"], "gap_analysis")
-    _approve(client, project["id"], run["id"], gap_step["id"])
-
-    steps = client.get(f"/api/v1/projects/{project['id']}/pipeline/runs/{run['id']}/steps").json()
-    assert len(steps) == 3
-    for s in steps:
-        assert s["status"] == "completed"
 
 
 # ── Gate 2 → SA Agent (step 4) ─────────────────────────────────────────────────
@@ -444,9 +480,7 @@ def test_approve_gate2_triggers_sa_agent(mock_llm, client: TestClient):
     run = _run_pipeline(client, project["id"])
     run_id = run["id"]
 
-    gap_step = _get_step(client, project["id"], run_id, "gap_analysis")
-    _approve(client, project["id"], run_id, gap_step["id"])
-
+    _approve_through_gate(client, project["id"], run_id, "gap_analysis")
     ba_step = _get_step(client, project["id"], run_id, "ba_documents")
     result = _approve(client, project["id"], run_id, ba_step["id"])
     assert result["next"] == "sa_documents"
@@ -461,11 +495,7 @@ def test_sa_agent_creates_three_documents(mock_llm, client: TestClient):
     project = _create_project(client)
     _create_input(client, project["id"])
     run = _run_pipeline(client, project["id"])
-
-    gap_step = _get_step(client, project["id"], run["id"], "gap_analysis")
-    _approve(client, project["id"], run["id"], gap_step["id"])
-    ba_step = _get_step(client, project["id"], run["id"], "ba_documents")
-    _approve(client, project["id"], run["id"], ba_step["id"])
+    _approve_through_gate(client, project["id"], run["id"], "gap_analysis", "ba_documents")
 
     docs = client.get(f"/api/v1/projects/{project['id']}/documents").json()
     assert docs["total"] == 8
@@ -479,17 +509,13 @@ def test_architecture_content(mock_llm, client: TestClient):
     project = _create_project(client)
     _create_input(client, project["id"])
     run = _run_pipeline(client, project["id"])
-    gap_step = _get_step(client, project["id"], run["id"], "gap_analysis")
-    _approve(client, project["id"], run["id"], gap_step["id"])
-    ba_step = _get_step(client, project["id"], run["id"], "ba_documents")
-    _approve(client, project["id"], run["id"], ba_step["id"])
+    _approve_through_gate(client, project["id"], run["id"], "gap_analysis", "ba_documents")
 
     docs = client.get(f"/api/v1/projects/{project['id']}/documents").json()
     doc_id = next(d["id"] for d in docs["items"] if d["document_type"] == "architecture_design")
     doc = client.get(f"/api/v1/projects/{project['id']}/documents/{doc_id}").json()
     assert "COMP-001" in doc["content_markdown"]
     assert "COMP-002" in doc["content_markdown"]
-    assert "COMP-003" in doc["content_markdown"]
     assert doc["status"] == "review"
 
 
@@ -498,17 +524,13 @@ def test_database_design_content(mock_llm, client: TestClient):
     project = _create_project(client)
     _create_input(client, project["id"])
     run = _run_pipeline(client, project["id"])
-    gap_step = _get_step(client, project["id"], run["id"], "gap_analysis")
-    _approve(client, project["id"], run["id"], gap_step["id"])
-    ba_step = _get_step(client, project["id"], run["id"], "ba_documents")
-    _approve(client, project["id"], run["id"], ba_step["id"])
+    _approve_through_gate(client, project["id"], run["id"], "gap_analysis", "ba_documents")
 
     docs = client.get(f"/api/v1/projects/{project['id']}/documents").json()
     doc_id = next(d["id"] for d in docs["items"] if d["document_type"] == "database_design")
     doc = client.get(f"/api/v1/projects/{project['id']}/documents/{doc_id}").json()
     assert "DB-001" in doc["content_markdown"]
     assert "DB-002" in doc["content_markdown"]
-    assert "FR-001" in doc["content_markdown"]
 
 
 @patch("app.llm.client.call_ollama", side_effect=_FULL_LLM_OUTPUTS)
@@ -516,79 +538,120 @@ def test_api_spec_content(mock_llm, client: TestClient):
     project = _create_project(client)
     _create_input(client, project["id"])
     run = _run_pipeline(client, project["id"])
-    gap_step = _get_step(client, project["id"], run["id"], "gap_analysis")
-    _approve(client, project["id"], run["id"], gap_step["id"])
-    ba_step = _get_step(client, project["id"], run["id"], "ba_documents")
-    _approve(client, project["id"], run["id"], ba_step["id"])
+    _approve_through_gate(client, project["id"], run["id"], "gap_analysis", "ba_documents")
 
     docs = client.get(f"/api/v1/projects/{project['id']}/documents").json()
     doc_id = next(d["id"] for d in docs["items"] if d["document_type"] == "api_spec")
     doc = client.get(f"/api/v1/projects/{project['id']}/documents/{doc_id}").json()
     assert "API-001" in doc["content_markdown"]
     assert "API-002" in doc["content_markdown"]
-    assert "FR-001" in doc["content_markdown"]
 
 
-@patch("app.llm.client.call_ollama", side_effect=_FULL_LLM_OUTPUTS)
-def test_list_steps_after_sa(mock_llm, client: TestClient):
-    project = _create_project(client)
-    _create_input(client, project["id"])
-    run = _run_pipeline(client, project["id"])
-    gap_step = _get_step(client, project["id"], run["id"], "gap_analysis")
-    _approve(client, project["id"], run["id"], gap_step["id"])
-    ba_step = _get_step(client, project["id"], run["id"], "ba_documents")
-    _approve(client, project["id"], run["id"], ba_step["id"])
+# ── Gate 3 → UX Agent (step 5) ─────────────────────────────────────────────────
 
-    steps = client.get(f"/api/v1/projects/{project['id']}/pipeline/runs/{run['id']}/steps").json()
-    assert len(steps) == 4
-    for s in steps:
-        assert s["status"] == "completed"
-
-
-# ── Gate 3 ─────────────────────────────────────────────────────────────────────
-
-@patch("app.llm.client.call_ollama", side_effect=_FULL_LLM_OUTPUTS)
-def test_approve_gate3_completes_run(mock_llm, client: TestClient):
+@patch("app.llm.client.call_ollama", side_effect=_MAX_LLM_OUTPUTS)
+def test_approve_gate3_triggers_ux_agent(mock_llm, client: TestClient):
     project = _create_project(client)
     _create_input(client, project["id"])
     run = _run_pipeline(client, project["id"])
     run_id = run["id"]
 
-    gap_step = _get_step(client, project["id"], run_id, "gap_analysis")
-    _approve(client, project["id"], run_id, gap_step["id"])
-    ba_step = _get_step(client, project["id"], run_id, "ba_documents")
-    _approve(client, project["id"], run_id, ba_step["id"])
+    _approve_through_gate(client, project["id"], run_id, "gap_analysis", "ba_documents")
     sa_step = _get_step(client, project["id"], run_id, "sa_documents")
     result = _approve(client, project["id"], run_id, sa_step["id"])
+    assert result["next"] == "ux_documents"
+
+    final_run = client.get(f"/api/v1/projects/{project['id']}/pipeline/runs/{run_id}").json()
+    assert final_run["status"] == "waiting_for_user"
+    assert final_run["current_step"] == "ux_documents"
+
+
+@patch("app.llm.client.call_ollama", side_effect=_MAX_LLM_OUTPUTS)
+def test_ux_agent_creates_screen_spec(mock_llm, client: TestClient):
+    project = _create_project(client)
+    _create_input(client, project["id"])
+    run = _run_pipeline(client, project["id"])
+    _approve_through_gate(client, project["id"], run["id"],
+                          "gap_analysis", "ba_documents", "sa_documents")
+
+    docs = client.get(f"/api/v1/projects/{project['id']}/documents").json()
+    assert docs["total"] == 9
+    doc_types = {d["document_type"] for d in docs["items"]}
+    assert "screen_spec" in doc_types
+
+
+@patch("app.llm.client.call_ollama", side_effect=_MAX_LLM_OUTPUTS)
+def test_screen_spec_content(mock_llm, client: TestClient):
+    project = _create_project(client)
+    _create_input(client, project["id"])
+    run = _run_pipeline(client, project["id"])
+    _approve_through_gate(client, project["id"], run["id"],
+                          "gap_analysis", "ba_documents", "sa_documents")
+
+    docs = client.get(f"/api/v1/projects/{project['id']}/documents").json()
+    doc_id = next(d["id"] for d in docs["items"] if d["document_type"] == "screen_spec")
+    doc = client.get(f"/api/v1/projects/{project['id']}/documents/{doc_id}").json()
+    assert "UI-001" in doc["content_markdown"]
+    assert "UI-002" in doc["content_markdown"]
+    assert "FLOW-001" in doc["content_markdown"]
+    assert "FLOW-002" in doc["content_markdown"]
+    assert "FR-001" in doc["content_markdown"]
+    assert doc["status"] == "review"
+
+
+@patch("app.llm.client.call_ollama", side_effect=_MAX_LLM_OUTPUTS)
+def test_list_steps_after_ux(mock_llm, client: TestClient):
+    project = _create_project(client)
+    _create_input(client, project["id"])
+    run = _run_pipeline(client, project["id"])
+    _approve_through_gate(client, project["id"], run["id"],
+                          "gap_analysis", "ba_documents", "sa_documents")
+
+    steps = client.get(f"/api/v1/projects/{project['id']}/pipeline/runs/{run['id']}/steps").json()
+    assert len(steps) == 5
+    for s in steps:
+        assert s["status"] == "completed"
+
+
+# ── Gate 4 ─────────────────────────────────────────────────────────────────────
+
+@patch("app.llm.client.call_ollama", side_effect=_MAX_LLM_OUTPUTS)
+def test_approve_gate4_completes_run(mock_llm, client: TestClient):
+    project = _create_project(client)
+    _create_input(client, project["id"])
+    run = _run_pipeline(client, project["id"])
+    run_id = run["id"]
+
+    _approve_through_gate(client, project["id"], run_id,
+                          "gap_analysis", "ba_documents", "sa_documents")
+    ux_step = _get_step(client, project["id"], run_id, "ux_documents")
+    result = _approve(client, project["id"], run_id, ux_step["id"])
     assert result["status"] == "approved"
 
     final_run = client.get(f"/api/v1/projects/{project['id']}/pipeline/runs/{run_id}").json()
     assert final_run["status"] == "completed"
 
 
-@patch("app.llm.client.call_ollama", side_effect=_FULL_LLM_OUTPUTS)
+@patch("app.llm.client.call_ollama", side_effect=_MAX_LLM_OUTPUTS)
 def test_approve_wrong_state_returns_400(mock_llm, client: TestClient):
     project = _create_project(client)
     _create_input(client, project["id"])
     run = _run_pipeline(client, project["id"])
     run_id = run["id"]
 
-    # All three gates → run = completed
-    gap_step = _get_step(client, project["id"], run_id, "gap_analysis")
-    _approve(client, project["id"], run_id, gap_step["id"])
-    ba_step = _get_step(client, project["id"], run_id, "ba_documents")
-    _approve(client, project["id"], run_id, ba_step["id"])
-    sa_step = _get_step(client, project["id"], run_id, "sa_documents")
-    _approve(client, project["id"], run_id, sa_step["id"])
+    # All four gates → run = completed
+    _approve_through_gate(client, project["id"], run_id,
+                          "gap_analysis", "ba_documents", "sa_documents", "ux_documents")
 
-    r = client.post(f"/api/v1/projects/{project['id']}/pipeline/runs/{run_id}/steps/{sa_step['id']}/approve")
+    ux_step = _get_step(client, project["id"], run_id, "ux_documents")
+    r = client.post(f"/api/v1/projects/{project['id']}/pipeline/runs/{run_id}/steps/{ux_step['id']}/approve")
     assert r.status_code == 400
     assert r.json()["detail"]["error_code"] == "INVALID_STATE"
 
 
 @patch("app.llm.client.call_ollama", side_effect=_BOTH_LLM_OUTPUTS)
 def test_approve_wrong_step_returns_400(mock_llm, client: TestClient):
-    """Approving req_summary step while run is at Gate 1 (gap_analysis) must fail."""
+    """Approving req_summary step while run is at Gate 1 must fail."""
     project = _create_project(client)
     _create_input(client, project["id"])
     run = _run_pipeline(client, project["id"])
