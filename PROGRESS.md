@@ -21,23 +21,21 @@
 | 7b | Template — Gap Analysis Report | `docs/templates/gap-analysis-report.template.md` | ✅ Done |
 | 8 | Database Schema Design | `docs/database/schema.md` | ✅ Done |
 | 9 | UI Design ใน Figma | https://www.figma.com/design/fwTNT7ztQLI1Hj0Bj0EaJb | ✅ Done |
+| 10 | README.md | `README.md` | ✅ Done |
 
 ---
 
-## Next Task
+## Status
 
-**Task 10 — README.md**
+**All 10 tasks complete.** The documentation and design phase is done.
 
-- File to create: `README.md` at repo root
-- Must cover: project overview, tech stack, folder structure, how to run locally, agent pipeline summary
+Next phase: backend and frontend implementation.
 
 ---
 
 ## Remaining Tasks
 
-| # | Task | Output |
-|---|------|--------|
-| 10 | README.md | Project overview + how to run |
+None — all planned tasks are complete.
 
 ---
 
