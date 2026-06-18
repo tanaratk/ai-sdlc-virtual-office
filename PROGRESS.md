@@ -19,16 +19,16 @@
 | 6 | Gap Analysis Agent System Prompt | `docs/prompts/gap-analysis-agent.system.md` | ✅ Done |
 | 7a | Template — Requirement Summary | `docs/templates/requirement-summary.template.md` | ✅ Done |
 | 7b | Template — Gap Analysis Report | `docs/templates/gap-analysis-report.template.md` | ✅ Done |
+| 8 | Database Schema Design | `docs/database/schema.md` | ✅ Done |
 
 ---
 
 ## Next Task
 
-**Task 8 — Database Schema Design**
+**Task 9 — UI Design in Figma**
 
-- File to create: `docs/database/schema.md`
-- Base content: Spec Section 12
-- Must cover: all tables, columns, data types, PKs, FKs, indexes, and enum types
+- Screens: Dashboard, Upload, Agent Console, Document Viewer
+- Tool: Figma MCP
 
 ---
 
@@ -36,9 +36,6 @@
 
 | # | Task | Output |
 |---|------|--------|
-| 8 | Database Schema Design | `docs/database/schema.md` |
-| 7b | Template — Gap Analysis Report | `docs/templates/gap-analysis-report.template.md` |
-| 8 | Database Schema Design | `docs/database/schema.md` |
 | 9 | UI Design ใน Figma | Dashboard, Upload, Agent Console, Document Viewer |
 | 10 | README.md | Project overview + how to run |
 
