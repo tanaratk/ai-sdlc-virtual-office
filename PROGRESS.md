@@ -25,10 +25,12 @@
 
 ## Next Task
 
-**Task 9 — UI Design in Figma**
+**Task 9 — UI Design in Figma (partial)**
 
-- Screens: Dashboard, Upload, Agent Console, Document Viewer
-- Tool: Figma MCP
+- Figma file: https://www.figma.com/design/fwTNT7ztQLI1Hj0Bj0EaJb
+- Dashboard ✅, Upload ✅, Agent Console ✅
+- Document Viewer ❌ blocked — Figma MCP hit Starter plan rate limit
+- To resume: upgrade Figma plan OR build Document Viewer manually in Figma
 
 ---
 
@@ -36,7 +38,7 @@
 
 | # | Task | Output |
 |---|------|--------|
-| 9 | UI Design ใน Figma | Dashboard, Upload, Agent Console, Document Viewer |
+| 9 | UI Design ใน Figma (Document Viewer remaining) | https://www.figma.com/design/fwTNT7ztQLI1Hj0Bj0EaJb |
 | 10 | README.md | Project overview + how to run |
 
 ---
