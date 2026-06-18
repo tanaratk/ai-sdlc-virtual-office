@@ -401,6 +401,65 @@ class Milestone(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class McpToolCategory(str, Enum):
+    filesystem = "filesystem"
+    github = "github"
+    database = "database"
+    design = "design"
+    browser = "browser"
+    document = "document"
+    testing = "testing"
+
+
+class McpCallStatus(str, Enum):
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+
+
+class McpTool(SQLModel, table=True):
+    __tablename__ = "mcp_tools"
+    __table_args__ = (UniqueConstraint("tool_name"),)
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    tool_name: str = Field(max_length=100)
+    display_name: str = Field(max_length=255)
+    description: str
+    category: McpToolCategory
+    requires_approval: bool = Field(default=True)
+    is_enabled: bool = Field(default=True)
+    is_dangerous: bool = Field(default=False)
+    server_config_json: Optional[dict[str, Any]] = Field(
+        default=None, sa_column=Column(sa.JSON)
+    )
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class McpToolCall(SQLModel, table=True):
+    __tablename__ = "mcp_tool_calls"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    project_id: uuid.UUID = Field(foreign_key="projects.id")
+    tool_name: str = Field(max_length=100)
+    agent_id: Optional[uuid.UUID] = Field(default=None, foreign_key="agents.id")
+    status: McpCallStatus = Field(default=McpCallStatus.pending)
+    input_json: Optional[dict[str, Any]] = Field(
+        default=None, sa_column=Column(sa.JSON)
+    )
+    output_json: Optional[dict[str, Any]] = Field(
+        default=None, sa_column=Column(sa.JSON)
+    )
+    error_message: Optional[str] = Field(default=None)
+    requested_by: Optional[str] = Field(default=None, max_length=255)
+    resolved_by: Optional[str] = Field(default=None, max_length=255)
+    requested_at: datetime = Field(default_factory=datetime.utcnow)
+    resolved_at: Optional[datetime] = Field(default=None)
+
+
 class GitHubSetting(SQLModel, table=True):
     __tablename__ = "github_settings"
     __table_args__ = (UniqueConstraint("project_id"),)

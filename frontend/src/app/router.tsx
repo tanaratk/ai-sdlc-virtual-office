@@ -9,6 +9,7 @@ import TraceabilityPage from "@/pages/TraceabilityPage";
 import VirtualOfficePage from "@/pages/VirtualOfficePage";
 import ChangeImpactPage from "@/pages/ChangeImpactPage";
 import GitHubPage from "@/pages/GitHubPage";
+import McpPage from "@/pages/McpPage";
 import Settings from "@/pages/Settings";
 
 export const router = createBrowserRouter([
@@ -26,6 +27,8 @@ export const router = createBrowserRouter([
       { path: "projects/:projectId/office", element: <VirtualOfficePage /> },
       { path: "projects/:projectId/change-impact", element: <ChangeImpactPage /> },
       { path: "projects/:projectId/github", element: <GitHubPage /> },
+      { path: "projects/:projectId/mcp", element: <McpPage /> },
+      { path: "mcp", element: <McpPage /> },
       { path: "intake", element: <RequirementIntake /> },
       { path: "agents", element: <AgentConsolePage /> },
       { path: "documents", element: <DocumentReview /> },

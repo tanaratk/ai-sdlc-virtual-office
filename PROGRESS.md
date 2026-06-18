@@ -1,6 +1,6 @@
 # AI-SDLC Virtual Office — Progress Tracker
 
-**Last Updated:** 2026-06-18 (Sprint 20 + Sprint 18 complete)  
+**Last Updated:** 2026-06-18 (Sprint 20 + Sprint 18 + Sprint 19 complete)  
 **Project:** ai-sdlc-virtual-office  
 **Repo:** https://github.com/tanaratk/ai-sdlc-virtual-office  
 **Working Directory:** D:\AI_Office
@@ -48,14 +48,14 @@
 | 16 | Virtual Office MVP | ✅ Done |
 | 17 | RAG MVP | 🔲 (deferred — no active use case yet) |
 | 18 | GitHub Integration MVP | ✅ Done |
-| 19 | MCP MVP | 🔲 |
+| 19 | MCP MVP | ✅ Done |
 | 20 | Change Impact Agent MVP | ✅ Done |
 
 ## Next Sprint
 
-**Sprint 17 — RAG MVP** (deferred) or **Sprint 19 — MCP MVP**
-- RAG: defer until real project hits context-window limit
-- MCP: extend agents with external tool calls
+**Sprint 17 — RAG MVP** (deferred — no active use case yet)
+- Trigger when: real project document hits LLM context-window limit
+- OR: need cross-project search / company knowledge base
 
 ---
 

@@ -8,6 +8,7 @@ from app.api.routes import (
     github,
     health,
     inputs,
+    mcp,
     messages,
     milestones,
     pipeline,
@@ -35,3 +36,5 @@ api_router.include_router(milestones.router, prefix="/projects", tags=["Mileston
 api_router.include_router(traceability.router, prefix="/projects", tags=["Traceability"])
 api_router.include_router(change_impact.router, prefix="/projects", tags=["Change Impact"])
 api_router.include_router(github.router, prefix="/projects", tags=["GitHub"])
+api_router.include_router(mcp.tool_router, tags=["MCP"])
+api_router.include_router(mcp.call_router, prefix="/projects", tags=["MCP"])
