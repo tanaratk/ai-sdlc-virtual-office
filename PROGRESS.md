@@ -33,7 +33,7 @@
 | 1 | Agent Contract Design | ✅ Done |
 | 2 | Prompt & Template Design | ✅ Done |
 | 3 | Database Design | ✅ Done |
-| 4 | API Design | 🔲 |
+| 4 | API Design | ✅ Done |
 | 5 | Workflow Design | 🔲 |
 | 6 | Backend Skeleton | 🔲 |
 | 7 | Frontend Skeleton | 🔲 |
@@ -41,10 +41,10 @@
 
 ## Next Sprint
 
-**Sprint 4 — API Design**
-- Create `docs/api/api-list.md`
-- Create `docs/api/openapi.yaml`
-- Create `docs/api/request-response-examples.md`
+**Sprint 5 — Workflow Design**
+- Create `docs/workflows/requirement-to-code.workflow.md`
+- Create `docs/workflows/agent-state-machine.md`
+- Create `docs/workflows/human-review-points.md`
 
 ---
 

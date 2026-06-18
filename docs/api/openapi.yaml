@@ -1,0 +1,1815 @@
+openapi: 3.0.3
+
+info:
+  title: AI-SDLC Working Office API
+  version: 1.0.0
+  description: >
+    Backend API for the AI-SDLC Working Office — an agentic software factory
+    where AI agents collaborate through the full SDLC pipeline.
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development server
+
+tags:
+  - name: Projects
+  - name: Requirement Inputs
+  - name: Pipeline
+  - name: Documents
+  - name: Messages
+  - name: Tasks
+  - name: Activity
+  - name: Agents
+  - name: LLM Settings
+  - name: Sprints
+  - name: Milestones
+  - name: Traceability
+  - name: Health
+
+paths:
+
+  # ── Projects ──────────────────────────────────────────────────────────────
+
+  /projects:
+    get:
+      tags: [Projects]
+      operationId: listProjects
+      summary: List all projects
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/page_size'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, archived, completed]
+      responses:
+        '200':
+          description: Paginated project list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProjects'
+    post:
+      tags: [Projects]
+      operationId: createProject
+      summary: Create a new project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectCreate'
+      responses:
+        '201':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /projects/{project_id}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      tags: [Projects]
+      operationId: getProject
+      summary: Get project by ID
+      responses:
+        '200':
+          description: Project details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Projects]
+      operationId: updateProject
+      summary: Update project name, description, or status
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectUpdate'
+      responses:
+        '200':
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Projects]
+      operationId: deleteProject
+      summary: Delete project and all child records
+      responses:
+        '204':
+          description: Project deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Requirement Inputs ────────────────────────────────────────────────────
+
+  /projects/{project_id}/inputs:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      tags: [Requirement Inputs]
+      operationId: listInputs
+      summary: List requirement inputs for a project
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/page_size'
+      responses:
+        '200':
+          description: Paginated input list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedInputs'
+    post:
+      tags: [Requirement Inputs]
+      operationId: createInput
+      summary: Create requirement input (manual text or file upload)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequirementInputCreate'
+      responses:
+        '201':
+          description: Requirement input created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequirementInputResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /projects/{project_id}/inputs/{input_id}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/input_id'
+    get:
+      tags: [Requirement Inputs]
+      operationId: getInput
+      summary: Get requirement input by ID
+      responses:
+        '200':
+          description: Requirement input detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequirementInputResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Requirement Inputs]
+      operationId: deleteInput
+      summary: Delete requirement input
+      responses:
+        '204':
+          description: Input deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Pipeline ──────────────────────────────────────────────────────────────
+
+  /projects/{project_id}/pipeline/runs:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      tags: [Pipeline]
+      operationId: listPipelineRuns
+      summary: List all pipeline runs for a project
+      responses:
+        '200':
+          description: List of pipeline runs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPipelineRuns'
+    post:
+      tags: [Pipeline]
+      operationId: startPipelineRun
+      summary: Start a new pipeline run
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PipelineRunCreate'
+      responses:
+        '201':
+          description: Pipeline run started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PipelineRunResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /projects/{project_id}/pipeline/runs/{run_id}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/run_id'
+    get:
+      tags: [Pipeline]
+      operationId: getPipelineRun
+      summary: Get pipeline run status and current step
+      responses:
+        '200':
+          description: Pipeline run details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PipelineRunResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{project_id}/pipeline/runs/{run_id}/steps:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/run_id'
+    get:
+      tags: [Pipeline]
+      operationId: listPipelineSteps
+      summary: List all steps for a pipeline run
+      responses:
+        '200':
+          description: List of pipeline steps
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PipelineStepResponse'
+
+  /projects/{project_id}/pipeline/runs/{run_id}/steps/{step_id}/approve:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/run_id'
+      - $ref: '#/components/parameters/step_id'
+    post:
+      tags: [Pipeline]
+      operationId: approveStep
+      summary: Approve a pipeline step output and advance to next step
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment:
+                  type: string
+      responses:
+        '200':
+          description: Step approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PipelineStepResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /projects/{project_id}/pipeline/runs/{run_id}/steps/{step_id}/reject:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/run_id'
+      - $ref: '#/components/parameters/step_id'
+    post:
+      tags: [Pipeline]
+      operationId: rejectStep
+      summary: Reject a pipeline step and halt the pipeline
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Step rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PipelineStepResponse'
+
+  /projects/{project_id}/pipeline/runs/{run_id}/steps/{step_id}/rerun:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/run_id'
+      - $ref: '#/components/parameters/step_id'
+    post:
+      tags: [Pipeline]
+      operationId: rerunStep
+      summary: Re-run a pipeline step
+      responses:
+        '202':
+          description: Re-run accepted and queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PipelineStepResponse'
+
+  # ── Documents ─────────────────────────────────────────────────────────────
+
+  /projects/{project_id}/documents:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      tags: [Documents]
+      operationId: listDocuments
+      summary: List documents (filter by type and status)
+      parameters:
+        - name: document_type
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/page_size'
+      responses:
+        '200':
+          description: Paginated document list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedDocuments'
+
+  /projects/{project_id}/documents/{document_id}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/document_id'
+    get:
+      tags: [Documents]
+      operationId: getDocument
+      summary: Get document with full Markdown content
+      responses:
+        '200':
+          description: Document detail with content
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{project_id}/documents/{document_id}/versions:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/document_id'
+    get:
+      tags: [Documents]
+      operationId: getDocumentVersions
+      summary: List all versions of a document
+      responses:
+        '200':
+          description: Document version history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DocumentResponse'
+
+  /projects/{project_id}/documents/{document_id}/approve:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/document_id'
+    post:
+      tags: [Documents]
+      operationId: approveDocument
+      summary: Approve a document
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                approved_by:
+                  type: string
+      responses:
+        '200':
+          description: Document approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+
+  /projects/{project_id}/documents/{document_id}/reject:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/document_id'
+    post:
+      tags: [Documents]
+      operationId: rejectDocument
+      summary: Reject a document with reason
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Document rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+
+  /projects/{project_id}/documents/{document_id}/export:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/document_id'
+    get:
+      tags: [Documents]
+      operationId: exportDocument
+      summary: Export document as Markdown file download
+      responses:
+        '200':
+          description: Markdown file
+          content:
+            text/markdown:
+              schema:
+                type: string
+
+  # ── Messages ──────────────────────────────────────────────────────────────
+
+  /projects/{project_id}/messages:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      tags: [Messages]
+      operationId: listMessages
+      summary: List messages (filter by agent_id or message_type)
+      parameters:
+        - name: agent_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: message_type
+          in: query
+          schema:
+            type: string
+            enum: [handoff, chat, notification, system]
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/page_size'
+      responses:
+        '200':
+          description: Paginated message list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMessages'
+    post:
+      tags: [Messages]
+      operationId: sendMessage
+      summary: Send message to an agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageCreate'
+      responses:
+        '201':
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+
+  # ── Tasks ─────────────────────────────────────────────────────────────────
+
+  /projects/{project_id}/tasks:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      tags: [Tasks]
+      operationId: listTasks
+      summary: List tasks (filter by status or agent)
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: agent_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/page_size'
+      responses:
+        '200':
+          description: Paginated task list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTasks'
+
+  /projects/{project_id}/tasks/{task_id}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/task_id'
+    get:
+      tags: [Tasks]
+      operationId: getTask
+      summary: Get task by ID
+      responses:
+        '200':
+          description: Task detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Tasks]
+      operationId: updateTask
+      summary: Update task status or priority
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskUpdate'
+      responses:
+        '200':
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+
+  # ── Activity ──────────────────────────────────────────────────────────────
+
+  /projects/{project_id}/activity:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      tags: [Activity]
+      operationId: getActivity
+      summary: Get recent activity events
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/page_size'
+        - name: event_type
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated activity log
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedActivity'
+
+  # ── Agents ────────────────────────────────────────────────────────────────
+
+  /agents:
+    get:
+      tags: [Agents]
+      operationId: listAgents
+      summary: List all agents with live status and position
+      parameters:
+        - name: is_active
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Agent list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AgentResponse'
+    post:
+      tags: [Agents]
+      operationId: createAgent
+      summary: Create a new agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentCreate'
+      responses:
+        '201':
+          description: Agent created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentResponse'
+
+  /agents/{agent_id}:
+    parameters:
+      - $ref: '#/components/parameters/agent_id'
+    get:
+      tags: [Agents]
+      operationId: getAgent
+      summary: Get agent by ID
+      responses:
+        '200':
+          description: Agent detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Agents]
+      operationId: updateAgent
+      summary: Update agent system prompt, model, avatar, or zone
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentUpdate'
+      responses:
+        '200':
+          description: Updated agent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentResponse'
+    delete:
+      tags: [Agents]
+      operationId: deactivateAgent
+      summary: Deactivate agent (soft delete — sets is_active = false)
+      responses:
+        '200':
+          description: Agent deactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentResponse'
+
+  /agents/{agent_id}/position:
+    parameters:
+      - $ref: '#/components/parameters/agent_id'
+    patch:
+      tags: [Agents]
+      operationId: updateAgentPosition
+      summary: Update agent position on office map
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [x, y]
+              properties:
+                x:
+                  type: integer
+                  minimum: 0
+                y:
+                  type: integer
+                  minimum: 0
+      responses:
+        '200':
+          description: Position updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentResponse'
+
+  # ── LLM Settings ──────────────────────────────────────────────────────────
+
+  /settings/llm:
+    get:
+      tags: [LLM Settings]
+      operationId: listLlmSettings
+      summary: List LLM configurations
+      responses:
+        '200':
+          description: LLM configuration list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LlmSettingResponse'
+    post:
+      tags: [LLM Settings]
+      operationId: createLlmSetting
+      summary: Create a new LLM configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LlmSettingCreate'
+      responses:
+        '201':
+          description: LLM configuration created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmSettingResponse'
+
+  /settings/llm/{setting_id}:
+    parameters:
+      - name: setting_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      tags: [LLM Settings]
+      operationId: updateLlmSetting
+      summary: Update LLM configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LlmSettingUpdate'
+      responses:
+        '200':
+          description: Updated LLM configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmSettingResponse'
+
+  /settings/llm/{setting_id}/activate:
+    parameters:
+      - name: setting_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags: [LLM Settings]
+      operationId: activateLlmSetting
+      summary: Set LLM configuration as active (deactivates all others)
+      responses:
+        '200':
+          description: LLM configuration activated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmSettingResponse'
+
+  # ── Sprints ───────────────────────────────────────────────────────────────
+
+  /projects/{project_id}/sprints:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      tags: [Sprints]
+      operationId: listSprints
+      summary: List sprints with status and story point progress
+      responses:
+        '200':
+          description: Sprint list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SprintResponse'
+    post:
+      tags: [Sprints]
+      operationId: createSprint
+      summary: Create a sprint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SprintCreate'
+      responses:
+        '201':
+          description: Sprint created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SprintResponse'
+
+  /projects/{project_id}/sprints/{sprint_id}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - name: sprint_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      tags: [Sprints]
+      operationId: updateSprint
+      summary: Update sprint dates, status, or story points
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SprintUpdate'
+      responses:
+        '200':
+          description: Updated sprint
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SprintResponse'
+
+  # ── Milestones ────────────────────────────────────────────────────────────
+
+  /projects/{project_id}/milestones:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      tags: [Milestones]
+      operationId: listMilestones
+      summary: List milestones with status and target dates
+      responses:
+        '200':
+          description: Milestone list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MilestoneResponse'
+    post:
+      tags: [Milestones]
+      operationId: createMilestone
+      summary: Create a milestone
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MilestoneCreate'
+      responses:
+        '201':
+          description: Milestone created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MilestoneResponse'
+
+  /projects/{project_id}/milestones/{milestone_id}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - name: milestone_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      tags: [Milestones]
+      operationId: updateMilestone
+      summary: Update milestone status or target date
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MilestoneUpdate'
+      responses:
+        '200':
+          description: Updated milestone
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MilestoneResponse'
+
+  # ── Traceability ──────────────────────────────────────────────────────────
+
+  /projects/{project_id}/traceability:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      tags: [Traceability]
+      operationId: getTraceabilityMatrix
+      summary: Get full traceability matrix for a project
+      responses:
+        '200':
+          description: Traceability link list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TraceabilityLinkResponse'
+
+  /projects/{project_id}/traceability/links:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    post:
+      tags: [Traceability]
+      operationId: createTraceabilityLink
+      summary: Create a traceability link between two artifacts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TraceabilityLinkCreate'
+      responses:
+        '201':
+          description: Traceability link created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TraceabilityLinkResponse'
+
+  /projects/{project_id}/traceability/links/{link_id}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - name: link_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      tags: [Traceability]
+      operationId: deleteTraceabilityLink
+      summary: Delete a traceability link
+      responses:
+        '204':
+          description: Link deleted
+
+  # ── Health ────────────────────────────────────────────────────────────────
+
+  /health:
+    get:
+      tags: [Health]
+      operationId: healthCheck
+      summary: System health check
+      responses:
+        '200':
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  database:
+                    type: string
+                    example: connected
+                  llm_provider:
+                    type: string
+                    example: ollama reachable
+
+# ── Components ──────────────────────────────────────────────────────────────
+
+components:
+
+  parameters:
+    project_id:
+      name: project_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    input_id:
+      name: input_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    run_id:
+      name: run_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    step_id:
+      name: step_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    document_id:
+      name: document_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    agent_id:
+      name: agent_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    task_id:
+      name: task_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    page_size:
+      name: page_size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: State conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+
+    ErrorResponse:
+      type: object
+      required: [error_code, message]
+      properties:
+        error_code:
+          type: string
+          example: NOT_FOUND
+        message:
+          type: string
+          example: Project with ID abc-123 not found
+        detail:
+          nullable: true
+
+    PaginationMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+
+    ProjectCreate:
+      type: object
+      required: [name, created_by]
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        created_by:
+          type: string
+
+    ProjectUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        status:
+          type: string
+          enum: [active, archived, completed]
+
+    ProjectResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, archived, completed]
+        created_by:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PaginatedProjects:
+      allOf:
+        - $ref: '#/components/schemas/PaginationMeta'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProjectResponse'
+
+    RequirementInputCreate:
+      type: object
+      required: [input_type, content]
+      properties:
+        input_type:
+          type: string
+          enum: [manual_text, meeting_transcript, chat_log, markdown_document, email_content, audio_transcript]
+        title:
+          type: string
+          maxLength: 255
+        content:
+          type: string
+          maxLength: 32000
+        file_url:
+          type: string
+          nullable: true
+        source_owner:
+          type: string
+          nullable: true
+        source_date:
+          type: string
+          format: date-time
+          nullable: true
+        metadata_json:
+          type: object
+          nullable: true
+
+    RequirementInputResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        input_type:
+          type: string
+        title:
+          type: string
+          nullable: true
+        content:
+          type: string
+        file_url:
+          type: string
+          nullable: true
+        source_owner:
+          type: string
+          nullable: true
+        source_date:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    PaginatedInputs:
+      allOf:
+        - $ref: '#/components/schemas/PaginationMeta'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/RequirementInputResponse'
+
+    PipelineRunCreate:
+      type: object
+      required: [input_id]
+      properties:
+        input_id:
+          type: string
+          format: uuid
+          description: The requirement input to process
+
+    PipelineRunResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, running, completed, failed, cancelled]
+        current_step:
+          type: string
+          nullable: true
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    PaginatedPipelineRuns:
+      allOf:
+        - $ref: '#/components/schemas/PaginationMeta'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/PipelineRunResponse'
+
+    PipelineStepResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        pipeline_run_id:
+          type: string
+          format: uuid
+        step_name:
+          type: string
+        agent_id:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+          enum: [pending, running, completed, failed, skipped]
+        output_document_id:
+          type: string
+          format: uuid
+          nullable: true
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        error_message:
+          type: string
+          nullable: true
+
+    DocumentResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        document_type:
+          type: string
+        title:
+          type: string
+        content_markdown:
+          type: string
+        version:
+          type: integer
+        status:
+          type: string
+          enum: [draft, review, approved, rejected, superseded]
+        created_by_agent_id:
+          type: string
+          format: uuid
+          nullable: true
+        approved_by:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PaginatedDocuments:
+      allOf:
+        - $ref: '#/components/schemas/PaginationMeta'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/DocumentResponse'
+
+    AgentCreate:
+      type: object
+      required: [name, role]
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        role:
+          type: string
+        description:
+          type: string
+        system_prompt:
+          type: string
+        home_zone:
+          type: string
+        model_provider:
+          type: string
+          enum: [ollama, openai]
+          default: ollama
+        model_name:
+          type: string
+          default: qwen3:8b
+
+    AgentUpdate:
+      type: object
+      properties:
+        system_prompt:
+          type: string
+        model_provider:
+          type: string
+          enum: [ollama, openai]
+        model_name:
+          type: string
+        avatar_url:
+          type: string
+        home_zone:
+          type: string
+        is_active:
+          type: boolean
+
+    AgentResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        role:
+          type: string
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [idle, working, done, error]
+        location_x:
+          type: integer
+        location_y:
+          type: integer
+        home_zone:
+          type: string
+          nullable: true
+        current_zone:
+          type: string
+          nullable: true
+        model_provider:
+          type: string
+        model_name:
+          type: string
+        is_active:
+          type: boolean
+        updated_at:
+          type: string
+          format: date-time
+
+    MessageCreate:
+      type: object
+      required: [receiver_id, receiver_type, content]
+      properties:
+        receiver_id:
+          type: string
+          format: uuid
+        receiver_type:
+          type: string
+          enum: [agent, user, system]
+        content:
+          type: string
+        message_type:
+          type: string
+          enum: [chat, handoff, notification, system]
+          default: chat
+
+    MessageResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        sender_type:
+          type: string
+        sender_id:
+          type: string
+          format: uuid
+        receiver_type:
+          type: string
+        receiver_id:
+          type: string
+          format: uuid
+        content:
+          type: string
+        message_type:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    PaginatedMessages:
+      allOf:
+        - $ref: '#/components/schemas/PaginationMeta'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/MessageResponse'
+
+    TaskUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending, in_progress, done, failed, cancelled]
+        priority:
+          type: string
+          enum: [low, medium, high, critical]
+
+    TaskResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        status:
+          type: string
+        priority:
+          type: string
+        assigned_agent_id:
+          type: string
+          format: uuid
+          nullable: true
+        pipeline_step:
+          type: string
+          nullable: true
+        output_document_id:
+          type: string
+          format: uuid
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    PaginatedTasks:
+      allOf:
+        - $ref: '#/components/schemas/PaginationMeta'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/TaskResponse'
+
+    ActivityResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+        message:
+          type: string
+        agent_id:
+          type: string
+          format: uuid
+          nullable: true
+        metadata_json:
+          type: object
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    PaginatedActivity:
+      allOf:
+        - $ref: '#/components/schemas/PaginationMeta'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/ActivityResponse'
+
+    LlmSettingCreate:
+      type: object
+      required: [provider, model_name]
+      properties:
+        provider:
+          type: string
+          enum: [ollama, openai]
+        base_url:
+          type: string
+          description: Required for Ollama
+        model_name:
+          type: string
+        api_key:
+          type: string
+          description: Required for OpenAI (stored encrypted)
+        temperature:
+          type: number
+          minimum: 0.0
+          maximum: 2.0
+          default: 0.7
+        max_tokens:
+          type: integer
+          minimum: 1
+          maximum: 32000
+          default: 4096
+
+    LlmSettingUpdate:
+      type: object
+      properties:
+        model_name:
+          type: string
+        temperature:
+          type: number
+        max_tokens:
+          type: integer
+        base_url:
+          type: string
+        api_key:
+          type: string
+
+    LlmSettingResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        provider:
+          type: string
+        base_url:
+          type: string
+          nullable: true
+        model_name:
+          type: string
+        temperature:
+          type: number
+        max_tokens:
+          type: integer
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    SprintCreate:
+      type: object
+      required: [sprint_number, name, planned_start, planned_end]
+      properties:
+        sprint_number:
+          type: integer
+          minimum: 0
+        name:
+          type: string
+          maxLength: 255
+        planned_start:
+          type: string
+          format: date
+        planned_end:
+          type: string
+          format: date
+        story_points_total:
+          type: integer
+          minimum: 0
+          default: 0
+
+    SprintUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        planned_start:
+          type: string
+          format: date
+        planned_end:
+          type: string
+          format: date
+        actual_end:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [not_started, in_progress, done, overdue]
+        story_points_total:
+          type: integer
+        story_points_done:
+          type: integer
+
+    SprintResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        sprint_number:
+          type: integer
+        name:
+          type: string
+        planned_start:
+          type: string
+          format: date
+        planned_end:
+          type: string
+          format: date
+        actual_end:
+          type: string
+          format: date
+          nullable: true
+        status:
+          type: string
+        story_points_total:
+          type: integer
+        story_points_done:
+          type: integer
+        days_remaining:
+          type: integer
+          description: Computed field — days until planned_end
+          nullable: true
+
+    MilestoneCreate:
+      type: object
+      required: [name, target_date, mvp_number]
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        target_date:
+          type: string
+          format: date
+        mvp_number:
+          type: integer
+          minimum: 1
+          maximum: 5
+
+    MilestoneUpdate:
+      type: object
+      properties:
+        target_date:
+          type: string
+          format: date
+        actual_date:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [not_started, in_progress, done, overdue]
+
+    MilestoneResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        target_date:
+          type: string
+          format: date
+        actual_date:
+          type: string
+          format: date
+          nullable: true
+        status:
+          type: string
+        mvp_number:
+          type: integer
+        days_remaining:
+          type: integer
+          description: Computed field — days until target_date
+          nullable: true
+
+    TraceabilityLinkCreate:
+      type: object
+      required: [source_type, source_id, target_type, target_id, link_type]
+      properties:
+        source_type:
+          type: string
+          enum: [requirement_input, document, task, pipeline_step]
+        source_id:
+          type: string
+          format: uuid
+        target_type:
+          type: string
+          enum: [requirement_input, document, task, pipeline_step]
+        target_id:
+          type: string
+          format: uuid
+        link_type:
+          type: string
+          enum: [derived_from, implements, tests, conflicts_with]
+
+    TraceabilityLinkResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        source_type:
+          type: string
+        source_id:
+          type: string
+          format: uuid
+        target_type:
+          type: string
+        target_id:
+          type: string
+          format: uuid
+        link_type:
+          type: string
+        created_at:
+          type: string
+          format: date-time
