@@ -119,6 +119,8 @@ def approve_step(
     step = session.get(PipelineStep, step_id)
     if not step or step.pipeline_run_id != run_id:
         raise HTTPException(status_code=404, detail={"error_code": "NOT_FOUND", "message": "Step not found"})
+    if step.step_name != run.current_step:
+        raise HTTPException(status_code=400, detail={"error_code": "WRONG_STEP", "message": f"Step {step.step_name!r} is not the current gate ({run.current_step!r})"})
 
     next_step_name = _NEXT_STEP.get(step.step_name)
 
@@ -167,6 +169,8 @@ def reject_step(
     step = session.get(PipelineStep, step_id)
     if not step or step.pipeline_run_id != run_id:
         raise HTTPException(status_code=404, detail={"error_code": "NOT_FOUND", "message": "Step not found"})
+    if step.step_name != run.current_step:
+        raise HTTPException(status_code=400, detail={"error_code": "WRONG_STEP", "message": f"Step {step.step_name!r} is not the current gate ({run.current_step!r})"})
 
     run.status = PipelineRunStatus.failed
     step.status = PipelineStepStatus.failed

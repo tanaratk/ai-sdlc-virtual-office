@@ -365,6 +365,20 @@ def test_approve_wrong_state_returns_400(mock_llm, client: TestClient):
     assert r.json()["detail"]["error_code"] == "INVALID_STATE"
 
 
+@patch("app.llm.client.call_ollama", side_effect=_BOTH_LLM_OUTPUTS)
+def test_approve_wrong_step_returns_400(mock_llm, client: TestClient):
+    """Approving req_summary step while run is at Gate 1 (gap_analysis) must fail."""
+    project = _create_project(client)
+    _create_input(client, project["id"])
+    run = _run_pipeline(client, project["id"])
+    run_id = run["id"]
+
+    req_step = _get_step(client, project["id"], run_id, "requirement_summary")
+    r = client.post(f"/api/v1/projects/{project['id']}/pipeline/runs/{run_id}/steps/{req_step['id']}/approve")
+    assert r.status_code == 400
+    assert r.json()["detail"]["error_code"] == "WRONG_STEP"
+
+
 # ── Gate 1 reject ──────────────────────────────────────────────────────────────
 
 @patch("app.llm.client.call_ollama", side_effect=_BOTH_LLM_OUTPUTS)
