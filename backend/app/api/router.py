@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.routes import (
     activity,
     agents,
+    change_impact,
     documents,
     health,
     inputs,
@@ -31,3 +32,4 @@ api_router.include_router(settings.router, prefix="/settings", tags=["LLM Settin
 api_router.include_router(sprints.router, prefix="/projects", tags=["Sprints"])
 api_router.include_router(milestones.router, prefix="/projects", tags=["Milestones"])
 api_router.include_router(traceability.router, prefix="/projects", tags=["Traceability"])
+api_router.include_router(change_impact.router, prefix="/projects", tags=["Change Impact"])

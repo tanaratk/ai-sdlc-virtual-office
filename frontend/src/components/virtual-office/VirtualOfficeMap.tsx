@@ -11,7 +11,7 @@ const ROOMS: RoomConfig[] = [
   { zone: "developer_zone",     label: "Developer",      stepNames: ["dev_tasks"],                           navPath: "documents" },
   { zone: "qa_lab",             label: "QA Lab",         stepNames: ["test_cases"],                          navPath: "documents" },
   { zone: "traceability_room",  label: "Traceability",   stepNames: [],                                      navPath: "traceability" },
-  { zone: "change_impact_room", label: "Change Impact",  stepNames: [],                                      navPath: "agents" },
+  { zone: "change_impact_room", label: "Change Impact",  stepNames: ["change_impact"],                       navPath: "change-impact" },
   { zone: "control_room",       label: "Control Room",   stepNames: [],                                      navPath: "agents" },
 ];
 
