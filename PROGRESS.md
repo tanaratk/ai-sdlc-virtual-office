@@ -25,17 +25,25 @@
 
 ---
 
-## Status
+## Sprint Progress (ai-dlc-development-sprint-skill.md)
 
-**All 10 tasks complete.** The documentation and design phase is done.
+| Sprint | Title | Status |
+|---|---|---|
+| 0 | Requirement Intake & Baseline Review | ✅ Done |
+| 1 | Agent Contract Design | 🔲 Next |
+| 2 | Prompt & Template Design | 🔲 |
+| 3 | Database Design | ✅ Done (schema.md exists) |
+| 4 | API Design | 🔲 |
+| 5 | Workflow Design | 🔲 |
+| 6 | Backend Skeleton | 🔲 |
+| 7 | Frontend Skeleton | 🔲 |
+| 8–20 | Agent MVP + Features | 🔲 |
 
-Next phase: backend and frontend implementation.
+## Next Sprint
 
----
-
-## Remaining Tasks
-
-None — all planned tasks are complete.
+**Sprint 1 — Agent Contract Design**
+- Rename `docs/contracts/` → `docs/agents/`
+- Add contracts for 6 remaining agents: BA, Architect, UX, Developer, QA, Change Impact
 
 ---
 
