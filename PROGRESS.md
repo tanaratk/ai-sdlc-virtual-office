@@ -31,7 +31,7 @@
 |---|---|---|
 | 0 | Requirement Intake & Baseline Review | ✅ Done |
 | 1 | Agent Contract Design | ✅ Done |
-| 2 | Prompt & Template Design | 🔲 |
+| 2 | Prompt & Template Design | ✅ Done |
 | 3 | Database Design | ✅ Done (schema.md exists) |
 | 4 | API Design | 🔲 |
 | 5 | Workflow Design | 🔲 |
@@ -41,10 +41,11 @@
 
 ## Next Sprint
 
-**Sprint 2 — Prompt & Template Design**
-- Create task prompts: `*.task.md` for all 8 agents
-- Create system prompts for 6 remaining agents
-- Create 8 output templates: BRD, FSD, User Story, Architecture Design, Database Design, API Spec, Screen Spec, Test Case, UAT Script, Change Impact Report, Code Task List
+**Sprint 3 — Database Design (complete)**
+- Add `docs/database/erd.md`
+- Add `docs/database/table-spec.md`
+- Add `docs/database/migration-plan.md`
+- (schema.md already exists)
 
 ---
 
