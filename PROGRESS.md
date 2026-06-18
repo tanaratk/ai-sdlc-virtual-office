@@ -1,6 +1,6 @@
 # AI-SDLC Virtual Office — Progress Tracker
 
-**Last Updated:** 2026-06-18 (Sprint 14 complete)  
+**Last Updated:** 2026-06-18 (Sprint 15 complete)  
 **Project:** ai-sdlc-virtual-office  
 **Repo:** https://github.com/tanaratk/ai-sdlc-virtual-office  
 **Working Directory:** D:\AI_Office
@@ -44,15 +44,16 @@
 | 12 | UX Agent MVP | ✅ Done |
 | 13 | Developer Agent MVP | ✅ Done |
 | 14 | QA Agent MVP | ✅ Done |
-| 15–20 | Agent MVP + Features | 🔲 |
+| 15 | Traceability MVP | ✅ Done |
+| 16–20 | Agent MVP + Features | 🔲 |
 
 ## Next Sprint
 
-**Sprint 15 — Traceability MVP**
-- Create traceability link model (requirement → BRD/FSD/API/DB/screen/code/test)
-- Create traceability API endpoints
-- Create traceability matrix UI
-- Generate coverage report
+**Sprint 16 — Virtual Office MVP**
+- Create 2D virtual office page with room components
+- Display agent avatars and live status (idle/working/done/error)
+- Allow clicking agent to open console
+- Reflect actual workflow state from pipeline
 
 ---
 
