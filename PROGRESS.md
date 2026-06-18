@@ -1,6 +1,6 @@
 # AI-SDLC Virtual Office — Progress Tracker
 
-**Last Updated:** 2026-06-18 (Sprint 23 — Docker + CI/CD complete)  
+**Last Updated:** 2026-06-18 (Sprint 17 — RAG MVP complete — ALL sprints DONE)  
 **Project:** ai-sdlc-virtual-office  
 **Repo:** https://github.com/tanaratk/ai-sdlc-virtual-office  
 **Working Directory:** D:\AI_Office
@@ -46,7 +46,7 @@
 | 14 | QA Agent MVP | ✅ Done |
 | 15 | Traceability MVP | ✅ Done |
 | 16 | Virtual Office MVP | ✅ Done |
-| 17 | RAG MVP | 🔲 (deferred — no active use case yet) |
+| 17 | RAG MVP | ✅ Done |
 | 18 | GitHub Integration MVP | ✅ Done |
 | 19 | MCP MVP | ✅ Done |
 | 20 | Change Impact Agent MVP | ✅ Done |
@@ -54,11 +54,9 @@
 | 22 | PM Agent MVP | ✅ Done |
 | 23 | Docker + CI/CD | ✅ Done |
 
-## Next Sprint
+## Project Status
 
-**Sprint 17 — RAG MVP** (deferred — implement when real project hits context-window limit)
-
-**Project is otherwise COMPLETE.** All 10 pipeline agents + infra are shipped.
+**ALL 24 sprints COMPLETE (0–23 + 17).** Every pipeline agent, infra, and feature is shipped.
 
 ---
 
