@@ -16,16 +16,17 @@
 | 3 | Requirement Agent Contract | `docs/contracts/requirement-agent.contract.json` | ✅ Done |
 | 4 | Gap Analysis Agent Contract | `docs/contracts/gap-analysis-agent.contract.json` | ✅ Done |
 | 5 | Requirement Agent System Prompt | `docs/prompts/requirement-agent.system.md` | ✅ Done |
+| 6 | Gap Analysis Agent System Prompt | `docs/prompts/gap-analysis-agent.system.md` | ✅ Done |
 
 ---
 
 ## Next Task
 
-**Task 6 — Gap Analysis Agent System Prompt**
+**Task 7a — Template: Requirement Summary**
 
-- File to create: `docs/prompts/gap-analysis-agent.system.md`
-- Base content: Spec Section 16.2 + Gap Analysis Agent Contract (`docs/contracts/gap-analysis-agent.contract.json`)
-- Must cover: role definition, per-section instructions for all 14 output sections, 12 gap categories, severity levels, Approval Gap trigger rule, quality checklist, handoff message to BA Agent
+- File to create: `docs/templates/requirement-summary.template.md`
+- Base content: Requirement Agent contract output sections + system prompt section list
+- Must cover: all 9 sections (Business Objective, Scope, FRs, NFRs, Stakeholders, Assumptions, Constraints, Business Rules, Open Questions) with table structures and placeholder rows
 
 ---
 
@@ -33,7 +34,6 @@
 
 | # | Task | Output |
 |---|------|--------|
-| 6 | Gap Analysis Agent System Prompt | `docs/prompts/gap-analysis-agent.system.md` |
 | 7a | Template — Requirement Summary | `docs/templates/requirement-summary.template.md` |
 | 7b | Template — Gap Analysis Report | `docs/templates/gap-analysis-report.template.md` |
 | 8 | Database Schema Design | `docs/database/schema.md` |
