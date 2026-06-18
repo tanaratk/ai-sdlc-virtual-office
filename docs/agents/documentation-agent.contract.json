@@ -1,0 +1,240 @@
+{
+  "agent": {
+    "id": "documentation-agent",
+    "name": "Documentation Agent",
+    "role": "documentation_manager",
+    "version": "1.0.0",
+    "description": "Compiles all approved pipeline documents into one structured project documentation package. Does not generate new content — assembles, cross-references, and formats existing approved documents.",
+    "home_zone": "documentation_room",
+    "model_provider": "ollama",
+    "default_model": "qwen3:8b"
+  },
+
+  "input": {
+    "description": "All approved documents from pipeline Steps 1–7 plus traceability data",
+    "required_fields": [
+      {
+        "field": "project_id",
+        "type": "string (UUID)",
+        "description": "ID of the project being documented"
+      },
+      {
+        "field": "requirement_summary_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved Requirement Summary document (status must be approved)"
+      },
+      {
+        "field": "gap_analysis_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved Gap Analysis Report document"
+      },
+      {
+        "field": "brd_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved BRD document"
+      },
+      {
+        "field": "fsd_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved FSD document"
+      },
+      {
+        "field": "user_story_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved User Stories document"
+      },
+      {
+        "field": "architecture_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved Architecture Design document"
+      },
+      {
+        "field": "database_design_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved Database Design document"
+      },
+      {
+        "field": "api_spec_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved API Specification document"
+      },
+      {
+        "field": "screen_spec_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved Screen Specification document"
+      },
+      {
+        "field": "code_task_list_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved Code Task List document"
+      },
+      {
+        "field": "test_cases_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved Test Cases document"
+      },
+      {
+        "field": "uat_script_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the approved UAT Script document"
+      }
+    ],
+    "optional_fields": [
+      {
+        "field": "change_impact_document_id",
+        "type": "string (UUID)",
+        "description": "ID of Change Impact Report if a change was requested during the pipeline run"
+      },
+      {
+        "field": "traceability_links_json",
+        "type": "array",
+        "description": "All traceability links for this project as JSON — used to generate the traceability matrix section"
+      }
+    ],
+    "constraints": [
+      "All required document IDs must reference documents with status = approved",
+      "Agent must not invent or modify existing document content — assembly only",
+      "Combined input must not exceed 32,000 characters per LLM call — use summarised versions if needed"
+    ]
+  },
+
+  "output": {
+    "description": "One compiled project documentation package as a single Markdown document",
+    "documents": [
+      {
+        "document_type": "compiled_documents",
+        "format": "markdown",
+        "template_ref": "docs/templates/compiled-documents.template.md",
+        "sections": [
+          {
+            "section": "cover_page",
+            "required": true,
+            "description": "Project name, version, date, compiled by, and document index"
+          },
+          {
+            "section": "table_of_contents",
+            "required": true,
+            "description": "Numbered list of all sections with page/anchor references"
+          },
+          {
+            "section": "requirement_summary",
+            "required": true,
+            "description": "Verbatim content from approved Requirement Summary document"
+          },
+          {
+            "section": "gap_analysis_report",
+            "required": true,
+            "description": "Verbatim content from approved Gap Analysis Report"
+          },
+          {
+            "section": "business_requirements",
+            "required": true,
+            "description": "Verbatim content from approved BRD"
+          },
+          {
+            "section": "functional_specification",
+            "required": true,
+            "description": "Verbatim content from approved FSD"
+          },
+          {
+            "section": "user_stories",
+            "required": true,
+            "description": "Verbatim content from approved User Stories"
+          },
+          {
+            "section": "architecture_design",
+            "required": true,
+            "description": "Verbatim content from approved Architecture Design"
+          },
+          {
+            "section": "database_design",
+            "required": true,
+            "description": "Verbatim content from approved Database Design"
+          },
+          {
+            "section": "api_specification",
+            "required": true,
+            "description": "Verbatim content from approved API Specification"
+          },
+          {
+            "section": "screen_specification",
+            "required": true,
+            "description": "Verbatim content from approved Screen Specification"
+          },
+          {
+            "section": "code_task_list",
+            "required": true,
+            "description": "Verbatim content from approved Code Task List"
+          },
+          {
+            "section": "test_cases",
+            "required": true,
+            "description": "Verbatim content from approved Test Cases"
+          },
+          {
+            "section": "uat_script",
+            "required": true,
+            "description": "Verbatim content from approved UAT Script"
+          },
+          {
+            "section": "traceability_matrix",
+            "required": true,
+            "description": "Generated traceability matrix table linking FR-XXX → BRD → FSD → API → UI → TC"
+          },
+          {
+            "section": "change_history",
+            "required": true,
+            "description": "Table of document versions, approval dates, and approved_by per document"
+          }
+        ],
+        "metadata": {
+          "agent_id": "documentation-agent",
+          "pipeline_step": "documentation",
+          "version": 1,
+          "status": "draft"
+        }
+      }
+    ]
+  },
+
+  "responsibilities": [
+    "Assemble all approved pipeline documents into one compiled output in the order defined by the template",
+    "Generate a traceability matrix from traceability_links data",
+    "Generate a change history table from document metadata (version, approved_by, approved_at)",
+    "Do NOT modify, summarise, or rewrite any content from source documents — copy verbatim",
+    "Do NOT add new requirements, designs, or specifications not present in source documents",
+    "If a document is missing or not approved, list it as MISSING in the corresponding section and continue"
+  ],
+
+  "handoff": {
+    "on_success": {
+      "next_agent": "pm-agent",
+      "trigger": "document_created",
+      "payload_fields": [
+        "project_id",
+        "compiled_document_id",
+        "section_count",
+        "traceability_link_count"
+      ]
+    },
+    "on_failure": {
+      "action": "notify_user",
+      "message": "Documentation Agent failed to compile project documents. Check that all upstream documents are in approved status and retry."
+    }
+  },
+
+  "pipeline_step": {
+    "step_name": "documentation",
+    "step_order": 9,
+    "total_steps": 10,
+    "timeout_seconds": 300
+  },
+
+  "office_behaviour": {
+    "idle_zone": "documentation_room",
+    "active_zone": "documentation_room",
+    "status_on_start": "working",
+    "status_on_complete": "done",
+    "chat_bubble_on_handoff": "Project documentation compiled. {section_count} sections assembled. Handing off to PM Agent."
+  }
+}

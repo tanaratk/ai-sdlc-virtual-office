@@ -64,7 +64,7 @@ This document provides business context, validation rules, default seed data, an
 - `model_name`: required when `is_active = true`
 - `is_active`: only active agents appear in the pipeline selector
 
-**Seed Data (8 agents to insert on first run):**
+**Seed Data (10 agents to insert on first run):**
 
 | name | role | home_zone | model_provider | model_name |
 |---|---|---|---|---|
@@ -76,6 +76,8 @@ This document provides business context, validation rules, default seed data, an
 | developer-agent | developer | developer_zone | ollama | qwen3:8b |
 | qa-agent | qa_engineer | qa_lab | ollama | qwen3:8b |
 | change-impact-agent | change_analyst | change_impact_room | ollama | qwen3:8b |
+| documentation-agent | documentation_manager | documentation_room | ollama | qwen3:8b |
+| pm-agent | project_manager | pm_room | ollama | qwen3:8b |
 
 **Usage Patterns:**
 - WebSocket broadcasts UPDATE to `agents` → clients reflect live position and status

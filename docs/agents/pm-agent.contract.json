@@ -1,0 +1,210 @@
+{
+  "agent": {
+    "id": "pm-agent",
+    "name": "PM Agent",
+    "role": "project_manager",
+    "version": "1.0.0",
+    "description": "Generates the final project summary and delivery report from the compiled documentation and pipeline run metadata. Closes the pipeline with a PM-level overview, sprint metrics, and next-step recommendations.",
+    "home_zone": "pm_room",
+    "model_provider": "ollama",
+    "default_model": "qwen3:8b"
+  },
+
+  "input": {
+    "description": "Compiled documentation package plus pipeline run metadata, sprint data, and milestone data",
+    "required_fields": [
+      {
+        "field": "project_id",
+        "type": "string (UUID)",
+        "description": "ID of the project"
+      },
+      {
+        "field": "compiled_document_id",
+        "type": "string (UUID)",
+        "description": "ID of the compiled_documents document produced by Documentation Agent"
+      },
+      {
+        "field": "pipeline_run_id",
+        "type": "string (UUID)",
+        "description": "ID of the pipeline run being summarised"
+      },
+      {
+        "field": "pipeline_run_metadata",
+        "type": "object",
+        "description": "Pipeline run summary: started_at, completed_at, total steps, failed steps, retry count per step"
+      },
+      {
+        "field": "requirement_summary_content",
+        "type": "string",
+        "description": "Content of the approved Requirement Summary (key inputs for executive summary)"
+      },
+      {
+        "field": "gap_analysis_content",
+        "type": "string",
+        "description": "Content of the approved Gap Analysis Report (open questions and gaps)"
+      }
+    ],
+    "optional_fields": [
+      {
+        "field": "sprints_json",
+        "type": "array",
+        "description": "Current sprint records for this project (sprint_number, name, status, story_points_total, story_points_done)"
+      },
+      {
+        "field": "milestones_json",
+        "type": "array",
+        "description": "Current milestone records (name, target_date, actual_date, status)"
+      },
+      {
+        "field": "open_questions_json",
+        "type": "array",
+        "description": "Unresolved open questions (OQ-XXX) from Gap Analysis — included in risk register"
+      }
+    ],
+    "constraints": [
+      "compiled_document_id must reference a document with status = draft or approved",
+      "Combined input must not exceed 32,000 characters per LLM call",
+      "Agent must not modify or contradict content in the compiled_documents — refer to it, do not rewrite it"
+    ]
+  },
+
+  "output": {
+    "description": "Two final delivery documents: a concise executive project summary and a detailed delivery report",
+    "documents": [
+      {
+        "document_type": "project_summary",
+        "format": "markdown",
+        "template_ref": "docs/templates/project-summary.template.md",
+        "sections": [
+          {
+            "section": "executive_summary",
+            "required": true,
+            "description": "2–3 paragraph summary of what was built, key decisions, and business value"
+          },
+          {
+            "section": "scope_delivered",
+            "required": true,
+            "description": "Table of all FRs and NFRs with delivery status (delivered / deferred / out-of-scope)"
+          },
+          {
+            "section": "artifacts_produced",
+            "required": true,
+            "description": "Table of all documents produced in this pipeline run with document type, version, and status"
+          },
+          {
+            "section": "sprint_progress",
+            "required": false,
+            "description": "Sprint table: sprint number, name, planned dates, status, story points done/total"
+          },
+          {
+            "section": "milestone_status",
+            "required": false,
+            "description": "Milestone table: MVP name, target date, actual date, status"
+          },
+          {
+            "section": "open_questions",
+            "required": true,
+            "description": "Table of unresolved open questions (OQ-XXX) with priority and owner"
+          },
+          {
+            "section": "next_steps",
+            "required": true,
+            "description": "Recommended next actions in priority order"
+          }
+        ],
+        "metadata": {
+          "agent_id": "pm-agent",
+          "pipeline_step": "pm_summary",
+          "version": 1,
+          "status": "draft"
+        }
+      },
+      {
+        "document_type": "delivery_report",
+        "format": "markdown",
+        "template_ref": "docs/templates/delivery-report.template.md",
+        "sections": [
+          {
+            "section": "project_info",
+            "required": true,
+            "description": "Project name, pipeline run ID, dates, total duration, agent runs"
+          },
+          {
+            "section": "pipeline_execution_log",
+            "required": true,
+            "description": "Table of all pipeline steps: step name, agent, started_at, completed_at, duration, retries, status"
+          },
+          {
+            "section": "document_inventory",
+            "required": true,
+            "description": "Full list of all documents produced: type, version, status, approved_by, approved_at"
+          },
+          {
+            "section": "quality_metrics",
+            "required": true,
+            "description": "FR coverage %, test case count per FR, traceability link count, re-run count"
+          },
+          {
+            "section": "risk_register",
+            "required": true,
+            "description": "Risks derived from open questions (OQ-XXX) and any rejected steps — with likelihood, impact, mitigation"
+          },
+          {
+            "section": "sign_off",
+            "required": true,
+            "description": "Sign-off table with roles (PM, BA, Architect, QA) — filled by humans after delivery"
+          }
+        ],
+        "metadata": {
+          "agent_id": "pm-agent",
+          "pipeline_step": "pm_summary",
+          "version": 1,
+          "status": "draft"
+        }
+      }
+    ]
+  },
+
+  "responsibilities": [
+    "Produce a concise project_summary suitable for stakeholder / executive review",
+    "Produce a detailed delivery_report for the project team including pipeline execution metrics",
+    "Reference FR-XXX, NFR-XXX, and OQ-XXX IDs from source documents",
+    "Calculate quality metrics from pipeline_run_metadata (step durations, retry counts)",
+    "List all unresolved open questions with their risk impact",
+    "Do NOT make promises about future development — describe what was delivered only",
+    "If sprint or milestone data is absent, omit those sections rather than fabricating data"
+  ],
+
+  "handoff": {
+    "on_success": {
+      "next_agent": null,
+      "trigger": "document_created",
+      "payload_fields": [
+        "project_id",
+        "project_summary_document_id",
+        "delivery_report_document_id",
+        "pipeline_run_id"
+      ],
+      "condition": "Pipeline run is complete. Set pipeline_runs.status = completed."
+    },
+    "on_failure": {
+      "action": "notify_user",
+      "message": "PM Agent failed to generate the project summary or delivery report. Check pipeline run metadata and compiled_document_id and retry."
+    }
+  },
+
+  "pipeline_step": {
+    "step_name": "pm_summary",
+    "step_order": 10,
+    "total_steps": 10,
+    "timeout_seconds": 240
+  },
+
+  "office_behaviour": {
+    "idle_zone": "pm_room",
+    "active_zone": "pm_room",
+    "status_on_start": "working",
+    "status_on_complete": "done",
+    "chat_bubble_on_handoff": "Pipeline complete. Project summary and delivery report ready for review."
+  }
+}
