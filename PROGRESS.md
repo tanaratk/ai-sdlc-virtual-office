@@ -1,6 +1,6 @@
 # AI-SDLC Virtual Office — Progress Tracker
 
-**Last Updated:** 2026-06-18 (Sprint 13 complete)  
+**Last Updated:** 2026-06-18 (Sprint 14 complete)  
 **Project:** ai-sdlc-virtual-office  
 **Repo:** https://github.com/tanaratk/ai-sdlc-virtual-office  
 **Working Directory:** D:\AI_Office
@@ -43,14 +43,16 @@
 | 11 | Solution Architect Agent MVP | ✅ Done |
 | 12 | UX Agent MVP | ✅ Done |
 | 13 | Developer Agent MVP | ✅ Done |
-| 14–20 | Agent MVP + Features | 🔲 |
+| 14 | QA Agent MVP | ✅ Done |
+| 15–20 | Agent MVP + Features | 🔲 |
 
 ## Next Sprint
 
-**Sprint 14 — QA Agent MVP**
-- Implement QA Agent runtime (read req_summary + FSD + API Spec + Screen Spec → generate test_cases + uat_script)
-- Chain from Gate 5 approval → QA Agent
-- Gate 6: approve/reject QA documents
+**Sprint 15 — Traceability MVP**
+- Create traceability link model (requirement → BRD/FSD/API/DB/screen/code/test)
+- Create traceability API endpoints
+- Create traceability matrix UI
+- Generate coverage report
 
 ---
 

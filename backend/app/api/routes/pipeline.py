@@ -68,6 +68,15 @@ def _run_dev_agent_background(run_id: uuid.UUID) -> None:
         DevAgentRunner(session).run(run_id)
 
 
+def _run_qa_agent_background(run_id: uuid.UUID) -> None:
+    """Step 7: QA Agent — triggered by Gate 5 approval."""
+    from app.agents.qa_agent import QAAgentRunner
+    from sqlmodel import Session as _Session
+
+    with _Session(engine) as session:
+        QAAgentRunner(session).run(run_id)
+
+
 # ── Gate approval helpers ──────────────────────────────────────────────────────
 
 # Maps step_name → next step to create on approval
@@ -76,7 +85,8 @@ _NEXT_STEP: dict[str, str | None] = {
     "ba_documents": "sa_documents",   # Gate 2: approve → run SA Agent
     "sa_documents": "ux_documents",   # Gate 3: approve → run UX Agent
     "ux_documents": "dev_tasks",      # Gate 4: approve → run Developer Agent
-    "dev_tasks":    None,             # Gate 5: approve → completed (Sprint 14 chains QA)
+    "dev_tasks":    "test_cases",     # Gate 5: approve → run QA Agent
+    "test_cases":   None,             # Gate 6: approve → pipeline completed
 }
 
 _NEXT_BACKGROUND: dict[str, object] = {
@@ -84,6 +94,7 @@ _NEXT_BACKGROUND: dict[str, object] = {
     "sa_documents": _run_sa_agent_background,
     "ux_documents": _run_ux_agent_background,
     "dev_tasks":    _run_dev_agent_background,
+    "test_cases":   _run_qa_agent_background,
 }
 
 
