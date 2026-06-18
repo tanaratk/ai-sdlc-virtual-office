@@ -276,16 +276,17 @@ class RequirementAgentRunner:
                 id=doc_id,
                 project_id=run.project_id,
                 document_type=DocumentType.requirement_summary,
-                title=f"Requirement Summary",
+                title="Requirement Summary",
                 content_markdown=markdown,
                 version=1,
-                status=DocumentStatus.draft,
+                status=DocumentStatus.review,
                 created_by_agent_id=agent_row.id if agent_row else None,
             )
             self.session.add(doc)
             self.session.flush()
 
             step.status = PipelineStepStatus.completed
+            step.agent_id = agent_row.id if agent_row else None
             step.output_document_id = doc.id
             step.completed_at = datetime.utcnow()
 

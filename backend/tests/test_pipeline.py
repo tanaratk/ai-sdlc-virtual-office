@@ -101,6 +101,7 @@ def test_pipeline_run_creates_document(mock_llm, client: TestClient):
     docs = client.get(f"/api/v1/projects/{project['id']}/documents").json()
     assert docs["total"] == 1
     assert docs["items"][0]["document_type"] == "requirement_summary"
+    assert docs["items"][0]["status"] == "review"
 
 
 @patch("app.llm.client.call_ollama", return_value=_MOCK_LLM_OUTPUT)
