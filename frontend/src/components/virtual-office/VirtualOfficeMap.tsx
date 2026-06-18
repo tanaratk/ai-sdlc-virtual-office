@@ -1,39 +1,37 @@
 import type { Agent } from "@/types/agent";
-import { AgentAvatar } from "./AgentAvatar";
+import type { PipelineRun, PipelineStep } from "@/types/workflow";
+import { RoomCard, type RoomConfig } from "./RoomCard";
 
-const ZONES = [
-  "requirement_room",
-  "gap_analysis_room",
-  "ba_room",
-  "sa_room",
-  "ux_studio",
-  "developer_zone",
-  "qa_lab",
-  "change_impact_room",
-  "documentation_room",
-  "pm_room",
+const ROOMS: RoomConfig[] = [
+  { zone: "requirement_room",   label: "Requirement",    stepNames: ["requirement_summary", "gap_analysis"], navPath: "intake" },
+  { zone: "gap_analysis_room",  label: "Gap Analysis",   stepNames: ["gap_analysis"],                       navPath: "intake" },
+  { zone: "ba_room",            label: "BA",             stepNames: ["ba_documents"],                        navPath: "documents" },
+  { zone: "sa_room",            label: "Architect",      stepNames: ["sa_documents"],                        navPath: "documents" },
+  { zone: "ux_studio",          label: "UX Studio",      stepNames: ["ux_documents"],                        navPath: "documents" },
+  { zone: "developer_zone",     label: "Developer",      stepNames: ["dev_tasks"],                           navPath: "documents" },
+  { zone: "qa_lab",             label: "QA Lab",         stepNames: ["test_cases"],                          navPath: "documents" },
+  { zone: "traceability_room",  label: "Traceability",   stepNames: [],                                      navPath: "traceability" },
+  { zone: "change_impact_room", label: "Change Impact",  stepNames: [],                                      navPath: "agents" },
+  { zone: "control_room",       label: "Control Room",   stepNames: [],                                      navPath: "agents" },
 ];
-
-const ZONE_LABELS: Record<string, string> = {
-  requirement_room: "Requirement",
-  gap_analysis_room: "Gap Analysis",
-  ba_room: "BA",
-  sa_room: "Architect",
-  ux_studio: "UX Studio",
-  developer_zone: "Developer",
-  qa_lab: "QA Lab",
-  change_impact_room: "Change Impact",
-  documentation_room: "Documentation",
-  pm_room: "PM",
-};
 
 interface VirtualOfficeMapProps {
   agents: Agent[];
+  projectId?: string;
+  activeRun?: PipelineRun | null;
+  steps?: PipelineStep[];
+  onAgentClick?: (agent: Agent) => void;
 }
 
-export function VirtualOfficeMap({ agents }: VirtualOfficeMapProps) {
+export function VirtualOfficeMap({
+  agents,
+  projectId,
+  activeRun,
+  steps,
+  onAgentClick,
+}: VirtualOfficeMapProps) {
   const agentsByZone = agents.reduce<Record<string, Agent[]>>((acc, agent) => {
-    const zone = agent.current_zone ?? "unknown";
+    const zone = agent.current_zone ?? agent.home_zone ?? "control_room";
     acc[zone] = acc[zone] ?? [];
     acc[zone].push(agent);
     return acc;
@@ -41,20 +39,16 @@ export function VirtualOfficeMap({ agents }: VirtualOfficeMapProps) {
 
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-      {ZONES.map((zone) => (
-        <div
-          key={zone}
-          className="flex flex-col gap-2 rounded-lg border bg-accent/40 p-3 min-h-[80px]"
-        >
-          <p className="text-xs font-medium text-muted-foreground">
-            {ZONE_LABELS[zone] ?? zone}
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {(agentsByZone[zone] ?? []).map((agent) => (
-              <AgentAvatar key={agent.id} agent={agent} size="sm" />
-            ))}
-          </div>
-        </div>
+      {ROOMS.map((room) => (
+        <RoomCard
+          key={room.zone}
+          room={room}
+          agents={agentsByZone[room.zone] ?? []}
+          projectId={projectId}
+          activeRun={activeRun}
+          steps={steps}
+          onAgentClick={onAgentClick}
+        />
       ))}
     </div>
   );

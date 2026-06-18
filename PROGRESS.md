@@ -1,6 +1,6 @@
 # AI-SDLC Virtual Office — Progress Tracker
 
-**Last Updated:** 2026-06-18 (Sprint 15 complete)  
+**Last Updated:** 2026-06-18 (Sprint 16 complete)  
 **Project:** ai-sdlc-virtual-office  
 **Repo:** https://github.com/tanaratk/ai-sdlc-virtual-office  
 **Working Directory:** D:\AI_Office
@@ -45,15 +45,16 @@
 | 13 | Developer Agent MVP | ✅ Done |
 | 14 | QA Agent MVP | ✅ Done |
 | 15 | Traceability MVP | ✅ Done |
-| 16–20 | Agent MVP + Features | 🔲 |
+| 16 | Virtual Office MVP | ✅ Done |
+| 17–20 | RAG + GitHub + MCP + Change Impact | 🔲 |
 
 ## Next Sprint
 
-**Sprint 16 — Virtual Office MVP**
-- Create 2D virtual office page with room components
-- Display agent avatars and live status (idle/working/done/error)
-- Allow clicking agent to open console
-- Reflect actual workflow state from pipeline
+**Sprint 17 — RAG MVP**
+- Document ingestion pipeline (chunk + embed)
+- Store embeddings in pgvector
+- RAG search API
+- Wire RAG context into selected agents
 
 ---
 

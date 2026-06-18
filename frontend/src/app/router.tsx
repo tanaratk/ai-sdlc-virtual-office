@@ -21,6 +21,7 @@ export const router = createBrowserRouter([
       { path: "projects/:projectId/agents", element: <AgentConsolePage /> },
       { path: "projects/:projectId/documents", element: <DocumentReview /> },
       { path: "projects/:projectId/traceability", element: <TraceabilityPage /> },
+      { path: "projects/:projectId/office", element: <VirtualOfficePage /> },
       { path: "intake", element: <RequirementIntake /> },
       { path: "agents", element: <AgentConsolePage /> },
       { path: "documents", element: <DocumentReview /> },

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Bot, FileText, Upload } from "lucide-react";
+import { ArrowLeft, Bot, Building2, FileText, GitBranch, Upload } from "lucide-react";
 import { projectApi } from "@/services/projectApi";
 import { sourceApi } from "@/services/sourceApi";
 
@@ -69,6 +69,24 @@ export default function ProjectWorkspace() {
           <FileText className="h-6 w-6 text-primary" />
           <span className="text-sm font-medium">Documents</span>
           <span className="text-xs text-muted-foreground">View generated docs</span>
+        </Link>
+
+        <Link
+          to={`/projects/${projectId}/traceability`}
+          className="flex flex-col items-center gap-2 rounded-lg border bg-white p-6 text-center hover:border-primary transition-colors"
+        >
+          <GitBranch className="h-6 w-6 text-primary" />
+          <span className="text-sm font-medium">Traceability</span>
+          <span className="text-xs text-muted-foreground">Coverage matrix</span>
+        </Link>
+
+        <Link
+          to={`/projects/${projectId}/office`}
+          className="flex flex-col items-center gap-2 rounded-lg border bg-white p-6 text-center hover:border-primary transition-colors"
+        >
+          <Building2 className="h-6 w-6 text-primary" />
+          <span className="text-sm font-medium">Virtual Office</span>
+          <span className="text-xs text-muted-foreground">Live agent status</span>
         </Link>
       </div>
     </div>
