@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
 from app.db.database import get_session
@@ -26,10 +26,10 @@ router = APIRouter()
 # ── Request / Response schemas ─────────────────────────────────────────────────
 
 class GitHubSettingUpsert(BaseModel):
-    repo_owner: str
-    repo_name: str
-    access_token: str
-    default_branch: str = "main"
+    repo_owner: str = Field(min_length=1, max_length=255)
+    repo_name: str = Field(min_length=1, max_length=255)
+    access_token: str = Field(min_length=1)
+    default_branch: str = Field(default="main", min_length=1, max_length=255)
 
 
 class GitHubSettingResponse(BaseModel):
@@ -73,8 +73,8 @@ class CreateIssuesResponse(BaseModel):
 
 
 class CreateBranchRequest(BaseModel):
-    branch_name: str
-    from_branch: Optional[str] = None
+    branch_name: str = Field(min_length=1, max_length=255)
+    from_branch: Optional[str] = Field(default=None, min_length=1, max_length=255)
 
 
 class CreateBranchResponse(BaseModel):

@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Annotated, Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
 from app.db.database import get_session
@@ -60,9 +60,9 @@ class McpToolCallResponse(BaseModel):
 
 
 class InvokeRequest(BaseModel):
-    tool_name: str
+    tool_name: str = Field(min_length=1, max_length=100)
     input_json: Optional[dict[str, Any]] = None
-    requested_by: str = "user"
+    requested_by: str = Field(default="user", min_length=1, max_length=255)
 
 
 class ResolveRequest(BaseModel):

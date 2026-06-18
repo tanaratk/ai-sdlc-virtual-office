@@ -11,11 +11,8 @@ from typing import Any
 from sqlmodel import Session, select
 
 from app.db.models import (
-    Document,
-    DocumentType,
     GitHubSetting,
     McpCallStatus,
-    McpTool,
     McpToolCall,
 )
 from app.services.github_service import (
@@ -121,7 +118,6 @@ def _stub_result(tool_name: str) -> dict[str, Any]:
 def run_call(call: McpToolCall, session: Session) -> McpToolCall:
     """Execute a call and update its status in the DB. Returns updated call."""
     call.status = McpCallStatus.running
-    call.resolved_at = datetime.utcnow()
     session.commit()
 
     try:

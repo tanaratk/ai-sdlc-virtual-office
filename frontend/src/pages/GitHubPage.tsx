@@ -46,6 +46,10 @@ export default function GitHubPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["github-settings", projectId] });
       queryClient.invalidateQueries({ queryKey: ["github-issues", projectId] });
+      // Clear sensitive form fields after save
+      setToken("");
+      setOwner("");
+      setRepo("");
     },
   });
 

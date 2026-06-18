@@ -43,6 +43,7 @@ export default function McpPage() {
 
   const [invokeTarget, setInvokeTarget] = useState<McpTool | null>(null);
   const [invokeInput, setInvokeInput] = useState("{}");
+  const [invokeInputError, setInvokeInputError] = useState<string | null>(null);
   const [expandedCall, setExpandedCall] = useState<string | null>(null);
 
   // ── Queries ──────────────────────────────────────────────────────────────────
@@ -68,7 +69,11 @@ export default function McpPage() {
   const invokeMutation = useMutation({
     mutationFn: () => {
       let parsed: Record<string, unknown> = {};
-      try { parsed = JSON.parse(invokeInput) as Record<string, unknown>; } catch { /* empty */ }
+      try {
+        parsed = JSON.parse(invokeInput) as Record<string, unknown>;
+      } catch {
+        throw new Error("Input is not valid JSON. Please fix it before submitting.");
+      }
       return mcpApi.invoke(projectId!, {
         tool_name: invokeTarget!.tool_name,
         input_json: parsed,
@@ -79,6 +84,7 @@ export default function McpPage() {
       qc.invalidateQueries({ queryKey: ["mcp-calls", projectId] });
       setInvokeTarget(null);
       setInvokeInput("{}");
+      setInvokeInputError(null);
     },
   });
 
@@ -254,10 +260,23 @@ export default function McpPage() {
               <label className="text-xs font-medium">Input JSON</label>
               <textarea
                 value={invokeInput}
-                onChange={(e) => setInvokeInput(e.target.value)}
+                onChange={(e) => {
+                  setInvokeInput(e.target.value);
+                  try {
+                    JSON.parse(e.target.value);
+                    setInvokeInputError(null);
+                  } catch {
+                    setInvokeInputError("Invalid JSON syntax");
+                  }
+                }}
                 rows={5}
-                className="w-full rounded-md border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                className={`w-full rounded-md border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring resize-none ${
+                  invokeInputError ? "border-destructive" : ""
+                }`}
               />
+              {invokeInputError && (
+                <p className="text-xs text-destructive">{invokeInputError}</p>
+              )}
             </div>
             {invokeMutation.isError && (
               <div className="flex items-start gap-2 text-sm text-destructive">
@@ -269,14 +288,18 @@ export default function McpPage() {
             )}
             <div className="flex gap-2 justify-end">
               <button
-                onClick={() => { setInvokeTarget(null); invokeMutation.reset(); }}
+                onClick={() => {
+                  setInvokeTarget(null);
+                  setInvokeInputError(null);
+                  invokeMutation.reset();
+                }}
                 className="rounded-md border px-4 py-1.5 text-sm hover:bg-accent"
               >
                 Cancel
               </button>
               <button
                 onClick={() => invokeMutation.mutate()}
-                disabled={invokeMutation.isPending}
+                disabled={invokeMutation.isPending || !!invokeInputError}
                 className="flex items-center gap-2 rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               >
                 {invokeMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
