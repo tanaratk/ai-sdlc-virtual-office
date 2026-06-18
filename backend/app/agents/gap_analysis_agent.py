@@ -5,6 +5,7 @@ Reads the requirement_summary document and detects:
 """
 import logging
 import uuid
+from collections import Counter
 from datetime import datetime
 from typing import Optional
 
@@ -102,7 +103,6 @@ def _render_markdown(
     score_bar = "█" * (data.completeness_score // 10) + "░" * (10 - data.completeness_score // 10)
 
     # Summary table by category
-    from collections import Counter
     cat_counts = Counter(g.category for g in data.gaps)
     sev_order = {"Critical": 0, "High": 1, "Medium": 2, "Low": 3}
     sorted_gaps = sorted(data.gaps, key=lambda g: sev_order.get(g.severity, 4))
