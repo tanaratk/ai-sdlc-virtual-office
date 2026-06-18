@@ -485,3 +485,16 @@ class GitHubIssue(SQLModel, table=True):
     requirement_ids: Optional[str] = Field(default=None, max_length=500)
     state: str = Field(default="open", max_length=50)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class RagChunk(SQLModel, table=True):
+    __tablename__ = "rag_chunks"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    project_id: uuid.UUID = Field(foreign_key="projects.id")
+    document_id: uuid.UUID = Field(foreign_key="documents.id")
+    document_type: str = Field(max_length=100)
+    chunk_index: int
+    chunk_text: str
+    embedding_json: Optional[str] = Field(default=None, sa_column=Column(sa.Text))
+    created_at: datetime = Field(default_factory=datetime.utcnow)

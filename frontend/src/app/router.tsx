@@ -12,6 +12,7 @@ import DocumentationPage from "@/pages/DocumentationPage";
 import GitHubPage from "@/pages/GitHubPage";
 import PMPage from "@/pages/PMPage";
 import McpPage from "@/pages/McpPage";
+import RAGPage from "@/pages/RAGPage";
 import Settings from "@/pages/Settings";
 
 export const router = createBrowserRouter([
@@ -32,6 +33,7 @@ export const router = createBrowserRouter([
       { path: "projects/:projectId/pm", element: <PMPage /> },
       { path: "projects/:projectId/github", element: <GitHubPage /> },
       { path: "projects/:projectId/mcp", element: <McpPage /> },
+      { path: "projects/:projectId/rag", element: <RAGPage /> },
       { path: "mcp", element: <McpPage /> },
       { path: "intake", element: <RequirementIntake /> },
       { path: "agents", element: <AgentConsolePage /> },

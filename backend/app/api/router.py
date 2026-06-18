@@ -15,6 +15,7 @@ from app.api.routes import (
     pipeline,
     pm,
     projects,
+    rag,
     settings,
     sprints,
     tasks,
@@ -42,3 +43,4 @@ api_router.include_router(pm.router, prefix="/projects", tags=["PM Agent"])
 api_router.include_router(github.router, prefix="/projects", tags=["GitHub"])
 api_router.include_router(mcp.tool_router, tags=["MCP"])
 api_router.include_router(mcp.call_router, prefix="/projects", tags=["MCP"])
+api_router.include_router(rag.router, prefix="/projects", tags=["RAG"])
