@@ -1,5 +1,4 @@
 import uuid
-from typing import Optional
 
 from fastapi import HTTPException
 from sqlmodel import Session, select
@@ -78,8 +77,9 @@ class TraceabilityService:
 
         types_present = [d.document_type for d in unique_docs]
         types_missing = [t for t in _PIPELINE_DOC_TYPES if t not in types_present]
+        pipeline_types_present = [t for t in types_present if t in _PIPELINE_DOC_TYPES]
         coverage_pct = (
-            round(len(types_present) / len(_PIPELINE_DOC_TYPES) * 100, 1)
+            round(len(pipeline_types_present) / len(_PIPELINE_DOC_TYPES) * 100, 1)
             if _PIPELINE_DOC_TYPES else 0.0
         )
 
@@ -193,8 +193,3 @@ class TraceabilityService:
         ).all()
         return [TraceabilityLinkResponse.model_validate(lnk) for lnk in links]
 
-    def get_link(self, project_id: uuid.UUID, link_id: uuid.UUID) -> Optional[TraceabilityLinkResponse]:
-        link = self.session.get(TraceabilityLink, link_id)
-        if not link or link.project_id != project_id:
-            return None
-        return TraceabilityLinkResponse.model_validate(link)

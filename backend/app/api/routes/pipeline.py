@@ -184,7 +184,7 @@ def approve_step(
             background_tasks.add_task(background_fn, run_id)
         return {"status": "approved", "next": next_step_name}
     else:
-        # Final gate — no more agents (Sprint 14 chains QA Agent here)
+        # Gate 6 (test_cases) — pipeline complete
         run.status = PipelineRunStatus.completed
         run.completed_at = datetime.utcnow()
         session.commit()

@@ -35,6 +35,11 @@ from app.llm.client import call_ollama, extract_json
 logger = logging.getLogger(__name__)
 
 AGENT_NAME = "developer-agent"
+
+
+def _esc(s: str) -> str:
+    """Escape braces in document content so str.format() doesn't misinterpret them."""
+    return s.replace("{", "{{").replace("}", "}}")
 STEP_NAME = "dev_tasks"
 TIMEOUT_SECONDS = 240.0
 
@@ -279,11 +284,11 @@ class DevAgentRunner:
             raw_json = call_ollama(
                 system_prompt=_SYSTEM_PROMPT,
                 user_prompt=_TASK_TEMPLATE.format(
-                    fsd=fsd_doc.content_markdown,
-                    architecture=arch_doc.content_markdown,
-                    database=db_doc.content_markdown,
-                    api_spec=api_doc.content_markdown,
-                    screen_spec=screen_doc.content_markdown,
+                    fsd=_esc(fsd_doc.content_markdown),
+                    architecture=_esc(arch_doc.content_markdown),
+                    database=_esc(db_doc.content_markdown),
+                    api_spec=_esc(api_doc.content_markdown),
+                    screen_spec=_esc(screen_doc.content_markdown),
                 ),
                 timeout=TIMEOUT_SECONDS,
             )

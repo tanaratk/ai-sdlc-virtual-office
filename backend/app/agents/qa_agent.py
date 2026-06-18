@@ -30,6 +30,11 @@ from app.llm.client import call_ollama, extract_json
 logger = logging.getLogger(__name__)
 
 AGENT_NAME = "qa-agent"
+
+
+def _esc(s: str) -> str:
+    """Escape braces in document content so str.format() doesn't misinterpret them."""
+    return s.replace("{", "{{").replace("}", "}}")
 STEP_NAME = "test_cases"
 TIMEOUT_SECONDS = 300.0
 
@@ -386,10 +391,10 @@ class QAAgentRunner:
             raw_json = call_ollama(
                 system_prompt=_SYSTEM_PROMPT,
                 user_prompt=_TASK_TEMPLATE.format(
-                    fsd=fsd_doc.content_markdown,
-                    user_story=story_doc.content_markdown,
-                    api_spec=api_doc.content_markdown,
-                    screen_spec=screen_doc.content_markdown if screen_doc else "(not available)",
+                    fsd=_esc(fsd_doc.content_markdown),
+                    user_story=_esc(story_doc.content_markdown),
+                    api_spec=_esc(api_doc.content_markdown),
+                    screen_spec=_esc(screen_doc.content_markdown) if screen_doc else "(not available)",
                 ),
                 timeout=TIMEOUT_SECONDS,
             )

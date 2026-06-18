@@ -134,7 +134,7 @@ export function TraceabilityMatrix({ projectId }: TraceabilityMatrixProps) {
         </button>
       </div>
 
-      {autoLinkMutation.isSuccess && (
+      {autoLinkMutation.isSuccess && autoLinkMutation.data && (
         <p className="text-xs text-green-600">{autoLinkMutation.data.message}</p>
       )}
 
