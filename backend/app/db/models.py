@@ -399,3 +399,30 @@ class Milestone(SQLModel, table=True):
     mvp_number: int
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class GitHubSetting(SQLModel, table=True):
+    __tablename__ = "github_settings"
+    __table_args__ = (UniqueConstraint("project_id"),)
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    project_id: uuid.UUID = Field(foreign_key="projects.id")
+    repo_owner: str = Field(max_length=255)
+    repo_name: str = Field(max_length=255)
+    access_token: str
+    default_branch: str = Field(default="main", max_length=255)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class GitHubIssue(SQLModel, table=True):
+    __tablename__ = "github_issues"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    project_id: uuid.UUID = Field(foreign_key="projects.id")
+    issue_number: int
+    issue_url: str = Field(max_length=500)
+    title: str = Field(max_length=500)
+    requirement_ids: Optional[str] = Field(default=None, max_length=500)
+    state: str = Field(default="open", max_length=50)
+    created_at: datetime = Field(default_factory=datetime.utcnow)

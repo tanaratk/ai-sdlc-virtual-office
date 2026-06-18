@@ -5,6 +5,7 @@ from app.api.routes import (
     agents,
     change_impact,
     documents,
+    github,
     health,
     inputs,
     messages,
@@ -33,3 +34,4 @@ api_router.include_router(sprints.router, prefix="/projects", tags=["Sprints"])
 api_router.include_router(milestones.router, prefix="/projects", tags=["Milestones"])
 api_router.include_router(traceability.router, prefix="/projects", tags=["Traceability"])
 api_router.include_router(change_impact.router, prefix="/projects", tags=["Change Impact"])
+api_router.include_router(github.router, prefix="/projects", tags=["GitHub"])

@@ -1,0 +1,365 @@
+"""GitHub Integration API — /projects/{project_id}/github/..."""
+import uuid
+from datetime import datetime
+from typing import Annotated, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
+from sqlmodel import Session, select
+
+from app.db.database import get_session
+from app.db.models import Document, DocumentType, GitHubIssue, GitHubSetting, Project
+from app.services.github_service import (
+    GitHubRepo,
+    GitHubServiceError,
+    build_issue_body,
+    create_branch,
+    create_issue,
+    list_issues,
+    parse_tasks_from_markdown,
+    verify_connection,
+)
+
+router = APIRouter()
+
+
+# ── Request / Response schemas ─────────────────────────────────────────────────
+
+class GitHubSettingUpsert(BaseModel):
+    repo_owner: str
+    repo_name: str
+    access_token: str
+    default_branch: str = "main"
+
+
+class GitHubSettingResponse(BaseModel):
+    id: str
+    project_id: str
+    repo_owner: str
+    repo_name: str
+    default_branch: str
+    repo_url: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class GitHubVerifyResponse(BaseModel):
+    ok: bool
+    full_name: str
+    private: bool
+    html_url: str
+
+
+class GitHubIssueResponse(BaseModel):
+    id: str
+    project_id: str
+    issue_number: int
+    issue_url: str
+    title: str
+    requirement_ids: Optional[str]
+    state: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class CreateIssuesResponse(BaseModel):
+    created: int
+    issues: list[GitHubIssueResponse]
+    skipped: int = 0
+    errors: list[str] = []
+
+
+class CreateBranchRequest(BaseModel):
+    branch_name: str
+    from_branch: Optional[str] = None
+
+
+class CreateBranchResponse(BaseModel):
+    branch: str
+    sha: str
+
+
+# ── Helpers ────────────────────────────────────────────────────────────────────
+
+def _get_project_or_404(session: Session, project_id: uuid.UUID) -> Project:
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project
+
+
+def _get_settings_or_404(session: Session, project_id: uuid.UUID) -> GitHubSetting:
+    setting = session.exec(
+        select(GitHubSetting).where(GitHubSetting.project_id == project_id)
+    ).first()
+    if not setting:
+        raise HTTPException(
+            status_code=404,
+            detail="GitHub settings not configured for this project. "
+                   "Call PUT /github/settings first.",
+        )
+    return setting
+
+
+def _to_repo(s: GitHubSetting) -> GitHubRepo:
+    return GitHubRepo(
+        owner=s.repo_owner,
+        name=s.repo_name,
+        token=s.access_token,
+        default_branch=s.default_branch,
+    )
+
+
+# ── Settings routes ────────────────────────────────────────────────────────────
+
+@router.get(
+    "/{project_id}/github/settings",
+    response_model=GitHubSettingResponse,
+    summary="Get GitHub settings for a project",
+)
+def get_github_settings(
+    project_id: uuid.UUID,
+    session: Annotated[Session, Depends(get_session)],
+) -> GitHubSettingResponse:
+    _get_project_or_404(session, project_id)
+    s = _get_settings_or_404(session, project_id)
+    return GitHubSettingResponse(
+        id=str(s.id),
+        project_id=str(s.project_id),
+        repo_owner=s.repo_owner,
+        repo_name=s.repo_name,
+        default_branch=s.default_branch,
+        repo_url=f"https://github.com/{s.repo_owner}/{s.repo_name}",
+        created_at=s.created_at,
+        updated_at=s.updated_at,
+    )
+
+
+@router.put(
+    "/{project_id}/github/settings",
+    response_model=GitHubSettingResponse,
+    summary="Save (or update) GitHub settings and verify connection",
+)
+def upsert_github_settings(
+    project_id: uuid.UUID,
+    body: GitHubSettingUpsert,
+    session: Annotated[Session, Depends(get_session)],
+) -> GitHubSettingResponse:
+    _get_project_or_404(session, project_id)
+
+    # Verify access before saving
+    repo = GitHubRepo(
+        owner=body.repo_owner,
+        name=body.repo_name,
+        token=body.access_token,
+        default_branch=body.default_branch,
+    )
+    try:
+        info = verify_connection(repo)
+    except GitHubServiceError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    existing = session.exec(
+        select(GitHubSetting).where(GitHubSetting.project_id == project_id)
+    ).first()
+
+    now = datetime.utcnow()
+    if existing:
+        existing.repo_owner = body.repo_owner
+        existing.repo_name = body.repo_name
+        existing.access_token = body.access_token
+        existing.default_branch = info.get("default_branch", body.default_branch)
+        existing.updated_at = now
+        session.commit()
+        session.refresh(existing)
+        s = existing
+    else:
+        s = GitHubSetting(
+            project_id=project_id,
+            repo_owner=body.repo_owner,
+            repo_name=body.repo_name,
+            access_token=body.access_token,
+            default_branch=info.get("default_branch", body.default_branch),
+        )
+        session.add(s)
+        session.commit()
+        session.refresh(s)
+
+    return GitHubSettingResponse(
+        id=str(s.id),
+        project_id=str(s.project_id),
+        repo_owner=s.repo_owner,
+        repo_name=s.repo_name,
+        default_branch=s.default_branch,
+        repo_url=f"https://github.com/{s.repo_owner}/{s.repo_name}",
+        created_at=s.created_at,
+        updated_at=s.updated_at,
+    )
+
+
+@router.post(
+    "/{project_id}/github/verify",
+    response_model=GitHubVerifyResponse,
+    summary="Verify GitHub connection for a project",
+)
+def verify_github(
+    project_id: uuid.UUID,
+    session: Annotated[Session, Depends(get_session)],
+) -> GitHubVerifyResponse:
+    _get_project_or_404(session, project_id)
+    s = _get_settings_or_404(session, project_id)
+    try:
+        info = verify_connection(_to_repo(s))
+    except GitHubServiceError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return GitHubVerifyResponse(
+        ok=True,
+        full_name=info["full_name"],
+        private=info["private"],
+        html_url=info["html_url"],
+    )
+
+
+# ── Issues routes ──────────────────────────────────────────────────────────────
+
+@router.get(
+    "/{project_id}/github/issues",
+    response_model=list[GitHubIssueResponse],
+    summary="List GitHub issues created from this project",
+)
+def list_github_issues(
+    project_id: uuid.UUID,
+    session: Annotated[Session, Depends(get_session)],
+) -> list[GitHubIssueResponse]:
+    _get_project_or_404(session, project_id)
+    issues = session.exec(
+        select(GitHubIssue)
+        .where(GitHubIssue.project_id == project_id)
+        .order_by(GitHubIssue.created_at.desc())
+    ).all()
+    return [
+        GitHubIssueResponse(
+            id=str(i.id),
+            project_id=str(i.project_id),
+            issue_number=i.issue_number,
+            issue_url=i.issue_url,
+            title=i.title,
+            requirement_ids=i.requirement_ids,
+            state=i.state,
+            created_at=i.created_at,
+        )
+        for i in issues
+    ]
+
+
+@router.post(
+    "/{project_id}/github/issues",
+    response_model=CreateIssuesResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create GitHub issues from the project's code task list",
+)
+def create_github_issues(
+    project_id: uuid.UUID,
+    session: Annotated[Session, Depends(get_session)],
+) -> CreateIssuesResponse:
+    project = _get_project_or_404(session, project_id)
+    s = _get_settings_or_404(session, project_id)
+    repo = _to_repo(s)
+
+    # Load the latest code_task_list document
+    task_doc = session.exec(
+        select(Document).where(
+            Document.project_id == project_id,
+            Document.document_type == DocumentType.code_task_list,
+        ).order_by(Document.created_at.desc())
+    ).first()
+    if not task_doc:
+        raise HTTPException(
+            status_code=404,
+            detail="No code task list document found for this project. "
+                   "Run the Developer Agent first.",
+        )
+
+    tasks = parse_tasks_from_markdown(task_doc.content_markdown)
+    created_issues: list[GitHubIssueResponse] = []
+    errors: list[str] = []
+    skipped = 0
+
+    for task in tasks:
+        # Skip if issue with same title already exists in DB
+        existing = session.exec(
+            select(GitHubIssue).where(
+                GitHubIssue.project_id == project_id,
+                GitHubIssue.title == task.title,
+            )
+        ).first()
+        if existing:
+            skipped += 1
+            continue
+
+        try:
+            result = create_issue(
+                repo=repo,
+                title=task.title,
+                body=build_issue_body(task, project.name),
+                labels=["ai-sdlc", "needs-review"],
+            )
+        except GitHubServiceError as exc:
+            errors.append(f"'{task.title}': {exc}")
+            continue
+
+        gh_issue = GitHubIssue(
+            project_id=project_id,
+            issue_number=result["number"],
+            issue_url=result["url"],
+            title=result["title"],
+            requirement_ids=", ".join(task.requirement_ids) if task.requirement_ids else None,
+            state=result["state"],
+        )
+        session.add(gh_issue)
+        session.flush()  # get id before commit
+
+        created_issues.append(GitHubIssueResponse(
+            id=str(gh_issue.id),
+            project_id=str(gh_issue.project_id),
+            issue_number=gh_issue.issue_number,
+            issue_url=gh_issue.issue_url,
+            title=gh_issue.title,
+            requirement_ids=gh_issue.requirement_ids,
+            state=gh_issue.state,
+            created_at=gh_issue.created_at,
+        ))
+
+    session.commit()
+    return CreateIssuesResponse(
+        created=len(created_issues),
+        issues=created_issues,
+        skipped=skipped,
+        errors=errors,
+    )
+
+
+# ── Branch route ───────────────────────────────────────────────────────────────
+
+@router.post(
+    "/{project_id}/github/branches",
+    response_model=CreateBranchResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a branch in the connected GitHub repository",
+)
+def create_github_branch(
+    project_id: uuid.UUID,
+    body: CreateBranchRequest,
+    session: Annotated[Session, Depends(get_session)],
+) -> CreateBranchResponse:
+    _get_project_or_404(session, project_id)
+    s = _get_settings_or_404(session, project_id)
+    try:
+        result = create_branch(repo=_to_repo(s), branch_name=body.branch_name,
+                               from_branch=body.from_branch)
+    except GitHubServiceError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return CreateBranchResponse(**result)

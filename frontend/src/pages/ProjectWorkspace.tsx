@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Bot, Building2, FileText, GitBranch, Upload, Zap } from "lucide-react";
+import { ArrowLeft, Bot, Building2, FileText, GitBranch, Github, Upload, Zap } from "lucide-react";
 import { projectApi } from "@/services/projectApi";
 import { sourceApi } from "@/services/sourceApi";
 
@@ -96,6 +96,15 @@ export default function ProjectWorkspace() {
           <Zap className="h-6 w-6 text-primary" />
           <span className="text-sm font-medium">Change Impact</span>
           <span className="text-xs text-muted-foreground">Analyse requirement changes</span>
+        </Link>
+
+        <Link
+          to={`/projects/${projectId}/github`}
+          className="flex flex-col items-center gap-2 rounded-lg border bg-white p-6 text-center hover:border-primary transition-colors"
+        >
+          <Github className="h-6 w-6 text-primary" />
+          <span className="text-sm font-medium">GitHub</span>
+          <span className="text-xs text-muted-foreground">Push tasks as issues</span>
         </Link>
       </div>
     </div>
