@@ -1,4 +1,4 @@
-"""Tests for the 5-agent pipeline: Requirement → Gap Analysis → BA → SA → UX Agent."""
+"""Tests for the 6-agent pipeline: Requirement → Gap Analysis → BA → SA → UX → Developer Agent."""
 import json
 import uuid
 from unittest.mock import patch
@@ -312,11 +312,88 @@ _MOCK_UX_OUTPUT = json.dumps({
     ],
 })
 
+_MOCK_DEV_OUTPUT = json.dumps({
+    "backend_tasks": [
+        {
+            "id": "TASK-001",
+            "category": "backend",
+            "title": "Implement POST /expenses endpoint",
+            "description": "Create FastAPI route that accepts expense submission payload, validates business rules, and persists to expense_requests table.",
+            "requirement_refs": ["FR-001"],
+            "api_refs": ["API-001"],
+            "db_refs": ["DB-002"],
+            "screen_refs": ["UI-001"],
+            "priority": "High",
+            "estimated_hours": 4,
+        },
+        {
+            "id": "TASK-002",
+            "category": "backend",
+            "title": "Implement POST /expenses/{id}/approve endpoint",
+            "description": "Create FastAPI route for manager approval action, update expense status to APPROVED, and trigger email notification service.",
+            "requirement_refs": ["FR-002"],
+            "api_refs": ["API-002"],
+            "db_refs": ["DB-002"],
+            "screen_refs": ["UI-002"],
+            "priority": "High",
+            "estimated_hours": 4,
+        },
+    ],
+    "frontend_tasks": [
+        {
+            "id": "TASK-003",
+            "category": "frontend",
+            "title": "Build Expense Submission screen",
+            "description": "React component for expense submission form with amount, description, and receipt file upload fields per UI-001 spec.",
+            "requirement_refs": ["FR-001"],
+            "api_refs": ["API-001"],
+            "db_refs": [],
+            "screen_refs": ["UI-001"],
+            "priority": "High",
+            "estimated_hours": 6,
+        },
+        {
+            "id": "TASK-004",
+            "category": "frontend",
+            "title": "Build Manager Approval Dashboard",
+            "description": "React component showing pending expense list with Approve/Reject buttons per UI-002 spec.",
+            "requirement_refs": ["FR-002"],
+            "api_refs": ["API-002"],
+            "db_refs": [],
+            "screen_refs": ["UI-002"],
+            "priority": "High",
+            "estimated_hours": 6,
+        },
+    ],
+    "database_migrations": [
+        {
+            "id": "MIG-001",
+            "table": "users",
+            "operation": "create_table",
+            "description": "Create users table with id, email, role columns per DB-001 spec.",
+            "db_ref": "DB-001",
+        },
+        {
+            "id": "MIG-002",
+            "table": "expense_requests",
+            "operation": "create_table",
+            "description": "Create expense_requests table with FK to users per DB-002 spec.",
+            "db_ref": "DB-002",
+        },
+    ],
+    "total_estimated_hours": 20,
+    "notes": [
+        "JWT authentication middleware must be set up before TASK-001 and TASK-002.",
+        "Email notification service integration is a dependency for TASK-002.",
+    ],
+})
+
 # LLM call sequences
-_BOTH_LLM_OUTPUTS  = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT]                                           # Gate 1
-_ALL_LLM_OUTPUTS   = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT, _MOCK_BA_OUTPUT]                          # Gate 2
-_FULL_LLM_OUTPUTS  = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT, _MOCK_BA_OUTPUT, _MOCK_SA_OUTPUT]         # Gate 3
-_MAX_LLM_OUTPUTS   = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT, _MOCK_BA_OUTPUT, _MOCK_SA_OUTPUT, _MOCK_UX_OUTPUT]  # Gate 4
+_BOTH_LLM_OUTPUTS  = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT]                                                                # Gate 1
+_ALL_LLM_OUTPUTS   = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT, _MOCK_BA_OUTPUT]                                               # Gate 2
+_FULL_LLM_OUTPUTS  = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT, _MOCK_BA_OUTPUT, _MOCK_SA_OUTPUT]                              # Gate 3
+_MAX_LLM_OUTPUTS   = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT, _MOCK_BA_OUTPUT, _MOCK_SA_OUTPUT, _MOCK_UX_OUTPUT]             # Gate 4
+_ULTRA_LLM_OUTPUTS = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT, _MOCK_BA_OUTPUT, _MOCK_SA_OUTPUT, _MOCK_UX_OUTPUT, _MOCK_DEV_OUTPUT]  # Gate 5
 
 
 # ── guard tests (no LLM) ───────────────────────────────────────────────────────
@@ -613,10 +690,10 @@ def test_list_steps_after_ux(mock_llm, client: TestClient):
         assert s["status"] == "completed"
 
 
-# ── Gate 4 ─────────────────────────────────────────────────────────────────────
+# ── Gate 4 → Developer Agent (step 6) ──────────────────────────────────────────
 
-@patch("app.llm.client.call_ollama", side_effect=_MAX_LLM_OUTPUTS)
-def test_approve_gate4_completes_run(mock_llm, client: TestClient):
+@patch("app.llm.client.call_ollama", side_effect=_ULTRA_LLM_OUTPUTS)
+def test_approve_gate4_triggers_dev_agent(mock_llm, client: TestClient):
     project = _create_project(client)
     _create_input(client, project["id"])
     run = _run_pipeline(client, project["id"])
@@ -626,25 +703,96 @@ def test_approve_gate4_completes_run(mock_llm, client: TestClient):
                           "gap_analysis", "ba_documents", "sa_documents")
     ux_step = _get_step(client, project["id"], run_id, "ux_documents")
     result = _approve(client, project["id"], run_id, ux_step["id"])
+    assert result["next"] == "dev_tasks"
+
+    final_run = client.get(f"/api/v1/projects/{project['id']}/pipeline/runs/{run_id}").json()
+    assert final_run["status"] == "waiting_for_user"
+    assert final_run["current_step"] == "dev_tasks"
+
+
+@patch("app.llm.client.call_ollama", side_effect=_ULTRA_LLM_OUTPUTS)
+def test_dev_agent_creates_task_list(mock_llm, client: TestClient):
+    project = _create_project(client)
+    _create_input(client, project["id"])
+    run = _run_pipeline(client, project["id"])
+    _approve_through_gate(client, project["id"], run["id"],
+                          "gap_analysis", "ba_documents", "sa_documents", "ux_documents")
+
+    docs = client.get(f"/api/v1/projects/{project['id']}/documents").json()
+    assert docs["total"] == 10
+    doc_types = {d["document_type"] for d in docs["items"]}
+    assert "code_task_list" in doc_types
+
+
+@patch("app.llm.client.call_ollama", side_effect=_ULTRA_LLM_OUTPUTS)
+def test_task_list_content(mock_llm, client: TestClient):
+    project = _create_project(client)
+    _create_input(client, project["id"])
+    run = _run_pipeline(client, project["id"])
+    _approve_through_gate(client, project["id"], run["id"],
+                          "gap_analysis", "ba_documents", "sa_documents", "ux_documents")
+
+    docs = client.get(f"/api/v1/projects/{project['id']}/documents").json()
+    doc_id = next(d["id"] for d in docs["items"] if d["document_type"] == "code_task_list")
+    doc = client.get(f"/api/v1/projects/{project['id']}/documents/{doc_id}").json()
+    assert "TASK-001" in doc["content_markdown"]
+    assert "TASK-002" in doc["content_markdown"]
+    assert "TASK-003" in doc["content_markdown"]
+    assert "TASK-004" in doc["content_markdown"]
+    assert "MIG-001" in doc["content_markdown"]
+    assert "MIG-002" in doc["content_markdown"]
+    assert "FR-001" in doc["content_markdown"]
+    assert "API-001" in doc["content_markdown"]
+    assert doc["status"] == "review"
+
+
+@patch("app.llm.client.call_ollama", side_effect=_ULTRA_LLM_OUTPUTS)
+def test_list_steps_after_dev(mock_llm, client: TestClient):
+    project = _create_project(client)
+    _create_input(client, project["id"])
+    run = _run_pipeline(client, project["id"])
+    _approve_through_gate(client, project["id"], run["id"],
+                          "gap_analysis", "ba_documents", "sa_documents", "ux_documents")
+
+    steps = client.get(f"/api/v1/projects/{project['id']}/pipeline/runs/{run['id']}/steps").json()
+    assert len(steps) == 6
+    for s in steps:
+        assert s["status"] == "completed"
+
+
+# ── Gate 5 ─────────────────────────────────────────────────────────────────────
+
+@patch("app.llm.client.call_ollama", side_effect=_ULTRA_LLM_OUTPUTS)
+def test_approve_gate5_completes_run(mock_llm, client: TestClient):
+    project = _create_project(client)
+    _create_input(client, project["id"])
+    run = _run_pipeline(client, project["id"])
+    run_id = run["id"]
+
+    _approve_through_gate(client, project["id"], run_id,
+                          "gap_analysis", "ba_documents", "sa_documents", "ux_documents")
+    dev_step = _get_step(client, project["id"], run_id, "dev_tasks")
+    result = _approve(client, project["id"], run_id, dev_step["id"])
     assert result["status"] == "approved"
 
     final_run = client.get(f"/api/v1/projects/{project['id']}/pipeline/runs/{run_id}").json()
     assert final_run["status"] == "completed"
 
 
-@patch("app.llm.client.call_ollama", side_effect=_MAX_LLM_OUTPUTS)
+@patch("app.llm.client.call_ollama", side_effect=_ULTRA_LLM_OUTPUTS)
 def test_approve_wrong_state_returns_400(mock_llm, client: TestClient):
     project = _create_project(client)
     _create_input(client, project["id"])
     run = _run_pipeline(client, project["id"])
     run_id = run["id"]
 
-    # All four gates → run = completed
+    # All five gates → run = completed
     _approve_through_gate(client, project["id"], run_id,
-                          "gap_analysis", "ba_documents", "sa_documents", "ux_documents")
+                          "gap_analysis", "ba_documents", "sa_documents",
+                          "ux_documents", "dev_tasks")
 
-    ux_step = _get_step(client, project["id"], run_id, "ux_documents")
-    r = client.post(f"/api/v1/projects/{project['id']}/pipeline/runs/{run_id}/steps/{ux_step['id']}/approve")
+    dev_step = _get_step(client, project["id"], run_id, "dev_tasks")
+    r = client.post(f"/api/v1/projects/{project['id']}/pipeline/runs/{run_id}/steps/{dev_step['id']}/approve")
     assert r.status_code == 400
     assert r.json()["detail"]["error_code"] == "INVALID_STATE"
 

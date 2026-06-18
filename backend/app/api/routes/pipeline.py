@@ -59,6 +59,15 @@ def _run_ux_agent_background(run_id: uuid.UUID) -> None:
         UXAgentRunner(session).run(run_id)
 
 
+def _run_dev_agent_background(run_id: uuid.UUID) -> None:
+    """Step 6: Developer Agent — triggered by Gate 4 approval."""
+    from app.agents.dev_agent import DevAgentRunner
+    from sqlmodel import Session as _Session
+
+    with _Session(engine) as session:
+        DevAgentRunner(session).run(run_id)
+
+
 # ── Gate approval helpers ──────────────────────────────────────────────────────
 
 # Maps step_name → next step to create on approval
@@ -66,13 +75,15 @@ _NEXT_STEP: dict[str, str | None] = {
     "gap_analysis": "ba_documents",   # Gate 1: approve → run BA Agent
     "ba_documents": "sa_documents",   # Gate 2: approve → run SA Agent
     "sa_documents": "ux_documents",   # Gate 3: approve → run UX Agent
-    "ux_documents": None,             # Gate 4: approve → completed (Sprint 13 chains Dev)
+    "ux_documents": "dev_tasks",      # Gate 4: approve → run Developer Agent
+    "dev_tasks":    None,             # Gate 5: approve → completed (Sprint 14 chains QA)
 }
 
 _NEXT_BACKGROUND: dict[str, object] = {
     "ba_documents": _run_ba_agent_background,
     "sa_documents": _run_sa_agent_background,
     "ux_documents": _run_ux_agent_background,
+    "dev_tasks":    _run_dev_agent_background,
 }
 
 
@@ -162,7 +173,7 @@ def approve_step(
             background_tasks.add_task(background_fn, run_id)
         return {"status": "approved", "next": next_step_name}
     else:
-        # Final gate — no more agents (Sprint 13 chains Developer Agent here)
+        # Final gate — no more agents (Sprint 14 chains QA Agent here)
         run.status = PipelineRunStatus.completed
         run.completed_at = datetime.utcnow()
         session.commit()
@@ -208,4 +219,4 @@ def rerun_step(
     step_id: uuid.UUID,
     session: Session = Depends(get_session),
 ):
-    raise HTTPException(status_code=501, detail={"error_code": "NOT_IMPLEMENTED", "message": "Step rerun — Sprint 13"})
+    raise HTTPException(status_code=501, detail={"error_code": "NOT_IMPLEMENTED", "message": "Step rerun — Sprint 14"})

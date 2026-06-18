@@ -1,6 +1,6 @@
 # AI-SDLC Virtual Office — Progress Tracker
 
-**Last Updated:** 2026-06-18 (Sprint 12 complete)  
+**Last Updated:** 2026-06-18 (Sprint 13 complete)  
 **Project:** ai-sdlc-virtual-office  
 **Repo:** https://github.com/tanaratk/ai-sdlc-virtual-office  
 **Working Directory:** D:\AI_Office
@@ -42,14 +42,15 @@
 | 10 | BA Agent MVP | ✅ Done |
 | 11 | Solution Architect Agent MVP | ✅ Done |
 | 12 | UX Agent MVP | ✅ Done |
-| 13–20 | Agent MVP + Features | 🔲 |
+| 13 | Developer Agent MVP | ✅ Done |
+| 14–20 | Agent MVP + Features | 🔲 |
 
 ## Next Sprint
 
-**Sprint 13 — Developer Agent MVP**
-- Implement Developer Agent runtime (read all approved docs → generate code_task_list)
-- Chain from Gate 4 approval → Developer Agent
-- Gate 5: approve/reject Dev task list
+**Sprint 14 — QA Agent MVP**
+- Implement QA Agent runtime (read req_summary + FSD + API Spec + Screen Spec → generate test_cases + uat_script)
+- Chain from Gate 5 approval → QA Agent
+- Gate 6: approve/reject QA documents
 
 ---
 
