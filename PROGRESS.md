@@ -34,17 +34,19 @@
 | 2 | Prompt & Template Design | ✅ Done |
 | 3 | Database Design | ✅ Done |
 | 4 | API Design | ✅ Done |
-| 5 | Workflow Design | 🔲 |
+| 5 | Workflow Design | ✅ Done |
 | 6 | Backend Skeleton | 🔲 |
 | 7 | Frontend Skeleton | 🔲 |
 | 8–20 | Agent MVP + Features | 🔲 |
 
 ## Next Sprint
 
-**Sprint 5 — Workflow Design**
-- Create `docs/workflows/requirement-to-code.workflow.md`
-- Create `docs/workflows/agent-state-machine.md`
-- Create `docs/workflows/human-review-points.md`
+**Sprint 6 — Backend Skeleton**
+- Initialize FastAPI project structure (`backend/`)
+- SQLModel table definitions (Python)
+- Alembic migration files
+- Docker Compose (`infra/docker-compose.yml`)
+- Database `ai_sdlc` created for real
 
 ---
 
