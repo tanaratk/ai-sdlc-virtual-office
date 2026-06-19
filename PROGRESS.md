@@ -53,29 +53,38 @@
 | 21 | Documentation Agent MVP | ✅ Done |
 | 22 | PM Agent MVP | ✅ Done |
 | 23 | Docker + CI/CD | ✅ Done |
-| **Phase 2** | **Code Generation Factory** | **In Progress** |
+| **Phase 2** | **Code Generation Factory** | ✅ Done |
 | 24 | Per-Agent LLM Selection | ✅ Done |
 | 25 | Developer Agent — Real Code Generation | ✅ Done |
 | 26 | Code Output Viewer + ZIP Download | ✅ Done |
 | 27 | DevOps Agent (Dockerfile + CI/CD gen) | ✅ Done |
 | 28 | Pipeline Steps 8–10 Completion | ✅ Done |
 | 29 | GitHub Push of Generated Application | ✅ Done |
+| **Phase 3** | **Enterprise Pipeline (3-Layer Architecture)** | 🔲 Next |
+| 30 | Pipeline Rewire — 3-Layer Architecture | 🔲 Next |
+| 31 | Agent File Output — write docs to workspace | 🔲 Planned |
+| 32 | Technical Design Agent (NEW) | 🔲 Planned |
+| 33 | Code Review Agent (NEW) | 🔲 Planned |
+| 34 | QA Agent Rewrite — gen test files + run | 🔲 Planned |
+| 35 | DevOps Agent — build + deploy + health check | 🔲 Planned |
+| 36 | Monitoring Agent (NEW) | 🔲 Planned |
+| 37 | Multi-Developer Agent fan-out | 🔲 Planned |
+| 38 | Agent Contract Refactor | 🔲 Planned |
+| 39 | Change Impact On-demand Trigger | 🔲 Planned |
 
 ## Project Status
 
-**Phase 1 COMPLETE (Sprint 0–23)** — SDLC Document Pipeline ครบทุก agent, infra, UI, RAG, GitHub, MCP
+**Phase 1 COMPLETE (Sprint 0–23)** — SDLC Document Pipeline ครบทุก agent
 
-**Phase 2 COMPLETE** — Code Generation Factory (Sprint 24–29)
-- Sprint 24: Per-Agent LLM Selection — ✅ Done
-- Sprint 25: Developer Agent Rewrite — Real Code Generation — **NEXT**
-- Sprint 25: Developer Agent Rewrite — Real Code Generation
-- Sprint 26: Code Output Viewer + ZIP Download
-- Sprint 27: DevOps Agent (Dockerfile + CI/CD)
-- Sprint 28: Pipeline Steps 8–10 Completion
-- Sprint 29: GitHub Push of Generated Application
+**Phase 2 COMPLETE (Sprint 24–29)** — Code Generation Factory
 
-**Goal shift:** Developer Agent ต้องสร้างไฟล์ code จริง (`.py`, `.tsx`, `.sql`) ไม่ใช่แค่ task list
-Spec อัปเดตแล้วใน `Requirement Spec/AI-SDLC-Working-Office-Spec.md`
+**Phase 3 IN PLANNING** — Enterprise 3-Layer Pipeline Architecture
+- Architecture decision: 2026-06-19
+- Spec: `Requirement Spec/AI-SDLC-Working-Office-Spec.md` Section 37
+- 12 agents: Requirement → Gap → BA → SA → UX → Technical Design → Dev(N) → Code Review → QA → DevOps → Monitor → Change Impact
+- 3 layers: Business / Design / Delivery
+- 2 hard gates: BA Approved, Technical Design Approved
+- Multi-Developer Agent fan-out for large projects
 
 ---
 

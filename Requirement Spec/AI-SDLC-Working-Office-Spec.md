@@ -3394,3 +3394,289 @@ AI Coding Tool ห้ามตีความระบบนี้เป็น�
 ```text
 The final output must be a real application workspace, not only generated documents.
 ```
+
+
+---
+
+# 37. Revised Pipeline Architecture (Phase 3 Standard)
+
+> **Decision Date:** 2026-06-19  
+> **Status:** APPROVED — supersedes the 10-step pipeline defined in Section 9  
+> **Owner:** Product / Architecture
+
+---
+
+## 37.1 Three-Layer Pipeline Overview
+
+```
+BUSINESS LAYER
+  [1] Requirement Agent   → docs/requirements.md
+  [2] Gap Analysis Agent  → docs/gap_report.md
+  [3] BA Agent            → docs/fsd.md + docs/user_stories.md
+  GATE: BA Approved → unlock Design Layer
+
+DESIGN LAYER
+  [4] SA Agent            → docs/architecture.md + docs/db_schema.md + docs/api_spec.md
+  [5] UX Agent            → docs/screen_spec.md + docs/ux_flows.md
+  [6] Technical Design Agent → docs/dev_tasks.md
+  GATE: Technical Design Approved → unlock Delivery Layer
+
+DELIVERY LAYER
+  [7] Developer Agent(s)  → app/** (source code, scalable to N instances)
+  [8] Code Review Agent   → docs/code_review.md
+  [9] QA Agent            → tests/** + docs/test_report.md
+  [10] DevOps Agent       → Dockerfile + docker-compose + build + deploy
+  [11] Monitoring Agent   → docs/monitoring_report.md + live metrics
+
+ON-DEMAND
+  [12] Change Impact Agent → docs/change_impact.md (triggered on requirement change)
+```
+
+---
+
+## 37.2 Agent Contracts
+
+### Agent 1 — Requirement Agent
+```
+INPUT : raw text / file (txt, md, pdf, docx, audio transcript)
+OUTPUT: docs/requirements.md
+  Sections: Executive Summary, FR-XXX, NFR-XXX, BR-XXX,
+            Assumptions, Out of Scope
+GATE  : Human review
+NEXT  : Gap Analysis Agent
+```
+
+### Agent 2 — Gap Analysis Agent
+```
+INPUT : docs/requirements.md
+OUTPUT: docs/gap_report.md
+  Sections: Missing Info (GAP-XXX), Ambiguities, Conflicts,
+            Risks, Open Questions (OQ-XXX)
+GATE  : Human review
+NEXT  : BA Agent
+```
+
+### Agent 3 — BA Agent
+```
+INPUT : docs/requirements.md + docs/gap_report.md
+OUTPUT: docs/fsd.md           (Functional Spec + Acceptance Criteria per FR)
+        docs/user_stories.md  (US-XXX: As a / I want / So that / AC)
+GATE  : Human APPROVE → unlock Design Layer
+NEXT  : SA Agent
+```
+
+### Agent 4 — SA Agent (Solution Architect)
+```
+INPUT : docs/fsd.md + docs/user_stories.md + docs/requirements.md
+OUTPUT: docs/architecture.md  (tech stack, component diagram, deployment)
+        docs/db_schema.md     (tables, columns, types, indexes, FK)
+        docs/api_spec.md      (OpenAPI-style endpoints + request/response)
+GATE  : Human review
+NEXT  : UX Agent
+```
+
+### Agent 5 — UX Agent
+```
+INPUT : docs/fsd.md + docs/user_stories.md + docs/architecture.md
+OUTPUT: docs/screen_spec.md   (UI-XXX screens, fields, actions, validation)
+        docs/ux_flows.md      (user journey in Mermaid)
+GATE  : Human review
+NEXT  : Technical Design Agent
+```
+
+### Agent 6 — Technical Design Agent (NEW)
+```
+INPUT : docs/fsd.md + docs/architecture.md + docs/db_schema.md
+        docs/api_spec.md + docs/screen_spec.md
+OUTPUT: docs/dev_tasks.md
+  Format per task:
+    TASK-XXX | domain(backend|frontend|db|test) | file_path |
+    description | depends_on | FR-ref | estimated_lines
+GATE  : Human APPROVE → unlock Delivery Layer
+NEXT  : Developer Agent(s)
+SCALING NOTE: task count determines how many Developer Agent instances to spawn
+```
+
+### Agent 7 — Developer Agent (Scalable to N instances)
+```
+INPUT : docs/dev_tasks.md (task slice)
+        docs/architecture.md + docs/db_schema.md
+        docs/api_spec.md + docs/screen_spec.md
+OUTPUT: app/backend/**       (FastAPI routes, models, services)
+        app/frontend/**      (React pages, components, hooks)
+        app/db/migrations/** (Alembic migration files)
+
+SCALING RULES:
+  <= 30 files : 1 Developer Agent instance
+  31-80 files : 2 instances (backend-agent + frontend-agent)
+  > 80 files  : 3 instances (backend + frontend + db/infra)
+  Each instance writes to its own domain slice
+  Code Review Agent waits for ALL instances to complete
+
+GATE  : All instances done
+NEXT  : Code Review Agent
+```
+
+### Agent 8 — Code Review Agent (NEW)
+```
+INPUT : app/**  (all generated source files)
+        docs/api_spec.md + docs/db_schema.md
+OUTPUT: docs/code_review.md
+  Sections: Security Issues (CRIT/HIGH/MED/LOW), Logic Errors,
+            API Contract Violations, DB Schema Violations,
+            Missing Error Handling, Recommendations
+GATE  : CRIT/HIGH issues block → must fix before QA
+        MED/LOW → human can approve and proceed
+NEXT  : QA Agent
+```
+
+### Agent 9 — QA Agent (Generate + Run)
+```
+INPUT : app/**  (source code)
+        docs/api_spec.md + docs/screen_spec.md + docs/user_stories.md
+OUTPUT (files):
+  tests/unit/test_*.py          (pytest unit tests per module)
+  tests/api/test_api_*.py       (httpx integration tests per endpoint)
+  tests/e2e/test_*.spec.ts      (Playwright UI tests per screen)
+  docs/test_report.md           (pass/fail summary + coverage)
+
+EXECUTION:
+  - Run pytest inside Docker container against running app
+  - Run Playwright against deployed frontend
+  - Capture exit code + stdout/stderr
+  - Write test_report.md
+
+GATE  : All tests pass → auto-proceed
+        Failures → human can override or request fix
+NEXT  : DevOps Agent
+```
+
+### Agent 10 — DevOps Agent (Build + Deploy + Rollback)
+```
+INPUT : docs/architecture.md + app/**
+OUTPUT (files):
+  Dockerfile.backend
+  Dockerfile.frontend
+  docker-compose.yml        (local dev)
+  docker-compose.prod.yml   (production)
+  nginx.conf
+  .env.example
+  .github/workflows/ci.yml
+  .github/workflows/deploy.yml
+
+ACTIONS:
+  1. Build Docker images (docker build)
+  2. Run docker-compose up
+  3. Health check: GET /health → 200
+  4. On failure: docker-compose down, rollback to previous image
+  5. Write docs/build_report.md
+
+GATE  : Health check pass → auto-proceed to Monitoring
+NEXT  : Monitoring Agent
+```
+
+### Agent 11 — Monitoring Agent (NEW)
+```
+INPUT : Running containers (Docker API)
+        docs/api_spec.md (for endpoint health checks)
+OUTPUT: docs/monitoring_report.md  (initial report after deploy)
+        Live metrics: response time, error rate, CPU/memory
+        Alerts: 5xx spike, container restart, OOM
+
+POLLING: every 30s for first 10 minutes post-deploy
+TRIGGER: also callable on-demand at any time
+```
+
+### Agent 12 — Change Impact Agent (On-demand only)
+```
+TRIGGER: User changes/adds requirement after pipeline completes
+INPUT : Original docs/requirements.md + new requirement text
+        All existing docs + app/** code
+OUTPUT: docs/change_impact.md
+  Sections: Changed Requirements, Affected Documents,
+            Affected Code Files, Affected Tests,
+            Estimated Re-work, Recommended Action
+
+HANDOFF: None — user decides which layer to re-run from
+```
+
+---
+
+## 37.3 Approval Gates
+
+| Gate | After | Condition | Effect |
+|------|-------|-----------|--------|
+| BA Approved | Agent 3 | Human approves FSD | Unlocks Design Layer |
+| Technical Design Approved | Agent 6 | Human approves dev_tasks.md | Unlocks Delivery Layer |
+| Code Review | Agent 8 | No CRIT/HIGH issues | Unlocks QA |
+| QA Pass | Agent 9 | All tests pass (or override) | Unlocks DevOps |
+| Deploy Health | Agent 10 | /health returns 200 | Unlocks Monitoring |
+
+---
+
+## 37.4 Output File Structure Per Project
+
+```
+{workspace}/{project_name}/
+├── docs/
+│   ├── requirements.md       [Agent 1]
+│   ├── gap_report.md         [Agent 2]
+│   ├── fsd.md                [Agent 3]
+│   ├── user_stories.md       [Agent 3]
+│   ├── architecture.md       [Agent 4]
+│   ├── db_schema.md          [Agent 4]
+│   ├── api_spec.md           [Agent 4]
+│   ├── screen_spec.md        [Agent 5]
+│   ├── ux_flows.md           [Agent 5]
+│   ├── dev_tasks.md          [Agent 6]
+│   ├── code_review.md        [Agent 8]
+│   ├── test_report.md        [Agent 9]
+│   ├── build_report.md       [Agent 10]
+│   ├── monitoring_report.md  [Agent 11]
+│   └── change_impact.md      [Agent 12, on-demand]
+├── app/
+│   ├── backend/              [Agent 7]
+│   ├── frontend/             [Agent 7]
+│   └── db/migrations/        [Agent 7]
+└── tests/
+    ├── unit/                 [Agent 9]
+    ├── api/                  [Agent 9]
+    └── e2e/                  [Agent 9]
+```
+
+---
+
+## 37.5 Multi-Developer Agent Fan-out
+
+Technical Design Agent tags each task with a domain:
+
+```markdown
+## TASK-001 | backend  | app/backend/routes/auth.py       | FR-001
+## TASK-015 | frontend | app/frontend/src/pages/Login.tsx  | FR-001
+## TASK-030 | database | app/db/migrations/0001_users.py   | FR-002
+```
+
+Pipeline spawns N instances based on task count:
+- <= 30 tasks: 1 instance (developer-agent-1)
+- 31-80 tasks: 2 instances (developer-agent-1: backend, developer-agent-2: frontend)
+- > 80 tasks:  3 instances (+ developer-agent-3: database/infra)
+
+Agent rows in DB: developer-agent-1, developer-agent-2, developer-agent-3
+Created on-demand via migration if not exists.
+
+---
+
+## 37.6 Phase 3 Sprint Plan
+
+| Sprint | Title | Scope |
+|--------|-------|-------|
+| 30 | Pipeline Rewire | 3-layer chain, gate logic, pipeline.py + tasks.py |
+| 31 | Agent File Output | All agents write docs to workspace filesystem |
+| 32 | Technical Design Agent | NEW agent — gen dev_tasks.md |
+| 33 | Code Review Agent | NEW agent — static + LLM review of generated code |
+| 34 | QA Agent Rewrite | Generate test files (.py/.spec.ts) + run + report |
+| 35 | DevOps Agent — Build+Deploy | docker build + compose up + health check + rollback |
+| 36 | Monitoring Agent | NEW agent — Docker API + endpoint polling |
+| 37 | Multi-Developer Agent | Fan-out Celery tasks, N instances, work distribution |
+| 38 | Agent Contract Refactor | SA/UX/Dev read FSD directly (remove stale BA dependency) |
+| 39 | Change Impact On-demand | UI trigger, re-run from affected layer |
