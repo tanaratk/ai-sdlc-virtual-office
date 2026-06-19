@@ -1,10 +1,11 @@
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import HTTPException
 from sqlmodel import Session, select
 
 from app.db.models import Agent
-from app.schemas.agent import AgentResponse
+from app.schemas.agent import AgentResponse, AgentUpdate
 
 
 class AgentService:
@@ -21,4 +22,16 @@ class AgentService:
         agent = self.session.get(Agent, agent_id)
         if not agent:
             raise HTTPException(status_code=404, detail={"error_code": "NOT_FOUND", "message": f"Agent {agent_id} not found"})
+        return AgentResponse.model_validate(agent)
+
+    def update(self, agent_id: uuid.UUID, data: AgentUpdate) -> AgentResponse:
+        agent = self.session.get(Agent, agent_id)
+        if not agent:
+            raise HTTPException(status_code=404, detail={"error_code": "NOT_FOUND", "message": f"Agent {agent_id} not found"})
+        for field, value in data.model_dump(exclude_unset=True).items():
+            setattr(agent, field, value)
+        agent.updated_at = datetime.now(UTC)
+        self.session.add(agent)
+        self.session.commit()
+        self.session.refresh(agent)
         return AgentResponse.model_validate(agent)

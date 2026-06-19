@@ -1,4 +1,4 @@
-import type { Agent } from "@/types/agent";
+import type { Agent, AgentUpdate, OllamaModelsResponse } from "@/types/agent";
 import type { PipelineRun, PipelineStep } from "@/types/workflow";
 import apiClient from "./apiClient";
 
@@ -8,6 +8,12 @@ export const agentApi = {
 
   get: (id: string) =>
     apiClient.get<Agent>(`/agents/${id}`).then((r) => r.data),
+
+  update: (id: string, data: AgentUpdate) =>
+    apiClient.patch<Agent>(`/agents/${id}`, data).then((r) => r.data),
+
+  listOllamaModels: () =>
+    apiClient.get<OllamaModelsResponse>("/settings/llm/models").then((r) => r.data),
 
   startRun: (projectId: string) =>
     apiClient

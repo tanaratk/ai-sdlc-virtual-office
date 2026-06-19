@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { sourceApi } from "@/services/sourceApi";
@@ -8,6 +9,7 @@ import type { RequirementInputCreate } from "@/types/requirement";
 export default function RequirementIntake() {
   const { projectId } = useParams<{ projectId: string }>();
   const queryClient = useQueryClient();
+  const [resetKey, setResetKey] = useState(0);
 
   const { data, isLoading } = useQuery({
     queryKey: ["inputs", projectId],
@@ -18,8 +20,10 @@ export default function RequirementIntake() {
   const createMutation = useMutation({
     mutationFn: (body: RequirementInputCreate) =>
       sourceApi.create(projectId!, body),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["inputs", projectId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["inputs", projectId] });
+      setResetKey((k) => k + 1);
+    },
   });
 
   const deleteMutation = useMutation({
@@ -33,6 +37,7 @@ export default function RequirementIntake() {
       <section>
         <h3 className="mb-4 text-sm font-semibold">Upload / Paste Requirement</h3>
         <RequirementUpload
+          key={resetKey}
           onSubmit={createMutation.mutate}
           isLoading={createMutation.isPending}
         />

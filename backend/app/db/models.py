@@ -167,6 +167,19 @@ class MilestoneStatus(str, Enum):
 
 # โ”€โ”€ Models โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
+class User(SQLModel, table=True):
+    __tablename__ = "users"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    email: str = Field(max_length=255, unique=True, index=True)
+    name: str = Field(max_length=255)
+    hashed_password: str
+    role: str = Field(default="user", max_length=50)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
 class Project(SQLModel, table=True):
     __tablename__ = "projects"
 
@@ -175,6 +188,7 @@ class Project(SQLModel, table=True):
     description: Optional[str] = Field(default=None)
     status: ProjectStatus = Field(default=ProjectStatus.active)
     created_by: str = Field(max_length=255)
+    workspace_path: Optional[str] = Field(default="D:\\workspace", max_length=500)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 

@@ -21,10 +21,21 @@ Every output is traceable back to a requirement ID.
 
 ---
 
+## Available Skills (invoke with `/skill-name`)
+
+| Skill | Command | Purpose |
+|---|---|---|
+| Karpathy Guidelines | `/karpathy-guidelines` | Coding discipline: simplicity, surgical changes, surface assumptions, verifiable success criteria |
+| AI-SDLC Sprint Playbook | `/ai-sdlc-sprint` | Full sprint playbook — tasks, outputs, acceptance criteria per sprint |
+
+Skills live in `.claude/skills/`. Apply `/karpathy-guidelines` on every coding task automatically.
+
+---
+
 ## First Thing to Do Every Session
 
 1. Read `PROGRESS.md` — it has the current sprint, completed work, and what is next
-2. Read `ai-dlc-development-sprint-skill.md` — the full 20-sprint development playbook
+2. Use `/ai-sdlc-sprint` skill for sprint detail (replaces reading `ai-dlc-development-sprint-skill.md` directly)
 3. Never start coding without checking which sprint is active
 
 ---

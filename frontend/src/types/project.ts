@@ -6,6 +6,7 @@ export interface Project {
   description: string | null;
   status: ProjectStatus;
   created_by: string;
+  workspace_path: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -14,10 +15,12 @@ export interface ProjectCreate {
   name: string;
   description?: string;
   created_by: string;
+  workspace_path?: string;
 }
 
 export interface ProjectUpdate {
   name?: string;
   description?: string;
   status?: ProjectStatus;
+  workspace_path?: string;
 }

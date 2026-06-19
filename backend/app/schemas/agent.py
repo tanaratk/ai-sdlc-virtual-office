@@ -12,6 +12,7 @@ class AgentResponse(BaseModel):
     name: str
     role: str
     description: Optional[str]
+    goal: Optional[str]
     status: AgentStatus
     home_zone: Optional[str]
     current_zone: Optional[str]
@@ -25,3 +26,10 @@ class AgentResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class AgentUpdate(BaseModel):
+    model_provider: Optional[ModelProvider] = None
+    model_name: Optional[str] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None

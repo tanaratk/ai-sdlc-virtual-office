@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.routes import (
     activity,
     agents,
+    auth,
     change_impact,
     documents,
     documentation,
@@ -25,6 +26,7 @@ from app.api.routes import (
 api_router = APIRouter()
 
 api_router.include_router(health.router, tags=["Health"])
+api_router.include_router(auth.router, prefix="/auth", tags=["Auth"])
 api_router.include_router(projects.router, prefix="/projects", tags=["Projects"])
 api_router.include_router(inputs.router, prefix="/projects", tags=["Requirement Inputs"])
 api_router.include_router(pipeline.router, prefix="/projects", tags=["Pipeline"])

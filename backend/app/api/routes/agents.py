@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 
 from app.db.session import get_session
-from app.schemas.agent import AgentResponse
+from app.schemas.agent import AgentResponse, AgentUpdate
 from app.services.agent_service import AgentService
 
 router = APIRouter()
@@ -22,14 +22,15 @@ def get_agent(agent_id: uuid.UUID, session: Session = Depends(get_session)):
     return svc.get(agent_id)
 
 
+@router.patch("/{agent_id}", response_model=AgentResponse)
+def update_agent(agent_id: uuid.UUID, body: AgentUpdate, session: Session = Depends(get_session)):
+    svc = AgentService(session)
+    return svc.update(agent_id, body)
+
+
 @router.post("", status_code=501)
 def create_agent():
     raise HTTPException(status_code=501, detail={"error_code": "NOT_IMPLEMENTED", "message": "Agent create — Sprint 12"})
-
-
-@router.patch("/{agent_id}", status_code=501)
-def update_agent(agent_id: uuid.UUID):
-    raise HTTPException(status_code=501, detail={"error_code": "NOT_IMPLEMENTED", "message": "Agent update — Sprint 12"})
 
 
 @router.delete("/{agent_id}", status_code=501)

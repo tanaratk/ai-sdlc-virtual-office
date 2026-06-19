@@ -11,25 +11,36 @@ const statusConfig = {
 
 interface AgentCardProps {
   agent: Agent;
+  isSelected?: boolean;
+  onClick?: () => void;
 }
 
-export function AgentCard({ agent }: AgentCardProps) {
+export function AgentCard({ agent, isSelected, onClick }: AgentCardProps) {
   const cfg = statusConfig[agent.status];
   const Icon = cfg.icon;
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border p-3 bg-white">
-      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent">
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors",
+        isSelected
+          ? "border-primary bg-primary/5"
+          : "bg-white hover:bg-accent/60"
+      )}
+    >
+      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent flex-shrink-0">
         <Bot className="h-4 w-4 text-primary" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{agent.name}</p>
         <p className="text-xs text-muted-foreground truncate">{agent.role}</p>
       </div>
-      <div className={cn("flex items-center gap-1 text-xs", cfg.color)}>
+      <div className={cn("flex items-center gap-1 text-xs flex-shrink-0", cfg.color)}>
         <Icon className={cn("h-3.5 w-3.5", "spin" in cfg && cfg.spin && "animate-spin")} />
         <span>{cfg.label}</span>
       </div>
-    </div>
+    </button>
   );
 }

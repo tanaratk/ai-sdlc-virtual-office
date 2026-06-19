@@ -1,9 +1,18 @@
 import { createBrowserRouter } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { AdminRoute } from "@/components/auth/AdminRoute";
 import Dashboard from "@/pages/Dashboard";
+import LoginPage from "@/pages/LoginPage";
+import RegisterPage from "@/pages/RegisterPage";
+import ProfilePage from "@/pages/ProfilePage";
+import UserManagementPage from "@/pages/UserManagementPage";
+import ProjectsList from "@/pages/ProjectsList";
+import NewProject from "@/pages/NewProject";
 import ProjectWorkspace from "@/pages/ProjectWorkspace";
 import RequirementIntake from "@/pages/RequirementIntake";
 import AgentConsolePage from "@/pages/AgentConsolePage";
+import AgentManagerPage from "@/pages/AgentManagerPage";
 import DocumentReview from "@/pages/DocumentReview";
 import TraceabilityPage from "@/pages/TraceabilityPage";
 import VirtualOfficePage from "@/pages/VirtualOfficePage";
@@ -14,14 +23,24 @@ import PMPage from "@/pages/PMPage";
 import McpPage from "@/pages/McpPage";
 import RAGPage from "@/pages/RAGPage";
 import Settings from "@/pages/Settings";
+import MonitoringPage from "@/pages/MonitoringPage";
 
 export const router = createBrowserRouter([
+  { path: "/login", element: <LoginPage /> },
+  { path: "/register", element: <RegisterPage /> },
+
   {
     path: "/",
-    element: <AppLayout />,
+    element: <ProtectedRoute><AppLayout /></ProtectedRoute>,
     children: [
       { index: true, element: <Dashboard /> },
-      { path: "projects", element: <Dashboard /> },
+      { path: "profile", element: <ProfilePage /> },
+      {
+        path: "users",
+        element: <AdminRoute><UserManagementPage /></AdminRoute>,
+      },
+      { path: "projects", element: <ProjectsList /> },
+      { path: "projects/new", element: <NewProject /> },
       { path: "projects/:projectId", element: <ProjectWorkspace /> },
       { path: "projects/:projectId/intake", element: <RequirementIntake /> },
       { path: "projects/:projectId/agents", element: <AgentConsolePage /> },
@@ -36,10 +55,11 @@ export const router = createBrowserRouter([
       { path: "projects/:projectId/rag", element: <RAGPage /> },
       { path: "mcp", element: <McpPage /> },
       { path: "intake", element: <RequirementIntake /> },
-      { path: "agents", element: <AgentConsolePage /> },
+      { path: "agents", element: <AgentManagerPage /> },
       { path: "documents", element: <DocumentReview /> },
       { path: "traceability", element: <TraceabilityPage /> },
       { path: "office", element: <VirtualOfficePage /> },
+      { path: "monitoring", element: <MonitoringPage /> },
       { path: "settings", element: <Settings /> },
     ],
   },

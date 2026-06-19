@@ -2,13 +2,21 @@ import { Play } from "lucide-react";
 import type { PipelineRun, PipelineStep } from "@/types/workflow";
 import { AgentRunStatus } from "./AgentRunStatus";
 
+const EMPTY_RUN: PipelineRun = {
+  id: "__empty__",
+  project_id: "",
+  status: "pending",
+  current_step: null,
+  started_at: null,
+  completed_at: null,
+  created_at: new Date().toISOString(),
+};
+
 interface AgentConsoleProps {
   projectId: string;
   activeRun: PipelineRun | null;
   steps: PipelineStep[];
   onStart: () => void;
-  onApprove: (stepId: string) => void;
-  onReject: (stepId: string) => void;
   isStarting: boolean;
 }
 
@@ -16,8 +24,6 @@ export function AgentConsole({
   activeRun,
   steps,
   onStart,
-  onApprove,
-  onReject,
   isStarting,
 }: AgentConsoleProps) {
   const canStart = !activeRun || ["completed", "failed", "cancelled"].includes(activeRun.status);
@@ -32,22 +38,15 @@ export function AgentConsole({
           className="flex items-center gap-2 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Play className="h-3 w-3" />
-          {isStarting ? "Starting…" : "Run Pipeline"}
+          {isStarting ? "Starting…" : canStart ? "Run Pipeline" : "Running…"}
         </button>
       </div>
 
-      {activeRun ? (
-        <AgentRunStatus
-          run={activeRun}
-          steps={steps}
-          onApprove={onApprove}
-          onReject={onReject}
-        />
-      ) : (
-        <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-          No pipeline runs yet. Click Run Pipeline to start.
-        </div>
-      )}
+      {/* Always show the pipeline stepper — empty state uses a pending run placeholder */}
+      <AgentRunStatus
+        run={activeRun ?? EMPTY_RUN}
+        steps={steps}
+      />
     </div>
   );
 }

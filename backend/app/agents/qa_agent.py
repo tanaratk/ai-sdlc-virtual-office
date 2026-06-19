@@ -9,7 +9,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlmodel import Session, select
 
 from app.db.models import (
@@ -35,60 +35,64 @@ AGENT_NAME = "qa-agent"
 def _esc(s: str) -> str:
     """Escape braces in document content so str.format() doesn't misinterpret them."""
     return s.replace("{", "{{").replace("}", "}}")
-STEP_NAME = "test_cases"
-TIMEOUT_SECONDS = 300.0
+STEP_NAME = “test_cases”
+TIMEOUT_SECONDS = 480.0
 
 
-# โ”€โ”€ Output schemas โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# โ”€โ”€ Output schemas (all fields optional to tolerate LLM schema drift) โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
-class _FunctionalTC(BaseModel):
-    id: str = "TC-001"
-    fsd_ref: str = ""
-    story_ref: str = ""
-    description: str
-    precondition: str = ""
+class _LenientBase(BaseModel):
+    model_config = ConfigDict(extra=”ignore”)
+
+
+class _FunctionalTC(_LenientBase):
+    id: str = “TC-001”
+    fsd_ref: str = “”
+    story_ref: str = “”
+    description: str = “”
+    precondition: str = “”
     steps: list[str] = Field(default_factory=list)
-    expected_result: str
-    priority: str = "High"
+    expected_result: str = “”
+    priority: str = “High”
 
 
-class _ApiTC(BaseModel):
-    id: str = "TC-010"
-    api_ref: str = ""
-    method: str = "GET"
-    endpoint: str
-    request_body: str = "โ€”"
+class _ApiTC(_LenientBase):
+    id: str = “TC-010”
+    api_ref: str = “”
+    method: str = “GET”
+    endpoint: str = “”
+    request_body: str = “โ€””
     expected_status: int = 200
-    expected_response: str = ""
-    priority: str = "High"
+    expected_response: str = “”
+    priority: str = “High”
 
 
-class _EdgeTC(BaseModel):
-    id: str = "TC-020"
-    fsd_ref: str = ""
-    scenario: str
-    input: str
-    expected_behaviour: str
+class _EdgeTC(_LenientBase):
+    id: str = “TC-020”
+    fsd_ref: str = “”
+    scenario: str = “”
+    input: str = “”
+    expected_behaviour: str = “”
 
 
-class _NegativeTC(BaseModel):
-    id: str = "TC-030"
-    fsd_ref: str = ""
-    scenario: str
-    invalid_input: str
-    expected_error: str
+class _NegativeTC(_LenientBase):
+    id: str = “TC-030”
+    fsd_ref: str = “”
+    scenario: str = “”
+    invalid_input: str = “”
+    expected_error: str = “”
 
 
-class _UATScenario(BaseModel):
-    id: str = "UAT-001"
-    story_ref: str = ""
-    description: str
-    actor: str
+class _UATScenario(_LenientBase):
+    id: str = “UAT-001”
+    story_ref: str = “”
+    description: str = “”
+    actor: str = “”
     steps: list[str] = Field(default_factory=list)
-    expected_outcome: str
+    expected_outcome: str = “”
 
 
-class QAAgentOutput(BaseModel):
+class QAAgentOutput(_LenientBase):
     functional_tests: list[_FunctionalTC] = Field(default_factory=list)
     api_tests: list[_ApiTC] = Field(default_factory=list)
     edge_case_tests: list[_EdgeTC] = Field(default_factory=list)

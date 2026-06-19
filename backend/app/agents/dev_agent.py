@@ -10,6 +10,8 @@ IMPORTANT: This agent generates TASK LISTS and SKELETON PLANS only.
 It must NOT generate production implementation code.
 """
 import logging
+import os
+import re
 import uuid
 from datetime import UTC, datetime
 from typing import Optional
@@ -29,6 +31,7 @@ from app.db.models import (
     PipelineRunStatus,
     PipelineStep,
     PipelineStepStatus,
+    Project,
 )
 from app.llm import client as _llm
 
@@ -341,6 +344,12 @@ class DevAgentRunner:
                 len(output.database_migrations),
             )
 
+            # Write output to workspace (non-fatal — log errors only)
+            try:
+                self._write_to_workspace(run.project_id, task_doc.content_markdown)
+            except Exception as ws_exc:
+                logger.warning("DevAgent workspace write failed (non-fatal): %s", ws_exc)
+
         except Exception as exc:
             logger.exception("DevAgent failed run=%s: %s", run_id, exc)
             self.session.rollback()
@@ -360,6 +369,26 @@ class DevAgentRunner:
                 logger.exception("Failed to persist failure state for run=%s", run_id)
 
     # โ”€โ”€ helpers โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+
+    def _write_to_workspace(self, project_id: uuid.UUID, content: str) -> None:
+        project = self.session.get(Project, project_id)
+        raw_path = (project.workspace_path if project else None) or "/workspace"
+
+        # Translate host Windows path → container mount point /workspace
+        container_path = re.sub(
+            r"^[A-Za-z]:[/\\]workspace", "/workspace", raw_path, flags=re.IGNORECASE
+        )
+        if not container_path.startswith("/workspace"):
+            container_path = "/workspace"
+
+        safe_name = re.sub(r"[^\w\-]", "_", project.name if project else "project")
+        out_dir = os.path.join(container_path, safe_name)
+        os.makedirs(out_dir, exist_ok=True)
+
+        out_file = os.path.join(out_dir, "dev_tasks.md")
+        with open(out_file, "w", encoding="utf-8") as f:
+            f.write(content)
+        logger.info("DevAgent wrote task list to %s", out_file)
 
     def _get_run(self, run_id: uuid.UUID) -> PipelineRun:
         run = self.session.get(PipelineRun, run_id)
