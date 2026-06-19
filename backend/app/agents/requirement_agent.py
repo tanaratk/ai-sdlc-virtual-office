@@ -26,7 +26,7 @@ from app.db.models import (
     PipelineStepStatus,
     RequirementInput,
 )
-from app.llm.client import call_ollama, extract_json
+from app.llm import client as _llm
 
 logger = logging.getLogger(__name__)
 
@@ -263,13 +263,13 @@ class RequirementAgentRunner:
             self._set_status(run, step, agent_row, PipelineRunStatus.running, PipelineStepStatus.running, AgentStatus.working)
 
             content = self._combine_inputs(inputs)
-            raw_json = call_ollama(
+            raw_json = _llm.call_ollama(
                 system_prompt=_SYSTEM_PROMPT,
                 user_prompt=_TASK_TEMPLATE.format(content=content),
                 timeout=TIMEOUT_SECONDS,
             )
 
-            parsed = extract_json(raw_json)
+            parsed = _llm.extract_json(raw_json)
             output = RequirementSummaryOutput.model_validate(parsed)
 
             doc_id = uuid.uuid4()

@@ -26,7 +26,7 @@ from app.db.models import (
     PipelineStep,
     TraceabilityLink,
 )
-from app.llm.client import call_ollama, extract_json
+from app.llm import client as _llm
 
 logger = logging.getLogger(__name__)
 
@@ -498,10 +498,10 @@ class PMAgentRunner:
             trace_count=trace_count,
             req_summary=_esc(req_summary) if req_summary else "(not available)",
         )
-        raw = call_ollama(
+        raw = _llm.call_ollama(
             system_prompt=_SYSTEM_PROMPT,
             user_prompt=prompt,
             timeout=TIMEOUT_SECONDS,
         )
-        parsed = extract_json(raw)
+        parsed = _llm.extract_json(raw)
         return PMSummaryOutput.model_validate(parsed)

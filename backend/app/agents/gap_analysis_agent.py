@@ -25,7 +25,7 @@ from app.db.models import (
     PipelineStep,
     PipelineStepStatus,
 )
-from app.llm.client import call_ollama, extract_json
+from app.llm import client as _llm
 
 logger = logging.getLogger(__name__)
 
@@ -206,13 +206,13 @@ class GapAnalysisAgentRunner:
             req_summary_doc = self._load_requirement_summary(run_id)
             content = req_summary_doc.content_markdown
 
-            raw_json = call_ollama(
+            raw_json = _llm.call_ollama(
                 system_prompt=_SYSTEM_PROMPT,
                 user_prompt=_TASK_TEMPLATE.format(content=content),
                 timeout=TIMEOUT_SECONDS,
             )
 
-            parsed = extract_json(raw_json)
+            parsed = _llm.extract_json(raw_json)
             output = GapAnalysisOutput.model_validate(parsed)
 
             doc_id = uuid.uuid4()

@@ -24,7 +24,7 @@ from app.db.models import (
     PipelineStep,
     PipelineStepStatus,
 )
-from app.llm.client import call_ollama, extract_json
+from app.llm import client as _llm
 
 logger = logging.getLogger(__name__)
 
@@ -259,7 +259,7 @@ class UXAgentRunner:
 
             brd_doc, fsd_doc, us_doc = self._load_ba_documents(run.project_id)
 
-            raw_json = call_ollama(
+            raw_json = _llm.call_ollama(
                 system_prompt=_SYSTEM_PROMPT,
                 user_prompt=_TASK_TEMPLATE.format(
                     brd=brd_doc.content_markdown,
@@ -269,7 +269,7 @@ class UXAgentRunner:
                 timeout=TIMEOUT_SECONDS,
             )
 
-            parsed = extract_json(raw_json)
+            parsed = _llm.extract_json(raw_json)
             output = UXAgentOutput.model_validate(parsed)
 
             screen_id = uuid.uuid4()

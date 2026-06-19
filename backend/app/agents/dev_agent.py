@@ -30,7 +30,7 @@ from app.db.models import (
     PipelineStep,
     PipelineStepStatus,
 )
-from app.llm.client import call_ollama, extract_json
+from app.llm import client as _llm
 
 logger = logging.getLogger(__name__)
 
@@ -281,7 +281,7 @@ class DevAgentRunner:
             fsd_doc, arch_doc, db_doc, api_doc, screen_doc = \
                 self._load_source_documents(run.project_id)
 
-            raw_json = call_ollama(
+            raw_json = _llm.call_ollama(
                 system_prompt=_SYSTEM_PROMPT,
                 user_prompt=_TASK_TEMPLATE.format(
                     fsd=_esc(fsd_doc.content_markdown),
@@ -293,7 +293,7 @@ class DevAgentRunner:
                 timeout=TIMEOUT_SECONDS,
             )
 
-            parsed = extract_json(raw_json)
+            parsed = _llm.extract_json(raw_json)
             output = DevAgentOutput.model_validate(parsed)
 
             task_doc_id = uuid.uuid4()

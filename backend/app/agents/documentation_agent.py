@@ -23,7 +23,7 @@ from app.db.models import (
     DocumentType,
     EventType,
 )
-from app.llm.client import call_ollama, extract_json
+from app.llm import client as _llm
 
 logger = logging.getLogger(__name__)
 
@@ -190,7 +190,7 @@ class DocumentationAgentRunner:
                 f"produced by the AI-SDLC pipeline."
             )
 
-        raw = call_ollama(
+        raw = _llm.call_ollama(
             system_prompt=_SYSTEM_PROMPT,
             user_prompt=_TASK_TEMPLATE.format(
                 project_name=_esc(project_name),
@@ -199,7 +199,7 @@ class DocumentationAgentRunner:
             ),
             timeout=TIMEOUT_SECONDS,
         )
-        parsed = extract_json(raw)
+        parsed = _llm.extract_json(raw)
 
         class _SummaryOut(BaseModel):
             executive_summary: str = ""

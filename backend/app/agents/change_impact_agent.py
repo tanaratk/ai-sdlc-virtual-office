@@ -22,7 +22,7 @@ from app.db.models import (
     DocumentType,
     EventType,
 )
-from app.llm.client import call_ollama, extract_json
+from app.llm import client as _llm
 
 logger = logging.getLogger(__name__)
 
@@ -431,7 +431,7 @@ class ChangeImpactAgentRunner:
         try:
             docs = self._load_documents(project_id)
 
-            raw_json = call_ollama(
+            raw_json = _llm.call_ollama(
                 system_prompt=_SYSTEM_PROMPT,
                 user_prompt=_TASK_TEMPLATE.format(
                     change_description=_esc(change_description),
@@ -447,7 +447,7 @@ class ChangeImpactAgentRunner:
                 timeout=TIMEOUT_SECONDS,
             )
 
-            parsed = extract_json(raw_json)
+            parsed = _llm.extract_json(raw_json)
             output = ChangeImpactOutput.model_validate(parsed)
 
             # Override computed flags in case LLM didn't set them

@@ -388,12 +388,73 @@ _MOCK_DEV_OUTPUT = json.dumps({
     ],
 })
 
+_MOCK_QA_OUTPUT = json.dumps({
+    "functional_tests": [
+        {
+            "id": "TC-001",
+            "fsd_ref": "FSD-001",
+            "story_ref": "US-001",
+            "description": "Employee can submit expense request with valid amount and description",
+            "precondition": "User is logged in as employee",
+            "steps": ["Navigate to expense form", "Fill in amount 500 THB", "Click Submit"],
+            "expected_result": "Expense request created with status PENDING",
+            "priority": "High",
+        },
+    ],
+    "api_tests": [
+        {
+            "id": "TC-010",
+            "api_ref": "API-001",
+            "method": "POST",
+            "endpoint": "/expenses",
+            "request_body": '{"amount": 500, "description": "Office supplies"}',
+            "expected_status": 201,
+            "expected_response": "id, status=PENDING",
+            "priority": "High",
+        },
+    ],
+    "edge_case_tests": [
+        {
+            "id": "TC-020",
+            "fsd_ref": "FSD-001",
+            "scenario": "Submit expense with maximum allowed amount",
+            "input": "amount = 49999",
+            "expected_behaviour": "Expense created successfully without CFO approval",
+        },
+    ],
+    "negative_tests": [
+        {
+            "id": "TC-030",
+            "fsd_ref": "FSD-001",
+            "scenario": "Submit expense with missing description",
+            "invalid_input": "description = ''",
+            "expected_error": "400 Bad Request — description is required",
+        },
+    ],
+    "uat_scenarios": [
+        {
+            "id": "UAT-001",
+            "story_ref": "US-001",
+            "description": "As an employee, I can submit and track my expense reimbursement",
+            "actor": "Employee",
+            "steps": ["Log in", "Go to New Expense", "Fill details and submit"],
+            "expected_outcome": "Request appears in My Expenses list with Pending status",
+        },
+    ],
+    "sign_off_criteria": [
+        "All TC-001 to TC-030 pass",
+        "UAT-001 accepted by finance team",
+    ],
+    "minimum_pass_rate": 95,
+})
+
 # LLM call sequences
 _BOTH_LLM_OUTPUTS  = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT]                                                                # Gate 1
 _ALL_LLM_OUTPUTS   = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT, _MOCK_BA_OUTPUT]                                               # Gate 2
 _FULL_LLM_OUTPUTS  = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT, _MOCK_BA_OUTPUT, _MOCK_SA_OUTPUT]                              # Gate 3
 _MAX_LLM_OUTPUTS   = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT, _MOCK_BA_OUTPUT, _MOCK_SA_OUTPUT, _MOCK_UX_OUTPUT]             # Gate 4
 _ULTRA_LLM_OUTPUTS = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT, _MOCK_BA_OUTPUT, _MOCK_SA_OUTPUT, _MOCK_UX_OUTPUT, _MOCK_DEV_OUTPUT]  # Gate 5
+_APEX_LLM_OUTPUTS  = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT, _MOCK_BA_OUTPUT, _MOCK_SA_OUTPUT, _MOCK_UX_OUTPUT, _MOCK_DEV_OUTPUT, _MOCK_QA_OUTPUT]  # Gate 6
 
 
 # ── guard tests (no LLM) ───────────────────────────────────────────────────────
@@ -762,7 +823,7 @@ def test_list_steps_after_dev(mock_llm, client: TestClient):
 
 # ── Gate 5 ─────────────────────────────────────────────────────────────────────
 
-@patch("app.llm.client.call_ollama", side_effect=_ULTRA_LLM_OUTPUTS)
+@patch("app.llm.client.call_ollama", side_effect=_APEX_LLM_OUTPUTS)
 def test_approve_gate5_completes_run(mock_llm, client: TestClient):
     project = _create_project(client)
     _create_input(client, project["id"])
@@ -774,6 +835,10 @@ def test_approve_gate5_completes_run(mock_llm, client: TestClient):
     dev_step = _get_step(client, project["id"], run_id, "dev_tasks")
     result = _approve(client, project["id"], run_id, dev_step["id"])
     assert result["status"] == "approved"
+
+    # QA agent runs after gate 5 approval; approve gate 6 (test_cases) to complete
+    qa_step = _get_step(client, project["id"], run_id, "test_cases")
+    _approve(client, project["id"], run_id, qa_step["id"])
 
     final_run = client.get(f"/api/v1/projects/{project['id']}/pipeline/runs/{run_id}").json()
     assert final_run["status"] == "completed"

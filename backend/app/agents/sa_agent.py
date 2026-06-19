@@ -26,7 +26,7 @@ from app.db.models import (
     PipelineStep,
     PipelineStepStatus,
 )
-from app.llm.client import call_ollama, extract_json
+from app.llm import client as _llm
 
 logger = logging.getLogger(__name__)
 
@@ -404,7 +404,7 @@ class SAAgentRunner:
 
             brd_doc, fsd_doc, us_doc = self._load_ba_documents(run.project_id)
 
-            raw_json = call_ollama(
+            raw_json = _llm.call_ollama(
                 system_prompt=_SYSTEM_PROMPT,
                 user_prompt=_TASK_TEMPLATE.format(
                     brd=brd_doc.content_markdown,
@@ -414,7 +414,7 @@ class SAAgentRunner:
                 timeout=TIMEOUT_SECONDS,
             )
 
-            parsed = extract_json(raw_json)
+            parsed = _llm.extract_json(raw_json)
             output = SAAgentOutput.model_validate(parsed)
 
             arch_id, db_id, api_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
