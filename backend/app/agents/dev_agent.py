@@ -1,13 +1,14 @@
-﻿"""Developer Agent โ€” Pipeline Step 6.
+"""Developer Agent -- Pipeline Step 6.
 
 Reads the approved FSD, Architecture Design, Database Design, API Spec,
-and Screen Specification to produce a Code Task List:
-  - Backend implementation tasks
-  - Frontend implementation tasks
-  - Database migration tasks
+and Screen Specification to generate real source code files for the project.
 
-IMPORTANT: This agent generates TASK LISTS and SKELETON PLANS only.
-It must NOT generate production implementation code.
+Generation strategy (2-phase):
+  Phase 1 -- Planning call (JSON): decide which files to create and their purposes.
+  Phase 2 -- Per-file call (text): generate raw code for each file.
+
+Files are written to: {workspace}/generated_app/{file_path}
+A summary document (code_task_list type) is saved to the DB.
 """
 import logging
 import os
@@ -16,7 +17,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
 from app.db.models import (
@@ -38,250 +39,182 @@ from app.llm import client as _llm
 logger = logging.getLogger(__name__)
 
 AGENT_NAME = "developer-agent"
+STEP_NAME = "dev_tasks"
+
+PLAN_TIMEOUT = 120.0
+FILE_TIMEOUT = 120.0
+MAX_FILES = 20
+MIN_FILE_CHARS = 30
 
 
 def _esc(s: str) -> str:
-    """Escape braces in document content so str.format() doesn't misinterpret them."""
     return s.replace("{", "{{").replace("}", "}}")
-STEP_NAME = "dev_tasks"
-TIMEOUT_SECONDS = 240.0
 
 
-# โ”€โ”€ Output schema โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
-
-def _first(data: dict, *keys: str, fallback: str = "") -> str:
-    for k in keys:
-        if k in data and data[k]:
-            return str(data[k])
-    return fallback
+def _trunc(s: str, n: int) -> str:
+    return s[:n] + "\n...(truncated)" if len(s) > n else s
 
 
-class _Task(BaseModel):
-    id: str = "TASK-001"
-    category: str = "backend"
-    title: str = ""
-    description: str = ""
-    requirement_refs: list[str] = Field(default_factory=list)
-    api_refs: list[str] = Field(default_factory=list)
-    db_refs: list[str] = Field(default_factory=list)
-    screen_refs: list[str] = Field(default_factory=list)
-    priority: str = "High"
-    estimated_hours: int = 4
+# -- File plan schema ---------------------------------------------------------
 
-    @model_validator(mode="before")
-    @classmethod
-    def _remap(cls, v: dict) -> dict:
-        if isinstance(v, dict):
-            if not v.get("title"):
-                v["title"] = _first(v, "name", "task", "summary", fallback="(untitled)")
-            if not v.get("description"):
-                v["description"] = _first(v, "detail", "details", "summary", "notes", fallback="")
-        return v
+class _FileSpec(BaseModel):
+    path: str = ""
+    lang: str = "python"
+    purpose: str = ""
+    context_hint: str = "backend"
+
+    class Config:
+        extra = "ignore"
 
 
-class _MigrationTask(BaseModel):
-    id: str = "MIG-001"
-    table: str = ""
-    operation: str = "create_table"
-    description: str = ""
-    db_ref: str = ""
+class _FilePlan(BaseModel):
+    files: list[_FileSpec] = Field(default_factory=list)
 
-    @model_validator(mode="before")
-    @classmethod
-    def _remap(cls, v: dict) -> dict:
-        if isinstance(v, dict):
-            if not v.get("operation"):
-                v["operation"] = _first(v, "type", "action", "op", fallback="create_table")
-            if not v.get("description"):
-                v["description"] = _first(v, "detail", "details", "summary", "notes", fallback="")
-            if not v.get("table"):
-                v["table"] = _first(v, "table_name", "name", fallback="unknown")
-        return v
+    class Config:
+        extra = "ignore"
 
 
-class DevAgentOutput(BaseModel):
-    backend_tasks: list[_Task] = Field(default_factory=list)
-    frontend_tasks: list[_Task] = Field(default_factory=list)
-    database_migrations: list[_MigrationTask] = Field(default_factory=list)
-    total_estimated_hours: int = 0
-    notes: list[str] = Field(default_factory=list)
+# -- Prompts ------------------------------------------------------------------
 
+_PLAN_SYSTEM_PROMPT = """\
+You are a senior software architect in an AI-powered software factory.
+Given technical specification documents, decide which source code files \
+to generate for a full-stack web application.
 
-# โ”€โ”€ Prompts โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
-
-_SYSTEM_PROMPT = """\
-You are the Developer Agent in an AI-powered software factory.
-Your job is to read the approved FSD, Architecture Design, Database Design,
-API Specification, and Screen Specification, then produce a structured
-Code Task List for the development team.
-
-CRITICAL RULES:
-- Generate TASK LISTS and SKELETON PLANS ONLY. Do NOT write implementation code.
-- Every task must reference at least one requirement ID (FR-XXX).
-- Backend tasks must reference an API endpoint ID (API-XXX) where applicable.
-- Frontend tasks must reference a screen ID (UI-XXX) where applicable.
-- Database migration tasks must reference a table ID (DB-XXX).
-- Task IDs must be sequential: TASK-001, TASK-002, โ€ฆ (backend and frontend share same sequence).
-- Migration IDs must be sequential: MIG-001, MIG-002, โ€ฆ
-- Estimate hours honestly per task (1โ€“16 hours).
-- You MUST return ONLY a valid JSON object โ€” no prose, no markdown wrapping.
+RULES:
+- Produce a JSON object with a "files" array only.
+- Each file must have: path, lang, purpose, context_hint.
+- path: relative path inside the project (e.g. "backend/app/models/user.py")
+- lang: "python", "typescript", "sql", "yaml", "markdown", or "text"
+- purpose: one sentence describing what this file does
+- context_hint: one of "backend_model", "backend_route", "backend_schema",
+  "backend_migration", "frontend_type", "frontend_service",
+  "frontend_component", "frontend_page", "readme"
+- Generate at most 15 files. Focus on the most critical files first.
+- Include: models, routes, schemas, one migration, key frontend pages/types/services, README.
+- Do NOT generate test files or config files in this phase.
+- Return ONLY valid JSON. No markdown fences, no explanation.
 """
 
-_TASK_TEMPLATE = """\
-Analyze the following approved technical documents and produce a
-Code Task List for backend, frontend, and database migration.
-Return ONLY the JSON โ€” no explanation, no code fences.
+_PLAN_TEMPLATE = """\
+Generate the file plan for this project. Return JSON only.
+
+FUNCTIONAL SPECIFICATION (excerpt):
+{fsd}
+
+DATABASE DESIGN (excerpt):
+{database}
+
+API SPECIFICATION (excerpt):
+{api_spec}
+
+SCREEN SPECIFICATION (excerpt):
+{screen_spec}
 
 Schema:
 {{
-  "backend_tasks": [
+  "files": [
     {{
-      "id": "TASK-001",
-      "category": "backend",
-      "title": "short task title",
-      "description": "what needs to be implemented โ€” no code, just description",
-      "requirement_refs": ["FR-001"],
-      "api_refs": ["API-001"],
-      "db_refs": ["DB-001"],
-      "screen_refs": [],
-      "priority": "High|Medium|Low",
-      "estimated_hours": 4
+      "path": "backend/app/models/user.py",
+      "lang": "python",
+      "purpose": "SQLModel User table definition",
+      "context_hint": "backend_model"
     }}
-  ],
-  "frontend_tasks": [
-    {{
-      "id": "TASK-010",
-      "category": "frontend",
-      "title": "short task title",
-      "description": "what UI component or page needs to be built",
-      "requirement_refs": ["FR-001"],
-      "api_refs": ["API-001"],
-      "db_refs": [],
-      "screen_refs": ["UI-001"],
-      "priority": "High|Medium|Low",
-      "estimated_hours": 4
-    }}
-  ],
-  "database_migrations": [
-    {{
-      "id": "MIG-001",
-      "table": "table_name",
-      "operation": "create_table|add_column|add_index|create_enum",
-      "description": "what this migration does",
-      "db_ref": "DB-001"
-    }}
-  ],
-  "total_estimated_hours": 40,
-  "notes": ["important implementation note or dependency"]
+  ]
 }}
-
-FUNCTIONAL SPECIFICATION DOCUMENT (FSD):
-{fsd}
-
-ARCHITECTURE DESIGN:
-{architecture}
-
-DATABASE DESIGN:
-{database}
-
-API SPECIFICATION:
-{api_spec}
-
-SCREEN SPECIFICATION:
-{screen_spec}
 """
 
+_FILE_SYSTEM_PROMPT = """\
+You are an expert code generator. You write clean, production-ready code.
 
-# โ”€โ”€ Markdown renderer โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
-
-def _render_task_list(data: DevAgentOutput, project_id: str, doc_id: str) -> str:
-    def _task_rows(tasks: list[_Task]) -> str:
-        if not tasks:
-            return "> No tasks defined."
-        rows = ""
-        for t in tasks:
-            refs = ", ".join(t.requirement_refs) if t.requirement_refs else "โ€”"
-            api = ", ".join(t.api_refs) if t.api_refs else "โ€”"
-            db = ", ".join(t.db_refs) if t.db_refs else "โ€”"
-            ui = ", ".join(t.screen_refs) if t.screen_refs else "โ€”"
-            rows += f"""
-#### {t.id} [{t.priority}] โ€” {t.title}
-
-{t.description}
-
-| Requirement Refs | API Refs | DB Refs | Screen Refs | Est. Hours |
-|---|---|---|---|---|
-| {refs} | {api} | {db} | {ui} | {t.estimated_hours}h |
-
+RULES:
+- Output ONLY the file content. No markdown fences. No explanation. No comments \
+  unless the code logic requires it.
+- Write complete, runnable code — not stubs or placeholders.
+- Follow the tech stack: FastAPI + SQLModel + PostgreSQL for backend, \
+  React + TypeScript + Vite + Tailwind for frontend.
+- Use standard patterns: Pydantic models, SQLModel tables, FastAPI APIRouter, \
+  React functional components with hooks.
+- Never output TODO or pass-only stubs unless the file is intentionally minimal.
 """
-        return rows
 
-    def _migration_rows(migrations: list[_MigrationTask]) -> str:
-        if not migrations:
-            return "| โ€” | โ€” | โ€” | โ€” |\n"
-        rows = ""
-        for m in migrations:
-            rows += f"| {m.id} | `{m.table}` | {m.operation} | {m.description} |\n"
-        return rows
+_FILE_TEMPLATE = """\
+Generate the complete content of this file:
 
-    backend_total = sum(t.estimated_hours for t in data.backend_tasks)
-    frontend_total = sum(t.estimated_hours for t in data.frontend_tasks)
+FILE PATH: {path}
+LANGUAGE: {lang}
+PURPOSE: {purpose}
 
-    notes_section = "\n".join(f"- {n}" for n in data.notes) \
-        if data.notes else "> No additional notes."
+RELEVANT SPECIFICATION:
+{context}
+
+Output the file content directly. No fences, no explanation.
+"""
+
+# Context snippets per hint type
+_CONTEXT_CHARS = {
+    "backend_model":     ("database", 4000),
+    "backend_schema":    ("api_spec", 3000),
+    "backend_route":     ("api_spec", 4000),
+    "backend_migration": ("database", 3000),
+    "frontend_type":     ("api_spec", 3000),
+    "frontend_service":  ("api_spec", 3500),
+    "frontend_component":("screen_spec", 3500),
+    "frontend_page":     ("screen_spec", 4000),
+    "readme":            ("fsd", 2000),
+}
+
+
+# -- Markdown renderer for summary document -----------------------------------
+
+def _render_summary(
+    files: list[_FileSpec],
+    results: list[tuple[str, bool]],
+    project_id: str,
+    doc_id: str,
+) -> str:
+    ok = sum(1 for _, success in results if success)
+    fail = len(results) - ok
+
+    rows = ""
+    for spec, (_, success) in zip(files, results):
+        status = "OK" if success else "FAILED"
+        rows += f"| `{spec.path}` | {spec.lang} | {spec.purpose[:60]} | {status} |\n"
 
     return f"""\
-# Code Task List
+# Generated Code Summary
 
 **Project ID:** `{project_id}`
 **Document ID:** `{doc_id}`
-**Generated By:** Developer Agent v1.0.0
+**Generated By:** Developer Agent v2.0.0
 **Pipeline Step:** 6 of 10
-**Status:** Draft โ’ Awaiting Review
-
-> โ ๏ธ This document contains TASK LISTS only. No implementation code is generated
-> until all upstream documents are approved and this task list is reviewed.
+**Status:** Draft -- Awaiting Review
 
 ---
 
-## Summary
+## Generation Results
 
-| Category | Tasks | Estimated Hours |
-|---|---|---|
-| Backend | {len(data.backend_tasks)} | {backend_total}h |
-| Frontend | {len(data.frontend_tasks)} | {frontend_total}h |
-| DB Migrations | {len(data.database_migrations)} | โ€” |
-| **Total** | **{len(data.backend_tasks) + len(data.frontend_tasks)}** | **{data.total_estimated_hours}h** |
+| Files OK | Files Failed |
+|---|---|
+| {ok} | {fail} |
 
----
+## File List
 
-## 1. Backend Tasks
-
-{_task_rows(data.backend_tasks)}
-
----
-
-## 2. Frontend Tasks
-
-{_task_rows(data.frontend_tasks)}
-
----
-
-## 3. Database Migrations
-
-| ID | Table | Operation | Description |
+| Path | Language | Purpose | Status |
 |---|---|---|---|
-{_migration_rows(data.database_migrations)}
+{rows}
 
 ---
 
-## 4. Implementation Notes
+## Output Location
 
-{notes_section}
+Files are written to: `generated_app/` inside the project workspace.
+
+{"**Warning:** Some files failed to generate. Review and regenerate manually." if fail else "All files generated successfully."}
 """
 
 
-# โ”€โ”€ Agent runner โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# -- Agent runner -------------------------------------------------------------
 
 class DevAgentRunner:
     def __init__(self, session: Session) -> None:
@@ -295,11 +228,12 @@ class DevAgentRunner:
             run = self._get_run(run_id)
 
             if run.status == PipelineRunStatus.failed:
-                logger.info("DevAgent skipped โ€” run %s already failed", run_id)
+                logger.info("DevAgent skipped -- run %s already failed", run_id)
                 return
 
             step = self._get_step(run_id)
             agent_row = self._get_agent_row()
+            model = agent_row.model_name if agent_row else None
 
             run.status = PipelineRunStatus.running
             run.current_step = STEP_NAME
@@ -313,44 +247,55 @@ class DevAgentRunner:
             fsd_doc, arch_doc, db_doc, api_doc, screen_doc = \
                 self._load_source_documents(run.project_id)
 
-            raw_json = _llm.call_ollama(
-                system_prompt=_SYSTEM_PROMPT,
-                user_prompt=_TASK_TEMPLATE.format(
-                    fsd=_esc(fsd_doc.content_markdown),
-                    architecture=_esc(arch_doc.content_markdown),
-                    database=_esc(db_doc.content_markdown),
-                    api_spec=_esc(api_doc.content_markdown),
-                    screen_spec=_esc(screen_doc.content_markdown),
-                ),
-                model=agent_row.model_name if agent_row else None,
-                timeout=TIMEOUT_SECONDS,
-            )
+            docs = {
+                "fsd":        fsd_doc.content_markdown,
+                "architecture": arch_doc.content_markdown,
+                "database":   db_doc.content_markdown,
+                "api_spec":   api_doc.content_markdown,
+                "screen_spec": screen_doc.content_markdown,
+            }
 
-            parsed = _llm.extract_json(raw_json)
-            output = DevAgentOutput.model_validate(parsed)
+            # Phase 1: plan which files to generate
+            file_plan = self._plan_files(docs, model)
+            files = file_plan.files[:MAX_FILES]
+            logger.info("DevAgent planned %d files for run=%s", len(files), run_id)
 
-            task_doc_id = uuid.uuid4()
+            # Phase 2: generate each file
+            out_dir = self._get_output_dir(run.project_id)
+            results: list[tuple[str, bool]] = []
+            for spec in files:
+                content = self._generate_file(spec, docs, model)
+                if content:
+                    self._write_file(out_dir, spec.path, content)
+                    results.append((spec.path, True))
+                    logger.info("DevAgent generated %s", spec.path)
+                else:
+                    results.append((spec.path, False))
+                    logger.warning("DevAgent failed to generate %s", spec.path)
+
+            # Save summary document
+            doc_id = uuid.uuid4()
             pid = str(run.project_id)
+            summary_md = _render_summary(files, results, pid, str(doc_id))
 
-            task_doc = Document(
-                id=task_doc_id,
+            summary_doc = Document(
+                id=doc_id,
                 project_id=run.project_id,
                 document_type=DocumentType.code_task_list,
-                title="Code Task List",
-                content_markdown=_render_task_list(output, pid, str(task_doc_id)),
+                title="Generated Code Summary",
+                content_markdown=summary_md,
                 version=1,
                 status=DocumentStatus.review,
                 created_by_agent_id=agent_row.id if agent_row else None,
             )
-            self.session.add(task_doc)
+            self.session.add(summary_doc)
             self.session.flush()
 
             step.status = PipelineStepStatus.completed
             step.agent_id = agent_row.id if agent_row else None
-            step.output_document_id = task_doc.id
+            step.output_document_id = summary_doc.id
             step.completed_at = datetime.now(UTC)
 
-            # Gate 5 โ€” wait for human review before any code is written
             run.status = PipelineRunStatus.waiting_for_user
             run.current_step = STEP_NAME
 
@@ -358,32 +303,21 @@ class DevAgentRunner:
                 agent_row.status = AgentStatus.done
                 agent_row.updated_at = datetime.now(UTC)
 
-            backend_h = sum(t.estimated_hours for t in output.backend_tasks)
-            frontend_h = sum(t.estimated_hours for t in output.frontend_tasks)
+            ok_count = sum(1 for _, s in results if s)
             self._log_activity(
                 run.project_id, agent_row,
-                f"Code task list created: {len(output.backend_tasks)} backend tasks ({backend_h}h), "
-                f"{len(output.frontend_tasks)} frontend tasks ({frontend_h}h), "
-                f"{len(output.database_migrations)} migrations. Awaiting Gate 5 review.",
+                f"Code generation complete: {ok_count}/{len(files)} files generated "
+                f"to generated_app/. Awaiting Gate 5 review.",
             )
             self.session.commit()
             logger.info(
-                "DevAgent completed run=%s doc=%s be_tasks=%d fe_tasks=%d migs=%d",
-                run_id, task_doc_id,
-                len(output.backend_tasks), len(output.frontend_tasks),
-                len(output.database_migrations),
+                "DevAgent completed run=%s files=%d/%d",
+                run_id, ok_count, len(files),
             )
-
-            # Write output to workspace (non-fatal — log errors only)
-            try:
-                self._write_to_workspace(run.project_id, task_doc.content_markdown)
-            except Exception as ws_exc:
-                logger.warning("DevAgent workspace write failed (non-fatal): %s", ws_exc)
 
         except Exception as exc:
             logger.exception("DevAgent failed run=%s: %s", run_id, exc)
             self.session.rollback()
-
             try:
                 run = self.session.get(PipelineRun, run_id)
                 if run:
@@ -398,13 +332,87 @@ class DevAgentRunner:
             except Exception:
                 logger.exception("Failed to persist failure state for run=%s", run_id)
 
-    # โ”€โ”€ helpers โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+    # -- Generation helpers ---------------------------------------------------
 
-    def _write_to_workspace(self, project_id: uuid.UUID, content: str) -> None:
+    def _plan_files(self, docs: dict[str, str], model: str | None) -> _FilePlan:
+        prompt = _PLAN_TEMPLATE.format(
+            fsd=_esc(_trunc(docs["fsd"], 3000)),
+            database=_esc(_trunc(docs["database"], 3000)),
+            api_spec=_esc(_trunc(docs["api_spec"], 3000)),
+            screen_spec=_esc(_trunc(docs["screen_spec"], 2000)),
+        )
+        raw = _llm.call_ollama(
+            system_prompt=_PLAN_SYSTEM_PROMPT,
+            user_prompt=prompt,
+            model=model,
+            timeout=PLAN_TIMEOUT,
+            response_format="json",
+        )
+        data = _llm.extract_json(raw)
+        return _FilePlan.model_validate(data)
+
+    def _generate_file(
+        self,
+        spec: _FileSpec,
+        docs: dict[str, str],
+        model: str | None,
+    ) -> str | None:
+        context = self._build_context(spec, docs)
+        prompt = _FILE_TEMPLATE.format(
+            path=spec.path,
+            lang=spec.lang,
+            purpose=spec.purpose,
+            context=context,
+        )
+        for attempt in range(2):
+            try:
+                raw = _llm.call_ollama(
+                    system_prompt=_FILE_SYSTEM_PROMPT,
+                    user_prompt=prompt,
+                    model=model,
+                    timeout=FILE_TIMEOUT,
+                    response_format=None,
+                )
+                content = _llm.strip_code_fences(raw)
+                if len(content) >= MIN_FILE_CHARS:
+                    return content
+                logger.warning(
+                    "File %s: content too short (%d chars), attempt %d",
+                    spec.path, len(content), attempt + 1,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "File %s generation error (attempt %d): %s",
+                    spec.path, attempt + 1, exc,
+                )
+        return None
+
+    def _build_context(self, spec: _FileSpec, docs: dict[str, str]) -> str:
+        hint = spec.context_hint
+        mapping = _CONTEXT_CHARS.get(hint, ("fsd", 2000))
+        primary_key, primary_chars = mapping
+
+        primary = _trunc(docs.get(primary_key, ""), primary_chars)
+
+        # Add FSD excerpt as secondary context for all non-readme types
+        secondary = ""
+        if hint not in ("readme",) and primary_key != "fsd":
+            secondary = f"\n\nFSD EXCERPT:\n{_trunc(docs['fsd'], 1500)}"
+
+        return primary + secondary
+
+    def _write_file(self, out_dir: str, rel_path: str, content: str) -> None:
+        # Sanitise path — strip leading slashes and prevent traversal
+        safe_rel = re.sub(r"\.\.+[/\\]", "", rel_path).lstrip("/\\")
+        full_path = os.path.join(out_dir, safe_rel)
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        with open(full_path, "w", encoding="utf-8") as f:
+            f.write(content)
+
+    def _get_output_dir(self, project_id: uuid.UUID) -> str:
         project = self.session.get(Project, project_id)
         raw_path = (project.workspace_path if project else None) or "/workspace"
 
-        # Translate host Windows path → container mount point /workspace
         container_path = re.sub(
             r"^[A-Za-z]:[/\\]workspace", "/workspace", raw_path, flags=re.IGNORECASE
         )
@@ -412,13 +420,9 @@ class DevAgentRunner:
             container_path = "/workspace"
 
         safe_name = re.sub(r"[^\w\-]", "_", project.name if project else "project")
-        out_dir = os.path.join(container_path, safe_name)
-        os.makedirs(out_dir, exist_ok=True)
+        return os.path.join(container_path, safe_name, "generated_app")
 
-        out_file = os.path.join(out_dir, "dev_tasks.md")
-        with open(out_file, "w", encoding="utf-8") as f:
-            f.write(content)
-        logger.info("DevAgent wrote task list to %s", out_file)
+    # -- DB helpers -----------------------------------------------------------
 
     def _get_run(self, run_id: uuid.UUID) -> PipelineRun:
         run = self.session.get(PipelineRun, run_id)
@@ -470,7 +474,9 @@ class DevAgentRunner:
 
         return fsd, arch, db, api, screen  # type: ignore[return-value]
 
-    def _log_activity(self, project_id: uuid.UUID, agent_row: Optional[Agent], message: str) -> None:
+    def _log_activity(
+        self, project_id: uuid.UUID, agent_row: Optional[Agent], message: str
+    ) -> None:
         log = ActivityLog(
             project_id=project_id,
             agent_id=agent_row.id if agent_row else None,

@@ -14,22 +14,28 @@ def call_ollama(
     user_prompt: str,
     model: str | None = None,
     timeout: float = 120.0,
+    response_format: str | None = "json",
 ) -> str:
-    """Call Ollama /api/chat and return the assistant message content."""
+    """Call Ollama /api/chat and return the assistant message content.
+
+    Pass response_format=None for free-form text output (code generation).
+    Default is "json" to preserve existing behaviour for document agents.
+    """
     model = model or settings.ollama_model
     url = f"{settings.ollama_base_url}/api/chat"
 
-    payload = {
+    payload: dict = {
         "model": model,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
         "stream": False,
-        "format": "json",
     }
+    if response_format:
+        payload["format"] = response_format
 
-    logger.info("LLM call → Ollama model=%s url=%s", model, url)
+    logger.info("LLM call → Ollama model=%s format=%s url=%s", model, response_format, url)
     with httpx.Client(timeout=timeout) as client:
         response = client.post(url, json=payload)
         response.raise_for_status()
@@ -56,3 +62,12 @@ def extract_json(text: str) -> dict:
             pass
 
     raise ValueError(f"Cannot parse JSON from LLM output. First 300 chars: {text[:300]}")
+
+
+def strip_code_fences(text: str) -> str:
+    """Remove markdown code fences from LLM code output."""
+    text = text.strip()
+    match = re.match(r"^```[\w]*\n([\s\S]+?)\n```$", text)
+    if match:
+        return match.group(1)
+    return text
