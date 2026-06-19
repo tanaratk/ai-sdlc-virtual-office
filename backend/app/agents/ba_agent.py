@@ -1,4 +1,4 @@
-﻿"""BA Agent โ€” Pipeline Step 3.
+"""BA Agent -- Pipeline Step 3.
 
 Produces three documents from the approved requirement_summary + gap_analysis_report:
   - Business Requirements Document (BRD)
@@ -33,9 +33,9 @@ AGENT_NAME = "ba-agent"
 STEP_NAME = "ba_documents"
 TIMEOUT_SECONDS = 180.0
 
-# โ”€โ”€ Output schema โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# โ"€โ"€ Output schema โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€
 
-def _first(data: dict, *keys: str, fallback: str = “”) -> str:
+def _first(data: dict, *keys: str, fallback: str = "") -> str:
     for k in keys:
         if k in data and data[k]:
             return str(data[k])
@@ -43,21 +43,21 @@ def _first(data: dict, *keys: str, fallback: str = “”) -> str:
 
 
 class _BRDRisk(BaseModel):
-    id: str = “RISK-001”
-    description: str = “”
-    impact: str = “Medium”
+    id: str = "RISK-001"
+    description: str = ""
+    impact: str = "Medium"
 
-    @model_validator(mode=”before”)
+    @model_validator(mode="before")
     @classmethod
     def _remap(cls, v: dict) -> dict:
         if isinstance(v, dict):
-            if not v.get(“description”):
-                v[“description”] = _first(v, “text”, “detail”, “risk”, “summary”, fallback=””)
+            if not v.get("description"):
+                v["description"] = _first(v, "text", "detail", "risk", "summary", fallback="")
         return v
 
 
 class _BRDOutput(BaseModel):
-    business_need: str = “”
+    business_need: str = ""
     objectives: list[str] = Field(default_factory=list)
     success_criteria: list[str] = Field(default_factory=list)
     assumptions: list[str] = Field(default_factory=list)
@@ -66,51 +66,51 @@ class _BRDOutput(BaseModel):
 
 
 class _FSDSpec(BaseModel):
-    id: str = “FSD-001”
-    requirement_ref: str = “”
-    feature: str = “”
-    description: str = “”
+    id: str = "FSD-001"
+    requirement_ref: str = ""
+    feature: str = ""
+    description: str = ""
     acceptance_criteria: list[str] = Field(default_factory=list)
 
-    @model_validator(mode=”before”)
+    @model_validator(mode="before")
     @classmethod
     def _remap(cls, v: dict) -> dict:
         if isinstance(v, dict):
-            if not v.get(“feature”):
-                v[“feature”] = _first(v, “name”, “title”, “feature_name”, “spec_name”, fallback=”Feature”)
-            if not v.get(“description”):
-                v[“description”] = _first(v, “detail”, “summary”, “spec”, “specification”, fallback=””)
-            if not v.get(“requirement_ref”):
-                v[“requirement_ref”] = _first(v, “req_ref”, “fr_ref”, “requirement_id”, fallback=””)
+            if not v.get("feature"):
+                v["feature"] = _first(v, "name", "title", "feature_name", "spec_name", fallback="Feature")
+            if not v.get("description"):
+                v["description"] = _first(v, "detail", "summary", "spec", "specification", fallback="")
+            if not v.get("requirement_ref"):
+                v["requirement_ref"] = _first(v, "req_ref", "fr_ref", "requirement_id", fallback="")
         return v
 
 
 class _FSDOutput(BaseModel):
-    system_overview: str = “”
+    system_overview: str = ""
     functional_specs: list[_FSDSpec] = Field(default_factory=list)
 
 
 class _UserStory(BaseModel):
-    id: str = “US-001”
-    requirement_ref: str = “”
-    as_a: str = “”
-    i_want: str = “”
-    so_that: str = “”
+    id: str = "US-001"
+    requirement_ref: str = ""
+    as_a: str = ""
+    i_want: str = ""
+    so_that: str = ""
     acceptance_criteria: list[str] = Field(default_factory=list)
-    priority: str = “Must Have”
+    priority: str = "Must Have"
 
-    @model_validator(mode=”before”)
+    @model_validator(mode="before")
     @classmethod
     def _remap(cls, v: dict) -> dict:
         if isinstance(v, dict):
-            if not v.get(“as_a”):
-                v[“as_a”] = _first(v, “role”, “user”, “persona”, “actor”, “as”, fallback=”User”)
-            if not v.get(“i_want”):
-                v[“i_want”] = _first(v, “want”, “need”, “goal”, “action”, “feature”, “i_want_to”, fallback=””)
-            if not v.get(“so_that”):
-                v[“so_that”] = _first(v, “benefit”, “reason”, “purpose”, “value”, “outcome”, “so_that_i_can”, fallback=””)
-            if not v.get(“requirement_ref”):
-                v[“requirement_ref”] = _first(v, “req_ref”, “fr_ref”, “requirement_id”, fallback=””)
+            if not v.get("as_a"):
+                v["as_a"] = _first(v, "role", "user", "persona", "actor", "as", fallback="User")
+            if not v.get("i_want"):
+                v["i_want"] = _first(v, "want", "need", "goal", "action", "feature", "i_want_to", fallback="")
+            if not v.get("so_that"):
+                v["so_that"] = _first(v, "benefit", "reason", "purpose", "value", "outcome", "so_that_i_can", fallback="")
+            if not v.get("requirement_ref"):
+                v["requirement_ref"] = _first(v, "req_ref", "fr_ref", "requirement_id", fallback="")
         return v
 
 
@@ -120,7 +120,7 @@ class BAAgentOutput(BaseModel):
     user_stories: list[_UserStory] = Field(default_factory=list)
 
 
-# โ”€โ”€ Prompts โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# โ"€โ"€ Prompts โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€
 
 _SYSTEM_PROMPT = """\
 You are the BA Agent (Business Analyst Agent) in an AI-powered software factory.
@@ -134,15 +134,15 @@ Rules:
 - Every FSD functional_spec must reference a requirement ID (FR-XXX) in requirement_ref.
 - Every user story must reference a requirement ID (FR-XXX) in requirement_ref.
 - Write acceptance criteria in Given/When/Then format.
-- BRD risks must have an ID (RISK-001, RISK-002, โ€ฆ).
-- FSD specs must have sequential IDs (FSD-001, FSD-002, โ€ฆ).
-- User stories must have sequential IDs (US-001, US-002, โ€ฆ).
-- You MUST return ONLY a valid JSON object โ€” no prose, no markdown wrapping.
+- BRD risks must have an ID (RISK-001, RISK-002, --ฆ).
+- FSD specs must have sequential IDs (FSD-001, FSD-002, --ฆ).
+- User stories must have sequential IDs (US-001, US-002, --ฆ).
+- You MUST return ONLY a valid JSON object -- no prose, no markdown wrapping.
 """
 
 _TASK_TEMPLATE = """\
 Analyze the following documents and produce a BRD, FSD, and User Story Backlog.
-Return ONLY the JSON โ€” no explanation, no code fences.
+Return ONLY the JSON -- no explanation, no code fences.
 
 Schema:
 {{
@@ -187,7 +187,7 @@ GAP ANALYSIS REPORT:
 """
 
 
-# โ”€โ”€ Markdown renderers โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# โ"€โ"€ Markdown renderers โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€
 
 def _render_brd(data: _BRDOutput, project_id: str, doc_id: str) -> str:
     def _bullets(items: list[str], fallback: str) -> str:
@@ -198,7 +198,7 @@ def _render_brd(data: _BRDOutput, project_id: str, doc_id: str) -> str:
         for r in data.risks:
             risk_rows += f"| {r.id} | {r.description} | {r.impact} |\n"
     else:
-        risk_rows = "| โ€” | No risks identified | โ€” |\n"
+        risk_rows = "| -- | No risks identified | -- |\n"
 
     return f"""\
 # Business Requirements Document (BRD)
@@ -207,7 +207,7 @@ def _render_brd(data: _BRDOutput, project_id: str, doc_id: str) -> str:
 **Document ID:** `{doc_id}`
 **Generated By:** BA Agent v1.0.0
 **Pipeline Step:** 3 of 10
-**Status:** Draft โ’ Awaiting Review
+**Status:** Draft โ' Awaiting Review
 
 ---
 
@@ -255,7 +255,7 @@ def _render_fsd(data: _FSDOutput, project_id: str, doc_id: str) -> str:
             if spec.acceptance_criteria else "> No acceptance criteria."
         ref = f" โ {spec.requirement_ref}" if spec.requirement_ref else ""
         specs_section += f"""
-### {spec.id}{ref} โ€” {spec.feature}
+### {spec.id}{ref} -- {spec.feature}
 
 {spec.description}
 
@@ -273,7 +273,7 @@ def _render_fsd(data: _FSDOutput, project_id: str, doc_id: str) -> str:
 **Document ID:** `{doc_id}`
 **Generated By:** BA Agent v1.0.0
 **Pipeline Step:** 3 of 10
-**Status:** Draft โ’ Awaiting Review
+**Status:** Draft โ' Awaiting Review
 
 ---
 
@@ -312,14 +312,14 @@ def _render_user_stories(stories: list[_UserStory], project_id: str, doc_id: str
 **Document ID:** `{doc_id}`
 **Generated By:** BA Agent v1.0.0
 **Pipeline Step:** 3 of 10
-**Status:** Draft โ’ Awaiting Review
+**Status:** Draft โ' Awaiting Review
 **Total Stories:** {len(stories)}
 
 ---
 {stories_section if stories_section else "> No user stories generated."}"""
 
 
-# โ”€โ”€ Agent runner โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# โ"€โ"€ Agent runner โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€
 
 class BAAgentRunner:
     def __init__(self, session: Session) -> None:
@@ -333,7 +333,7 @@ class BAAgentRunner:
             run = self._get_run(run_id)
 
             if run.status == PipelineRunStatus.failed:
-                logger.info("BAAgent skipped โ€” run %s already failed", run_id)
+                logger.info("BAAgent skipped -- run %s already failed", run_id)
                 return
 
             step = self._get_step(run_id)
@@ -405,7 +405,7 @@ class BAAgentRunner:
             step.output_document_id = brd_doc.id  # BRD is the primary output
             step.completed_at = datetime.now(UTC)
 
-            # Gate 2 โ€” wait for human review of BRD/FSD/User Stories
+            # Gate 2 -- wait for human review of BRD/FSD/User Stories
             run.status = PipelineRunStatus.waiting_for_user
             run.current_step = STEP_NAME
 
@@ -442,7 +442,7 @@ class BAAgentRunner:
             except Exception:
                 logger.exception("Failed to persist failure state for run=%s", run_id)
 
-    # โ”€โ”€ helpers โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+    # โ"€โ"€ helpers โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€
 
     def _get_run(self, run_id: uuid.UUID) -> PipelineRun:
         run = self.session.get(PipelineRun, run_id)

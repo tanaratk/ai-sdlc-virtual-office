@@ -78,16 +78,20 @@ export default function ProjectWorkspace() {
       label: "Run AI Pipeline",
       desc: !hasInputs
         ? "Complete Step 1 first — upload at least one requirement"
-        : activeRun
-        ? `Running… current step: ${latestRun?.current_step ?? "starting"}`
+        : activeRun?.status === "waiting_for_user"
+        ? `Waiting for your approval — step: ${activeRun.current_step}`
+        : activeRun?.status === "running"
+        ? `Running… current step: ${activeRun.current_step ?? "starting"}`
         : pipelineDone
         ? "Pipeline completed — all 10 agents finished"
+        : latestRun?.status === "failed"
+        ? "Last run failed — check the console or retry"
         : "Start the 10-agent SDLC pipeline",
       href: `/projects/${projectId}/agents`,
       icon: Bot,
       done: pipelineDone,
       locked: !canRunPipeline,
-      actionLabel: activeRun ? "View Progress" : "Run Pipeline",
+      actionLabel: activeRun ? (activeRun.status === "waiting_for_user" ? "Review & Approve" : "View Progress") : "Run Pipeline",
     },
     {
       num: 3,

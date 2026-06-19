@@ -1,4 +1,4 @@
-﻿"""QA Agent โ€” Pipeline Step 7.
+"""QA Agent -- Pipeline Step 7.
 
 Reads approved FSD, User Stories, API Spec, and (optionally) Screen Spec to produce:
   - Test Cases document (functional, API, edge-case, negative)
@@ -35,13 +35,13 @@ AGENT_NAME = "qa-agent"
 def _esc(s: str) -> str:
     """Escape braces in document content so str.format() doesn't misinterpret them."""
     return s.replace("{", "{{").replace("}", "}}")
-STEP_NAME = “test_cases”
+STEP_NAME = "test_cases"
 TIMEOUT_SECONDS = 480.0
 
 
-# โ”€โ”€ Output schemas (all fields optional to tolerate LLM schema drift) โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# โ"€โ"€ Output schemas (all fields optional to tolerate LLM schema drift) โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€
 
-def _first(data: dict, *keys: str, fallback: str = “”) -> str:
+def _first(data: dict, *keys: str, fallback: str = "") -> str:
     for k in keys:
         if k in data and data[k]:
             return str(data[k])
@@ -49,115 +49,115 @@ def _first(data: dict, *keys: str, fallback: str = “”) -> str:
 
 
 class _LenientBase(BaseModel):
-    model_config = ConfigDict(extra=”ignore”)
+    model_config = ConfigDict(extra="ignore")
 
 
 class _FunctionalTC(_LenientBase):
-    id: str = “TC-001”
-    fsd_ref: str = “”
-    story_ref: str = “”
-    description: str = “”
-    precondition: str = “”
+    id: str = "TC-001"
+    fsd_ref: str = ""
+    story_ref: str = ""
+    description: str = ""
+    precondition: str = ""
     steps: list[str] = Field(default_factory=list)
-    expected_result: str = “”
-    priority: str = “High”
+    expected_result: str = ""
+    priority: str = "High"
 
-    @model_validator(mode=”before”)
+    @model_validator(mode="before")
     @classmethod
     def _remap(cls, v: dict) -> dict:
         if isinstance(v, dict):
-            if not v.get(“description”):
-                v[“description”] = _first(v, “title”, “name”, “test_description”, “summary”, fallback=””)
-            if not v.get(“expected_result”):
-                v[“expected_result”] = _first(v, “expected”, “result”, “expected_outcome”, “outcome”, fallback=””)
-            if not v.get(“fsd_ref”):
-                v[“fsd_ref”] = _first(v, “fsd”, “spec_ref”, “requirement_ref”, “ref”, fallback=””)
+            if not v.get("description"):
+                v["description"] = _first(v, "title", "name", "test_description", "summary", fallback="")
+            if not v.get("expected_result"):
+                v["expected_result"] = _first(v, "expected", "result", "expected_outcome", "outcome", fallback="")
+            if not v.get("fsd_ref"):
+                v["fsd_ref"] = _first(v, "fsd", "spec_ref", "requirement_ref", "ref", fallback="")
         return v
 
 
 class _ApiTC(_LenientBase):
-    id: str = “TC-010”
-    api_ref: str = “”
-    method: str = “GET”
-    endpoint: str = “”
-    request_body: str = “—“
+    id: str = "TC-010"
+    api_ref: str = ""
+    method: str = "GET"
+    endpoint: str = ""
+    request_body: str = "—"
     expected_status: int = 200
-    expected_response: str = “”
-    priority: str = “High”
+    expected_response: str = ""
+    priority: str = "High"
 
-    @model_validator(mode=”before”)
+    @model_validator(mode="before")
     @classmethod
     def _remap(cls, v: dict) -> dict:
         if isinstance(v, dict):
-            if not v.get(“endpoint”):
-                v[“endpoint”] = _first(v, “url”, “path”, “route”, “api_path”, fallback=””)
-            if not v.get(“api_ref”):
-                v[“api_ref”] = _first(v, “api”, “ref”, “endpoint_ref”, fallback=””)
+            if not v.get("endpoint"):
+                v["endpoint"] = _first(v, "url", "path", "route", "api_path", fallback="")
+            if not v.get("api_ref"):
+                v["api_ref"] = _first(v, "api", "ref", "endpoint_ref", fallback="")
             # expected_status might come as string
-            if “expected_status” in v and isinstance(v[“expected_status”], str):
+            if "expected_status" in v and isinstance(v["expected_status"], str):
                 try:
-                    v[“expected_status”] = int(v[“expected_status”])
+                    v["expected_status"] = int(v["expected_status"])
                 except ValueError:
-                    v[“expected_status”] = 200
+                    v["expected_status"] = 200
         return v
 
 
 class _EdgeTC(_LenientBase):
-    id: str = “TC-020”
-    fsd_ref: str = “”
-    scenario: str = “”
-    input: str = “”
-    expected_behaviour: str = “”
+    id: str = "TC-020"
+    fsd_ref: str = ""
+    scenario: str = ""
+    input: str = ""
+    expected_behaviour: str = ""
 
-    @model_validator(mode=”before”)
+    @model_validator(mode="before")
     @classmethod
     def _remap(cls, v: dict) -> dict:
         if isinstance(v, dict):
-            if not v.get(“scenario”):
-                v[“scenario”] = _first(v, “description”, “name”, “title”, “test_case”, fallback=””)
-            if not v.get(“expected_behaviour”):
-                v[“expected_behaviour”] = _first(v, “expected_behavior”, “expected”, “outcome”, “result”, fallback=””)
+            if not v.get("scenario"):
+                v["scenario"] = _first(v, "description", "name", "title", "test_case", fallback="")
+            if not v.get("expected_behaviour"):
+                v["expected_behaviour"] = _first(v, "expected_behavior", "expected", "outcome", "result", fallback="")
         return v
 
 
 class _NegativeTC(_LenientBase):
-    id: str = “TC-030”
-    fsd_ref: str = “”
-    scenario: str = “”
-    invalid_input: str = “”
-    expected_error: str = “”
+    id: str = "TC-030"
+    fsd_ref: str = ""
+    scenario: str = ""
+    invalid_input: str = ""
+    expected_error: str = ""
 
-    @model_validator(mode=”before”)
+    @model_validator(mode="before")
     @classmethod
     def _remap(cls, v: dict) -> dict:
         if isinstance(v, dict):
-            if not v.get(“scenario”):
-                v[“scenario”] = _first(v, “description”, “name”, “title”, “test_case”, fallback=””)
-            if not v.get(“expected_error”):
-                v[“expected_error”] = _first(v, “error”, “expected”, “error_message”, “outcome”, fallback=””)
-            if not v.get(“invalid_input”):
-                v[“invalid_input”] = _first(v, “input”, “bad_input”, “test_input”, fallback=””)
+            if not v.get("scenario"):
+                v["scenario"] = _first(v, "description", "name", "title", "test_case", fallback="")
+            if not v.get("expected_error"):
+                v["expected_error"] = _first(v, "error", "expected", "error_message", "outcome", fallback="")
+            if not v.get("invalid_input"):
+                v["invalid_input"] = _first(v, "input", "bad_input", "test_input", fallback="")
         return v
 
 
 class _UATScenario(_LenientBase):
-    id: str = “UAT-001”
-    story_ref: str = “”
-    description: str = “”
-    actor: str = “”
+    id: str = "UAT-001"
+    story_ref: str = ""
+    description: str = ""
+    actor: str = ""
     steps: list[str] = Field(default_factory=list)
-    expected_outcome: str = “”
+    expected_outcome: str = ""
 
-    @model_validator(mode=”before”)
+    @model_validator(mode="before")
     @classmethod
     def _remap(cls, v: dict) -> dict:
         if isinstance(v, dict):
-            if not v.get(“description”):
-                v[“description”] = _first(v, “name”, “title”, “scenario_name”, “summary”, fallback=””)
-            if not v.get(“actor”):
-                v[“actor”] = _first(v, “role”, “user”, “persona”, “stakeholder”, fallback=””)
-            if not v.get(“expected_outcome”):
-                v[“expected_outcome”] = _first(v, “outcome”, “expected”, “result”, “expected_result”, fallback=””)
+            if not v.get("description"):
+                v["description"] = _first(v, "name", "title", "scenario_name", "summary", fallback="")
+            if not v.get("actor"):
+                v["actor"] = _first(v, "role", "user", "persona", "stakeholder", fallback="")
+            if not v.get("expected_outcome"):
+                v["expected_outcome"] = _first(v, "outcome", "expected", "result", "expected_result", fallback="")
         return v
 
 
@@ -171,7 +171,7 @@ class QAAgentOutput(_LenientBase):
     minimum_pass_rate: int = 95
 
 
-# โ”€โ”€ Prompts โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# โ"€โ"€ Prompts โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€
 
 _SYSTEM_PROMPT = """\
 You are the QA Agent in an AI-powered software factory.
@@ -181,16 +181,16 @@ then produce comprehensive Test Cases and a UAT Script.
 CRITICAL RULES:
 - Every FSD specification (FSD-XXX) must have at least one functional test case.
 - Every API endpoint (API-XXX) must have at least one API test case (happy path + at least one error case).
-- Assign TC-XXX IDs GLOBALLY โ€” do not restart numbering per section.
+- Assign TC-XXX IDs GLOBALLY -- do not restart numbering per section.
   Functional: TC-001..., API: TC-010+, Edge: TC-020+, Negative: TC-030+.
-- UAT scenarios must be written in plain language for non-technical business users โ€” no technical jargon.
-- Do NOT write test code โ€” test case descriptions and steps only.
-- You MUST return ONLY a valid JSON object โ€” no prose, no markdown wrapping.
+- UAT scenarios must be written in plain language for non-technical business users -- no technical jargon.
+- Do NOT write test code -- test case descriptions and steps only.
+- You MUST return ONLY a valid JSON object -- no prose, no markdown wrapping.
 """
 
 _TASK_TEMPLATE = """\
 Analyze the following approved documents and produce a comprehensive QA document.
-Return ONLY the JSON โ€” no explanation, no code fences.
+Return ONLY the JSON -- no explanation, no code fences.
 
 Schema:
 {{
@@ -233,7 +233,7 @@ Schema:
       "fsd_ref": "FSD-001",
       "scenario": "missing required field X",
       "invalid_input": "request without field X",
-      "expected_error": "422 VALIDATION_ERROR โ€” field required"
+      "expected_error": "422 VALIDATION_ERROR -- field required"
     }}
   ],
   "uat_scenarios": [
@@ -267,16 +267,16 @@ SCREEN SPECIFICATION:
 """
 
 
-# โ”€โ”€ Markdown renderers โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# โ"€โ"€ Markdown renderers โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€
 
 def _render_test_cases(data: QAAgentOutput, project_id: str, doc_id: str,
                        fsd_id: str, story_id: str, api_id: str) -> str:
     def _func_rows(tests: list[_FunctionalTC]) -> str:
         if not tests:
-            return "| โ€” | โ€” | โ€” | โ€” | โ€” | โ€” | โ€” | โ€” |\n"
+            return "| -- | -- | -- | -- | -- | -- | -- | -- |\n"
         rows = ""
         for t in tests:
-            steps = " ".join(f"{i+1}. {s}" for i, s in enumerate(t.steps)) or "โ€”"
+            steps = " ".join(f"{i+1}. {s}" for i, s in enumerate(t.steps)) or "--"
             rows += (
                 f"| {t.id} | {t.fsd_ref} | {t.story_ref} | {t.description} "
                 f"| {t.precondition} | {steps} | {t.expected_result} | {t.priority} |\n"
@@ -285,7 +285,7 @@ def _render_test_cases(data: QAAgentOutput, project_id: str, doc_id: str,
 
     def _api_rows(tests: list[_ApiTC]) -> str:
         if not tests:
-            return "| โ€” | โ€” | โ€” | โ€” | โ€” | โ€” | โ€” | โ€” |\n"
+            return "| -- | -- | -- | -- | -- | -- | -- | -- |\n"
         rows = ""
         for t in tests:
             rows += (
@@ -296,7 +296,7 @@ def _render_test_cases(data: QAAgentOutput, project_id: str, doc_id: str,
 
     def _edge_rows(tests: list[_EdgeTC]) -> str:
         if not tests:
-            return "| โ€” | โ€” | โ€” | โ€” | โ€” |\n"
+            return "| -- | -- | -- | -- | -- |\n"
         return "".join(
             f"| {t.id} | {t.fsd_ref} | {t.scenario} | {t.input} | {t.expected_behaviour} |\n"
             for t in tests
@@ -304,7 +304,7 @@ def _render_test_cases(data: QAAgentOutput, project_id: str, doc_id: str,
 
     def _neg_rows(tests: list[_NegativeTC]) -> str:
         if not tests:
-            return "| โ€” | โ€” | โ€” | โ€” | โ€” |\n"
+            return "| -- | -- | -- | -- | -- |\n"
         return "".join(
             f"| {t.id} | {t.fsd_ref} | {t.scenario} | {t.invalid_input} | {t.expected_error} |\n"
             for t in tests
@@ -321,7 +321,7 @@ def _render_test_cases(data: QAAgentOutput, project_id: str, doc_id: str,
 **Generated By:** QA Agent v1.0.0
 **Pipeline Step:** 7 of 10
 **Source Documents:** FSD `{fsd_id}`, User Stories `{story_id}`, API Spec `{api_id}`
-**Status:** Draft โ’ Awaiting Review
+**Status:** Draft โ' Awaiting Review
 
 ---
 
@@ -372,10 +372,10 @@ def _render_test_cases(data: QAAgentOutput, project_id: str, doc_id: str,
 def _render_uat_script(data: QAAgentOutput, project_id: str, doc_id: str) -> str:
     def _uat_rows(scenarios: list[_UATScenario]) -> str:
         if not scenarios:
-            return "| โ€” | โ€” | โ€” | โ€” | โ€” | โ€” | โ€” |\n"
+            return "| -- | -- | -- | -- | -- | -- | -- |\n"
         rows = ""
         for s in scenarios:
-            steps = " ".join(f"{i+1}. {st}" for i, st in enumerate(s.steps)) or "โ€”"
+            steps = " ".join(f"{i+1}. {st}" for i, st in enumerate(s.steps)) or "--"
             rows += (
                 f"| {s.id} | {s.story_ref} | {s.description} | {s.actor} "
                 f"| {steps} | {s.expected_outcome} | โ Pass / โ Fail |\n"
@@ -392,7 +392,7 @@ def _render_uat_script(data: QAAgentOutput, project_id: str, doc_id: str) -> str
 **Document ID:** `{doc_id}`
 **Generated By:** QA Agent v1.0.0
 **Pipeline Step:** 7 of 10
-**Status:** Draft โ’ Awaiting Review
+**Status:** Draft โ' Awaiting Review
 
 ---
 
@@ -429,7 +429,7 @@ def _render_uat_script(data: QAAgentOutput, project_id: str, doc_id: str) -> str
 """
 
 
-# โ”€โ”€ Agent runner โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# โ"€โ"€ Agent runner โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€
 
 class QAAgentRunner:
     def __init__(self, session: Session) -> None:
@@ -443,7 +443,7 @@ class QAAgentRunner:
             run = self._get_run(run_id)
 
             if run.status == PipelineRunStatus.failed:
-                logger.info("QAAgent skipped โ€” run %s already failed", run_id)
+                logger.info("QAAgent skipped -- run %s already failed", run_id)
                 return
 
             step = self._get_step(run_id)
@@ -516,7 +516,7 @@ class QAAgentRunner:
             step.output_document_id = tc_doc.id
             step.completed_at = datetime.now(UTC)
 
-            # Gate 6 โ€” wait for human review before proceeding
+            # Gate 6 -- wait for human review before proceeding
             run.status = PipelineRunStatus.waiting_for_user
             run.current_step = STEP_NAME
 
@@ -557,7 +557,7 @@ class QAAgentRunner:
             except Exception:
                 logger.exception("Failed to persist failure state for run=%s", run_id)
 
-    # โ”€โ”€ helpers โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+    # โ"€โ"€ helpers โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€
 
     def _get_run(self, run_id: uuid.UUID) -> PipelineRun:
         run = self.session.get(PipelineRun, run_id)
