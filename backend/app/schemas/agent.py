@@ -21,6 +21,7 @@ class AgentResponse(BaseModel):
     sprite_direction: SpriteDirection
     model_provider: ModelProvider
     model_name: str
+    skill_markdown: Optional[str]
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -32,4 +33,5 @@ class AgentUpdate(BaseModel):
     model_provider: Optional[ModelProvider] = None
     model_name: Optional[str] = None
     description: Optional[str] = None
+    skill_markdown: Optional[str] = None
     is_active: Optional[bool] = None

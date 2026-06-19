@@ -231,6 +231,7 @@ class Agent(SQLModel, table=True):
     sprite_direction: SpriteDirection = Field(default=SpriteDirection.down)
     model_provider: ModelProvider = Field(default=ModelProvider.ollama)
     model_name: str = Field(default="qwen3:8b", max_length=100)
+    skill_markdown: Optional[str] = Field(default=None)
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

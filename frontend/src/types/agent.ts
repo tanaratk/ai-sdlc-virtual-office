@@ -14,6 +14,7 @@ export interface Agent {
   location_y: number;
   model_provider: ModelProvider;
   model_name: string;
+  skill_markdown: string | null;
   is_active: boolean;
   updated_at: string;
 }
@@ -22,6 +23,7 @@ export interface AgentUpdate {
   model_provider?: ModelProvider;
   model_name?: string;
   description?: string;
+  skill_markdown?: string;
   is_active?: boolean;
 }
 
