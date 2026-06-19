@@ -305,6 +305,7 @@ class UXAgentRunner:
                     fsd=fsd_doc.content_markdown,
                     user_stories=us_doc.content_markdown,
                 ),
+                model=agent_row.model_name if agent_row else None,
                 timeout=TIMEOUT_SECONDS,
             )
 

@@ -226,6 +226,7 @@ class GapAnalysisAgentRunner:
             raw_json = _llm.call_ollama(
                 system_prompt=_SYSTEM_PROMPT,
                 user_prompt=_TASK_TEMPLATE.format(content=content),
+                model=agent_row.model_name if agent_row else None,
                 timeout=TIMEOUT_SECONDS,
             )
 

@@ -322,6 +322,7 @@ class DevAgentRunner:
                     api_spec=_esc(api_doc.content_markdown),
                     screen_spec=_esc(screen_doc.content_markdown),
                 ),
+                model=agent_row.model_name if agent_row else None,
                 timeout=TIMEOUT_SECONDS,
             )
 

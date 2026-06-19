@@ -94,7 +94,10 @@ class DocumentationAgentRunner:
             if not docs:
                 raise ValueError("No documents found for this project. Run pipeline agents first.")
 
-            exec_summary = self._generate_executive_summary(project_name, docs)
+            exec_summary = self._generate_executive_summary(
+                project_name, docs,
+                model=agent_row.model_name if agent_row else None,
+            )
 
             doc_id = uuid.uuid4()
             content = self._render_compiled_doc(
@@ -174,7 +177,8 @@ class DocumentationAgentRunner:
         return result
 
     def _generate_executive_summary(
-        self, project_name: str, docs: list[tuple[str, Document]]
+        self, project_name: str, docs: list[tuple[str, Document]],
+        model: str | None = None,
     ) -> str:
         req_summary = ""
         for label, doc in docs:
@@ -197,6 +201,7 @@ class DocumentationAgentRunner:
                 doc_count=len(docs),
                 req_summary=_esc(req_summary),
             ),
+            model=model,
             timeout=TIMEOUT_SECONDS,
         )
         parsed = _llm.extract_json(raw)

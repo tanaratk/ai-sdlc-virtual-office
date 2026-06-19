@@ -356,6 +356,7 @@ class BAAgentRunner:
                     req_summary=req_doc.content_markdown,
                     gap_report=gap_doc.content_markdown,
                 ),
+                model=agent_row.model_name if agent_row else None,
                 timeout=TIMEOUT_SECONDS,
             )
 

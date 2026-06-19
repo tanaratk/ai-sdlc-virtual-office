@@ -355,7 +355,10 @@ class PMAgentRunner:
             trace_count = self._count_traceability(project_id)
             req_summary = self._get_req_summary(doc_rows)
 
-            pm_output = self._call_llm(project_name, len(doc_rows), trace_count, req_summary)
+            pm_output = self._call_llm(
+                project_name, len(doc_rows), trace_count, req_summary,
+                model=agent_row.model_name if agent_row else None,
+            )
 
             pid = str(project_id)
             now = datetime.now(UTC)
@@ -491,6 +494,7 @@ class PMAgentRunner:
         doc_count: int,
         trace_count: int,
         req_summary: str,
+        model: str | None = None,
     ) -> PMSummaryOutput:
         prompt = _TASK_TEMPLATE.format(
             project_name=_esc(project_name),
@@ -501,6 +505,7 @@ class PMAgentRunner:
         raw = _llm.call_ollama(
             system_prompt=_SYSTEM_PROMPT,
             user_prompt=prompt,
+            model=model,
             timeout=TIMEOUT_SECONDS,
         )
         parsed = _llm.extract_json(raw)

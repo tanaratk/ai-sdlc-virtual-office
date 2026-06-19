@@ -444,6 +444,7 @@ class ChangeImpactAgentRunner:
                     screen_spec=_esc(docs.get("screen_spec", "(not available)")),
                     test_cases=_esc(docs.get("test_cases", "(not available)")),
                 ),
+                model=agent_row.model_name if agent_row else None,
                 timeout=TIMEOUT_SECONDS,
             )
 
