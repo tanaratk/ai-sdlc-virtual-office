@@ -41,7 +41,8 @@ _NEXT_STEP: dict[str, str | None] = {
     "ux_documents":      "technical_design",
     "technical_design":  "dev_tasks",          # Design Layer gate
     # Delivery Layer
-    "dev_tasks":         "devops_tasks",
+    "dev_tasks":         "code_review",       # Code Review after Developer Agent
+    "code_review":       "devops_tasks",
     "devops_tasks":      "test_cases",
     "test_cases":        None,                 # Pipeline complete
 }
@@ -53,7 +54,8 @@ _NEXT_TASK: dict[str, str] = {
     "sa_documents":      "ux_documents",
     "ux_documents":      "technical_design",
     "technical_design":  "dev_tasks",
-    "dev_tasks":         "devops_tasks",
+    "dev_tasks":         "code_review",
+    "code_review":       "devops_tasks",
     "devops_tasks":      "test_cases",
 }
 
@@ -66,6 +68,7 @@ _RETRY_TASK: dict[str, str] = {
     "ux_documents":        "ux_documents",
     "technical_design":    "technical_design",
     "dev_tasks":           "dev_tasks",
+    "code_review":         "code_review",
     "devops_tasks":        "devops_tasks",
     "test_cases":          "test_cases",
 }
@@ -85,6 +88,7 @@ _STEP_LAYER: dict[str, str] = {
     "ux_documents":        "design",
     "technical_design":    "design",
     "dev_tasks":           "delivery",
+    "code_review":         "delivery",
     "devops_tasks":        "delivery",
     "test_cases":          "delivery",
 }

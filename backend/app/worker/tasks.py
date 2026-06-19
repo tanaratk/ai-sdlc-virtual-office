@@ -168,6 +168,24 @@ def run_technical_design(self, run_id: str) -> None:
         TechnicalDesignAgentRunner(session).run(uuid.UUID(run_id))
 
 
+# ── Step 7: Code Review Agent ─────────────────────────────────────────────────
+
+@celery_app.task(
+    base=_AgentTask,
+    bind=True,
+    name="tasks.run_code_review",
+    max_retries=_MAX_RETRIES,
+    default_retry_delay=_RETRY_DELAY,
+    autoretry_for=_RETRY_ON,
+)
+def run_code_review(self, run_id: str) -> None:
+    from app.agents.code_review_agent import CodeReviewAgentRunner
+    from app.db.session import engine
+
+    with Session(engine) as session:
+        CodeReviewAgentRunner(session).run(uuid.UUID(run_id))
+
+
 # ── Step 8: QA Agent ──────────────────────────────────────────────────────────
 
 @celery_app.task(
@@ -380,6 +398,7 @@ STEP_TASKS: dict[str, object] = {
     "technical_design":  run_technical_design,
     # Delivery Layer
     "dev_tasks":         run_dev_agent,
+    "code_review":       run_code_review,
     "devops_tasks":      run_devops_agent,
     "test_cases":        run_qa_agent,
     # On-demand (not in auto-chain)
