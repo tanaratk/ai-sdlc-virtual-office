@@ -54,8 +54,8 @@
 | 22 | PM Agent MVP | ✅ Done |
 | 23 | Docker + CI/CD | ✅ Done |
 | **Phase 2** | **Code Generation Factory** | **In Progress** |
-| 24 | Per-Agent LLM Selection | 🔲 Next |
-| 25 | Developer Agent — Real Code Generation | 🔲 Planned |
+| 24 | Per-Agent LLM Selection | ✅ Done |
+| 25 | Developer Agent — Real Code Generation | 🔲 Next |
 | 26 | Code Output Viewer + ZIP Download | 🔲 Planned |
 | 27 | DevOps Agent (Dockerfile + CI/CD gen) | 🔲 Planned |
 | 28 | Pipeline Steps 8–10 Completion | 🔲 Planned |
@@ -66,7 +66,8 @@
 **Phase 1 COMPLETE (Sprint 0–23)** — SDLC Document Pipeline ครบทุก agent, infra, UI, RAG, GitHub, MCP
 
 **Phase 2 IN PROGRESS** — Code Generation Factory (Sprint 24–29)
-- Sprint 24: Per-Agent LLM Selection — **NEXT**
+- Sprint 24: Per-Agent LLM Selection — ✅ Done
+- Sprint 25: Developer Agent Rewrite — Real Code Generation — **NEXT**
 - Sprint 25: Developer Agent Rewrite — Real Code Generation
 - Sprint 26: Code Output Viewer + ZIP Download
 - Sprint 27: DevOps Agent (Dockerfile + CI/CD)
