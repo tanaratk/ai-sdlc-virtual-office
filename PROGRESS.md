@@ -55,8 +55,8 @@
 | 23 | Docker + CI/CD | ✅ Done |
 | **Phase 2** | **Code Generation Factory** | **In Progress** |
 | 24 | Per-Agent LLM Selection | ✅ Done |
-| 25 | Developer Agent — Real Code Generation | 🔲 Next |
-| 26 | Code Output Viewer + ZIP Download | 🔲 Planned |
+| 25 | Developer Agent — Real Code Generation | ✅ Done |
+| 26 | Code Output Viewer + ZIP Download | 🔲 Next |
 | 27 | DevOps Agent (Dockerfile + CI/CD gen) | 🔲 Planned |
 | 28 | Pipeline Steps 8–10 Completion | 🔲 Planned |
 | 29 | GitHub Push of Generated Application | 🔲 Planned |
