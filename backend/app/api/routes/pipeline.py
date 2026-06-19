@@ -19,33 +19,42 @@ class _RejectBody(BaseModel):
     reason: str = "Rejected by user"
 
 
-# ── Gate map ──────────────────────────────────────────────────────────────────
-# step_name → next step name to create on approval (None = pipeline done)
+# ── 3-Layer Pipeline Gate Map ─────────────────────────────────────────────────
+#
+# BUSINESS LAYER:  requirement_summary → gap_analysis → ba_documents
+#   [HARD GATE] ba_documents approved → unlock Design Layer
+#
+# DESIGN LAYER:    sa_documents → ux_documents → technical_design
+#   [HARD GATE] technical_design approved → unlock Delivery Layer
+#
+# DELIVERY LAYER:  dev_tasks → devops_tasks → test_cases → DONE
+#
+# ON-DEMAND (removed from auto-chain): change_impact, documentation, pm_summary
 
+# step_name → next step name to create on approval (None = pipeline done)
 _NEXT_STEP: dict[str, str | None] = {
-    "gap_analysis":  "ba_documents",
-    "ba_documents":  "sa_documents",
-    "sa_documents":  "ux_documents",
-    "ux_documents":  "dev_tasks",
-    "dev_tasks":     "devops_tasks",
-    "devops_tasks":  "test_cases",
-    "test_cases":    "change_impact",
-    "change_impact": "documentation",
-    "documentation": "pm_summary",
-    "pm_summary":    None,
+    # Business Layer
+    "gap_analysis":      "ba_documents",
+    "ba_documents":      "sa_documents",       # Business Layer gate
+    # Design Layer
+    "sa_documents":      "ux_documents",
+    "ux_documents":      "technical_design",
+    "technical_design":  "dev_tasks",          # Design Layer gate
+    # Delivery Layer
+    "dev_tasks":         "devops_tasks",
+    "devops_tasks":      "test_cases",
+    "test_cases":        None,                 # Pipeline complete
 }
 
 # step_name → task key to dispatch on approval
 _NEXT_TASK: dict[str, str] = {
-    "gap_analysis":  "ba_documents",
-    "ba_documents":  "sa_documents",
-    "sa_documents":  "ux_documents",
-    "ux_documents":  "dev_tasks",
-    "dev_tasks":     "devops_tasks",
-    "devops_tasks":  "test_cases",
-    "test_cases":    "change_impact",
-    "change_impact": "documentation",
-    "documentation": "pm_summary",
+    "gap_analysis":      "ba_documents",
+    "ba_documents":      "sa_documents",
+    "sa_documents":      "ux_documents",
+    "ux_documents":      "technical_design",
+    "technical_design":  "dev_tasks",
+    "dev_tasks":         "devops_tasks",
+    "devops_tasks":      "test_cases",
 }
 
 # step_name → which task key retries that step
@@ -55,12 +64,29 @@ _RETRY_TASK: dict[str, str] = {
     "ba_documents":        "ba_documents",
     "sa_documents":        "sa_documents",
     "ux_documents":        "ux_documents",
+    "technical_design":    "technical_design",
     "dev_tasks":           "dev_tasks",
     "devops_tasks":        "devops_tasks",
     "test_cases":          "test_cases",
-    "change_impact":       "change_impact",
-    "documentation":       "documentation",
-    "pm_summary":          "pm_summary",
+}
+
+# Hard gates — approve at these steps triggers a layer transition message
+_LAYER_GATES: dict[str, str] = {
+    "ba_documents":     "Design Layer unlocked",
+    "technical_design": "Delivery Layer unlocked",
+}
+
+# Step → layer mapping (for API responses and UI display)
+_STEP_LAYER: dict[str, str] = {
+    "requirement_summary": "business",
+    "gap_analysis":        "business",
+    "ba_documents":        "business",
+    "sa_documents":        "design",
+    "ux_documents":        "design",
+    "technical_design":    "design",
+    "dev_tasks":           "delivery",
+    "devops_tasks":        "delivery",
+    "test_cases":          "delivery",
 }
 
 
@@ -137,6 +163,8 @@ def approve_step(
         raise HTTPException(status_code=400, detail={"error_code": "WRONG_STEP", "message": f"Step {step.step_name!r} is not the current gate ({run.current_step!r})"})
 
     next_step_name = _NEXT_STEP.get(step.step_name)
+    layer_transition = _LAYER_GATES.get(step.step_name)
+    current_layer = _STEP_LAYER.get(step.step_name)
 
     if next_step_name is not None:
         next_step = PipelineStep(
@@ -153,12 +181,25 @@ def approve_step(
         if task_key:
             _dispatch(task_key, run_id)
 
-        return {"status": "approved", "next": next_step_name}
+        response: dict = {
+            "status": "approved",
+            "next": next_step_name,
+            "next_layer": _STEP_LAYER.get(next_step_name),
+            "current_layer": current_layer,
+        }
+        if layer_transition:
+            response["layer_transition"] = layer_transition
+        return response
     else:
         run.status = PipelineRunStatus.completed
         run.completed_at = datetime.now(UTC)
         session.commit()
-        return {"status": "approved", "run_id": str(run_id)}
+        return {
+            "status": "approved",
+            "run_id": str(run_id),
+            "current_layer": current_layer,
+            "pipeline": "completed",
+        }
 
 
 @router.post("/{project_id}/pipeline/runs/{run_id}/steps/{step_id}/reject", status_code=200)

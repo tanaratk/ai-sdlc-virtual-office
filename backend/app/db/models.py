@@ -87,6 +87,7 @@ class DocumentType(str, Enum):
     api_spec = "api_spec"
     screen_spec = "screen_spec"
     code_task_list = "code_task_list"
+    technical_design = "technical_design"
     devops_config = "devops_config"
     test_cases = "test_cases"
     uat_script = "uat_script"

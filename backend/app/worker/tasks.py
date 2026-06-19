@@ -150,6 +150,73 @@ def run_devops_agent(self, run_id: str) -> None:
         DevOpsAgentRunner(session).run(uuid.UUID(run_id))
 
 
+# ── Step 6: Technical Design Agent (placeholder until Sprint 32) ─────────────
+
+@celery_app.task(
+    base=_AgentTask,
+    bind=True,
+    name="tasks.run_technical_design",
+    max_retries=_MAX_RETRIES,
+    default_retry_delay=_RETRY_DELAY,
+    autoretry_for=_RETRY_ON,
+)
+def run_technical_design(self, run_id: str) -> None:
+    """Placeholder for Technical Design Agent (real implementation in Sprint 32).
+
+    Creates a stub dev_tasks.md so the pipeline gate works end-to-end.
+    Human review of this stub will unlock the Delivery Layer.
+    """
+    from app.db.models import Document, DocumentStatus, DocumentType, PipelineRun, Project
+    from app.db.session import engine
+
+    STEP = "technical_design"
+    _id = uuid.UUID(run_id)
+
+    with Session(engine) as session:
+        run, step = _step_init(session, _id, STEP)
+        if not run:
+            return
+        try:
+            project = session.get(Project, run.project_id)
+            project_name = project.name if project else "Project"
+
+            stub_md = f"""\
+# Technical Design — {project_name}
+
+> **Status:** Placeholder — Technical Design Agent (Sprint 32) not yet implemented.
+> Review this stub and approve to proceed to the Delivery Layer,
+> or wait for Sprint 32 to generate a real dev_tasks.md.
+
+## dev_tasks.md (stub)
+
+| Task | Domain | File | FR-ref |
+|------|--------|------|--------|
+| TASK-001 | backend | app/backend/main.py | FR-001 |
+| TASK-002 | frontend | app/frontend/src/App.tsx | FR-001 |
+| TASK-003 | database | app/db/migrations/0001_init.py | FR-002 |
+
+**Estimated instances:** 1 Developer Agent
+"""
+            doc_id = uuid.uuid4()
+            doc = Document(
+                id=doc_id,
+                project_id=run.project_id,
+                document_type=DocumentType.technical_design,
+                title=f"Technical Design — {project_name} (Placeholder)",
+                content_markdown=stub_md,
+                version=1,
+                status=DocumentStatus.draft,
+            )
+            session.add(doc)
+            session.flush()
+            _step_complete(session, _id, STEP, doc_id)
+            logger.info("Technical Design placeholder created run=%s", _id)
+        except Exception as exc:
+            logger.exception("run_technical_design failed run=%s: %s", _id, exc)
+            session.rollback()
+            _step_fail(session, _id, STEP, str(exc))
+
+
 # ── Step 8: QA Agent ──────────────────────────────────────────────────────────
 
 @celery_app.task(
@@ -353,14 +420,19 @@ def run_pm_pipeline(self, run_id: str) -> None:
 # Maps step_name → task function.  Used by pipeline.py so it has one place to look.
 
 STEP_TASKS: dict[str, object] = {
-    "pipeline_start": run_pipeline_start,
-    "ba_documents":   run_ba_agent,
-    "sa_documents":   run_sa_agent,
-    "ux_documents":   run_ux_agent,
-    "dev_tasks":      run_dev_agent,
-    "devops_tasks":   run_devops_agent,
-    "test_cases":     run_qa_agent,
-    "change_impact":  run_change_impact_pipeline,
-    "documentation":  run_documentation_pipeline,
-    "pm_summary":     run_pm_pipeline,
+    # Business Layer
+    "pipeline_start":    run_pipeline_start,
+    "ba_documents":      run_ba_agent,
+    # Design Layer
+    "sa_documents":      run_sa_agent,
+    "ux_documents":      run_ux_agent,
+    "technical_design":  run_technical_design,
+    # Delivery Layer
+    "dev_tasks":         run_dev_agent,
+    "devops_tasks":      run_devops_agent,
+    "test_cases":        run_qa_agent,
+    # On-demand (not in auto-chain)
+    "change_impact":     run_change_impact_pipeline,
+    "documentation":     run_documentation_pipeline,
+    "pm_summary":        run_pm_pipeline,
 }
