@@ -1,5 +1,5 @@
-import uuid
-from datetime import datetime
+﻿import uuid
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
@@ -17,10 +17,10 @@ class _RejectBody(BaseModel):
     reason: str = "Rejected by user"
 
 
-# ── Background tasks ───────────────────────────────────────────────────────────
+# โ”€โ”€ Background tasks โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 def _run_pipeline_background(run_id: uuid.UUID) -> None:
-    """Steps 1+2: Requirement Agent → Gap Analysis Agent (auto-chained)."""
+    """Steps 1+2: Requirement Agent โ’ Gap Analysis Agent (auto-chained)."""
     from app.agents.gap_analysis_agent import GapAnalysisAgentRunner
     from app.agents.requirement_agent import RequirementAgentRunner
     from sqlmodel import Session as _Session
@@ -33,7 +33,7 @@ def _run_pipeline_background(run_id: uuid.UUID) -> None:
 
 
 def _run_ba_agent_background(run_id: uuid.UUID) -> None:
-    """Step 3: BA Agent — triggered by Gate 1 approval."""
+    """Step 3: BA Agent โ€” triggered by Gate 1 approval."""
     from app.agents.ba_agent import BAAgentRunner
     from sqlmodel import Session as _Session
 
@@ -42,7 +42,7 @@ def _run_ba_agent_background(run_id: uuid.UUID) -> None:
 
 
 def _run_sa_agent_background(run_id: uuid.UUID) -> None:
-    """Step 4: SA Agent — triggered by Gate 2 approval."""
+    """Step 4: SA Agent โ€” triggered by Gate 2 approval."""
     from app.agents.sa_agent import SAAgentRunner
     from sqlmodel import Session as _Session
 
@@ -51,7 +51,7 @@ def _run_sa_agent_background(run_id: uuid.UUID) -> None:
 
 
 def _run_ux_agent_background(run_id: uuid.UUID) -> None:
-    """Step 5: UX Agent — triggered by Gate 3 approval."""
+    """Step 5: UX Agent โ€” triggered by Gate 3 approval."""
     from app.agents.ux_agent import UXAgentRunner
     from sqlmodel import Session as _Session
 
@@ -60,7 +60,7 @@ def _run_ux_agent_background(run_id: uuid.UUID) -> None:
 
 
 def _run_dev_agent_background(run_id: uuid.UUID) -> None:
-    """Step 6: Developer Agent — triggered by Gate 4 approval."""
+    """Step 6: Developer Agent โ€” triggered by Gate 4 approval."""
     from app.agents.dev_agent import DevAgentRunner
     from sqlmodel import Session as _Session
 
@@ -69,7 +69,7 @@ def _run_dev_agent_background(run_id: uuid.UUID) -> None:
 
 
 def _run_qa_agent_background(run_id: uuid.UUID) -> None:
-    """Step 7: QA Agent — triggered by Gate 5 approval."""
+    """Step 7: QA Agent โ€” triggered by Gate 5 approval."""
     from app.agents.qa_agent import QAAgentRunner
     from sqlmodel import Session as _Session
 
@@ -77,16 +77,16 @@ def _run_qa_agent_background(run_id: uuid.UUID) -> None:
         QAAgentRunner(session).run(run_id)
 
 
-# ── Gate approval helpers ──────────────────────────────────────────────────────
+# โ”€โ”€ Gate approval helpers โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
-# Maps step_name → next step to create on approval
+# Maps step_name โ’ next step to create on approval
 _NEXT_STEP: dict[str, str | None] = {
-    "gap_analysis": "ba_documents",   # Gate 1: approve → run BA Agent
-    "ba_documents": "sa_documents",   # Gate 2: approve → run SA Agent
-    "sa_documents": "ux_documents",   # Gate 3: approve → run UX Agent
-    "ux_documents": "dev_tasks",      # Gate 4: approve → run Developer Agent
-    "dev_tasks":    "test_cases",     # Gate 5: approve → run QA Agent
-    "test_cases":   None,             # Gate 6: approve → pipeline completed
+    "gap_analysis": "ba_documents",   # Gate 1: approve โ’ run BA Agent
+    "ba_documents": "sa_documents",   # Gate 2: approve โ’ run SA Agent
+    "sa_documents": "ux_documents",   # Gate 3: approve โ’ run UX Agent
+    "ux_documents": "dev_tasks",      # Gate 4: approve โ’ run Developer Agent
+    "dev_tasks":    "test_cases",     # Gate 5: approve โ’ run QA Agent
+    "test_cases":   None,             # Gate 6: approve โ’ pipeline completed
 }
 
 _NEXT_BACKGROUND: dict[str, object] = {
@@ -98,7 +98,7 @@ _NEXT_BACKGROUND: dict[str, object] = {
 }
 
 
-# ── Routes ─────────────────────────────────────────────────────────────────────
+# โ”€โ”€ Routes โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 @router.post("/{project_id}/pipeline/runs", response_model=PipelineRunResponse, status_code=201)
 def start_pipeline_run(
@@ -184,9 +184,9 @@ def approve_step(
             background_tasks.add_task(background_fn, run_id)
         return {"status": "approved", "next": next_step_name}
     else:
-        # Gate 6 (test_cases) — pipeline complete
+        # Gate 6 (test_cases) โ€” pipeline complete
         run.status = PipelineRunStatus.completed
-        run.completed_at = datetime.utcnow()
+        run.completed_at = datetime.now(UTC)
         session.commit()
         return {"status": "approved", "run_id": str(run_id)}
 
@@ -230,4 +230,4 @@ def rerun_step(
     step_id: uuid.UUID,
     session: Session = Depends(get_session),
 ):
-    raise HTTPException(status_code=501, detail={"error_code": "NOT_IMPLEMENTED", "message": "Step rerun — Sprint 14"})
+    raise HTTPException(status_code=501, detail={"error_code": "NOT_IMPLEMENTED", "message": "Step rerun โ€” Sprint 14"})

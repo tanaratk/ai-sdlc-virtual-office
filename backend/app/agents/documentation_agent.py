@@ -1,14 +1,14 @@
-"""Documentation Agent — Pipeline Step 9.
+﻿"""Documentation Agent โ€” Pipeline Step 9.
 
 Collects all available project documents, asks the LLM to write a brief
 executive summary, then assembles the full Compiled Document Set in one
 Markdown bundle with a cover page, TOC, document index, and all content.
 
-No new content is invented — this agent compiles what already exists.
+No new content is invented โ€” this agent compiles what already exists.
 """
 import logging
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Optional
 
 from pydantic import BaseModel
@@ -49,18 +49,18 @@ _DOC_ORDER: list[tuple[DocumentType, str]] = [
 
 _SYSTEM_PROMPT = """\
 You are the Documentation Agent in an AI-powered software factory.
-Your only task right now is to write a concise executive summary (3–5 sentences)
+Your only task right now is to write a concise executive summary (3โ€“5 sentences)
 for the project, based on the requirement summary provided.
 
 RULES:
 - Do NOT invent requirements or design decisions not mentioned in the input.
-- Write in plain English — no jargon, no bullet lists, no headings.
+- Write in plain English โ€” no jargon, no bullet lists, no headings.
 - Return ONLY a JSON object with one key: "executive_summary".
 - Example: {"executive_summary": "This project aims to ..."}
 """
 
 _TASK_TEMPLATE = """\
-Write a 3–5 sentence executive summary for this software project.
+Write a 3โ€“5 sentence executive summary for this software project.
 
 PROJECT NAME: {project_name}
 DOCUMENTS COMPILED: {doc_count}
@@ -85,7 +85,7 @@ class DocumentationAgentRunner:
 
         if agent_row:
             agent_row.status = AgentStatus.working
-            agent_row.updated_at = datetime.utcnow()
+            agent_row.updated_at = datetime.now(UTC)
             self.session.commit()
 
         try:
@@ -109,7 +109,7 @@ class DocumentationAgentRunner:
                 id=doc_id,
                 project_id=project_id,
                 document_type=DocumentType.compiled_documents,
-                title=f"Compiled Document Set — {project_name}",
+                title=f"Compiled Document Set โ€” {project_name}",
                 content_markdown=content,
                 version=1,
                 status=DocumentStatus.review,
@@ -129,7 +129,7 @@ class DocumentationAgentRunner:
 
             if agent_row:
                 agent_row.status = AgentStatus.done
-                agent_row.updated_at = datetime.utcnow()
+                agent_row.updated_at = datetime.now(UTC)
 
             self.session.commit()
             self.session.refresh(compiled)
@@ -146,13 +146,13 @@ class DocumentationAgentRunner:
             if agent_row:
                 try:
                     agent_row.status = AgentStatus.error
-                    agent_row.updated_at = datetime.utcnow()
+                    agent_row.updated_at = datetime.now(UTC)
                     self.session.commit()
                 except Exception:
                     pass
             raise
 
-    # ── helpers ────────────────────────────────────────────────────────────────
+    # โ”€โ”€ helpers โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
     def _get_agent_row(self) -> Optional[Agent]:
         return self.session.exec(
@@ -217,21 +217,21 @@ class DocumentationAgentRunner:
         docs: list[tuple[str, Document]],
         executive_summary: str,
     ) -> str:
-        now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+        now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
 
-        # ── Document index table ──────────────────────────────────────────────
+        # โ”€โ”€ Document index table โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
         index_rows = "".join(
             f"| {label} | {doc.title} | {doc.status} | `{doc.id}` |\n"
             for label, doc in docs
         )
 
-        # ── TOC entries ───────────────────────────────────────────────────────
+        # โ”€โ”€ TOC entries โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
         toc_lines = "\n".join(
             f"{i + 1}. {label}"
             for i, (label, _) in enumerate(docs)
         )
 
-        # ── Document bodies ───────────────────────────────────────────────────
+        # โ”€โ”€ Document bodies โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
         bodies: list[str] = []
         for i, (label, doc) in enumerate(docs, start=1):
             bodies.append(
@@ -255,7 +255,7 @@ class DocumentationAgentRunner:
 **Generated By:** Documentation Agent v1.0.0
 **Pipeline Step:** 9 of 10
 **Compiled At:** {now}
-**Status:** Draft — Awaiting Review
+**Status:** Draft โ€” Awaiting Review
 
 ---
 

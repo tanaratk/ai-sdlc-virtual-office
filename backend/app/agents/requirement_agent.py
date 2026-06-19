@@ -1,12 +1,12 @@
-"""Requirement Agent — Pipeline Step 1.
+﻿"""Requirement Agent โ€” Pipeline Step 1.
 
 Runtime pattern:
-  load inputs → build prompt → call LLM → validate JSON → render Markdown
-  → save Document → update PipelineRun/Step/Agent
+  load inputs โ’ build prompt โ’ call LLM โ’ validate JSON โ’ render Markdown
+  โ’ save Document โ’ update PipelineRun/Step/Agent
 """
 import logging
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -38,7 +38,7 @@ def _cell(s: str) -> str:
 STEP_NAME = "requirement_summary"
 TIMEOUT_SECONDS = 120.0
 
-# ── Output schema (Pydantic validation) ────────────────────────────────────────
+# โ”€โ”€ Output schema (Pydantic validation) โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 class _FR(BaseModel):
     id: str = "FR-001"
@@ -78,7 +78,7 @@ class RequirementSummaryOutput(BaseModel):
     open_questions: list[str] = Field(default_factory=list)
 
 
-# ── System prompt ──────────────────────────────────────────────────────────────
+# โ”€โ”€ System prompt โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 _SYSTEM_PROMPT = """\
 You are the Requirement Agent in an AI-powered software factory.
@@ -91,12 +91,12 @@ Rules:
 - Do not merge separate requirements.
 - Preserve original intent.
 - Use professional English.
-- You MUST return ONLY a valid JSON object — no prose, no markdown wrapping.
+- You MUST return ONLY a valid JSON object โ€” no prose, no markdown wrapping.
 """
 
 _TASK_TEMPLATE = """\
 Analyze the following requirement input(s) and return a JSON object with exactly this schema.
-Return ONLY the JSON — no explanation, no code fences.
+Return ONLY the JSON โ€” no explanation, no code fences.
 
 Schema:
 {{
@@ -125,7 +125,7 @@ REQUIREMENT INPUTS:
 """
 
 
-# ── Markdown renderer ──────────────────────────────────────────────────────────
+# โ”€โ”€ Markdown renderer โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 def _render_markdown(
     data: RequirementSummaryOutput,
@@ -244,7 +244,7 @@ def _render_markdown(
 """
 
 
-# ── Agent runner ───────────────────────────────────────────────────────────────
+# โ”€โ”€ Agent runner โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 class RequirementAgentRunner:
     def __init__(self, session: Session) -> None:
@@ -292,9 +292,9 @@ class RequirementAgentRunner:
             step.status = PipelineStepStatus.completed
             step.agent_id = agent_row.id if agent_row else None
             step.output_document_id = doc.id
-            step.completed_at = datetime.utcnow()
+            step.completed_at = datetime.now(UTC)
 
-            # Create next step — Gap Analysis Agent will pick it up
+            # Create next step โ€” Gap Analysis Agent will pick it up
             gap_step = PipelineStep(
                 pipeline_run_id=run.id,
                 step_name="gap_analysis",
@@ -302,12 +302,12 @@ class RequirementAgentRunner:
             )
             self.session.add(gap_step)
 
-            # Run continues — do not complete yet
+            # Run continues โ€” do not complete yet
             run.current_step = None
 
             if agent_row:
                 agent_row.status = AgentStatus.idle
-                agent_row.updated_at = datetime.utcnow()
+                agent_row.updated_at = datetime.now(UTC)
 
             self._log_activity(run.project_id, agent_row, f"Requirement summary created. FRs: {len(output.functional_requirements)}, Open questions: {len(output.open_questions)}. Proceeding to gap analysis.")
             self.session.commit()
@@ -326,12 +326,12 @@ class RequirementAgentRunner:
                     step.error_message = str(exc)[:2000]
                 if agent_row:
                     agent_row.status = AgentStatus.error
-                    agent_row.updated_at = datetime.utcnow()
+                    agent_row.updated_at = datetime.now(UTC)
                 self.session.commit()
             except Exception:
                 logger.exception("Failed to persist failure state for run=%s", run_id)
 
-    # ── helpers ────────────────────────────────────────────────────────────────
+    # โ”€โ”€ helpers โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
     def _get_run(self, run_id: uuid.UUID) -> PipelineRun:
         run = self.session.get(PipelineRun, run_id)
@@ -383,12 +383,12 @@ class RequirementAgentRunner:
     ) -> None:
         run.status = run_status
         run.current_step = STEP_NAME
-        run.started_at = run.started_at or datetime.utcnow()
+        run.started_at = run.started_at or datetime.now(UTC)
         step.status = step_status
-        step.started_at = step.started_at or datetime.utcnow()
+        step.started_at = step.started_at or datetime.now(UTC)
         if agent_row:
             agent_row.status = agent_status
-            agent_row.updated_at = datetime.utcnow()
+            agent_row.updated_at = datetime.now(UTC)
         self.session.commit()
 
     def _log_activity(self, project_id: uuid.UUID, agent_row: Agent | None, message: str) -> None:

@@ -1,5 +1,5 @@
-import uuid
-from datetime import date, datetime
+﻿import uuid
+from datetime import UTC, date, datetime
 from enum import Enum
 from typing import Any, Optional
 
@@ -8,7 +8,7 @@ from sqlalchemy import Column, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 
-# ── Enums ──────────────────────────────────────────────────────────────────────
+# โ”€โ”€ Enums โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 class ProjectStatus(str, Enum):
     active = "active"
@@ -165,7 +165,7 @@ class MilestoneStatus(str, Enum):
     overdue = "overdue"
 
 
-# ── Models ─────────────────────────────────────────────────────────────────────
+# โ”€โ”€ Models โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 class Project(SQLModel, table=True):
     __tablename__ = "projects"
@@ -175,8 +175,8 @@ class Project(SQLModel, table=True):
     description: Optional[str] = Field(default=None)
     status: ProjectStatus = Field(default=ProjectStatus.active)
     created_by: str = Field(max_length=255)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class RequirementInput(SQLModel, table=True):
@@ -193,7 +193,7 @@ class RequirementInput(SQLModel, table=True):
     metadata_json: Optional[dict[str, Any]] = Field(
         default=None, sa_column=Column(sa.JSON)
     )
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class Agent(SQLModel, table=True):
@@ -217,8 +217,8 @@ class Agent(SQLModel, table=True):
     model_provider: ModelProvider = Field(default=ModelProvider.ollama)
     model_name: str = Field(default="qwen3:8b", max_length=100)
     is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class Task(SQLModel, table=True):
@@ -240,8 +240,8 @@ class Task(SQLModel, table=True):
     output_document_id: Optional[uuid.UUID] = Field(default=None)
     due_date: Optional[datetime] = Field(default=None)
     created_by: str = Field(max_length=255)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class PipelineRun(SQLModel, table=True):
@@ -253,7 +253,7 @@ class PipelineRun(SQLModel, table=True):
     current_step: Optional[str] = Field(default=None, max_length=100)
     started_at: Optional[datetime] = Field(default=None)
     completed_at: Optional[datetime] = Field(default=None)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class Document(SQLModel, table=True):
@@ -270,8 +270,8 @@ class Document(SQLModel, table=True):
         default=None, foreign_key="agents.id"
     )
     approved_by: Optional[str] = Field(default=None, max_length=255)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class PipelineStep(SQLModel, table=True):
@@ -309,7 +309,7 @@ class Message(SQLModel, table=True):
     metadata_json: Optional[dict[str, Any]] = Field(
         default=None, sa_column=Column(sa.JSON)
     )
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class ActivityLog(SQLModel, table=True):
@@ -324,7 +324,7 @@ class ActivityLog(SQLModel, table=True):
     metadata_json: Optional[dict[str, Any]] = Field(
         default=None, sa_column=Column(sa.JSON)
     )
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class TraceabilityLink(SQLModel, table=True):
@@ -337,7 +337,7 @@ class TraceabilityLink(SQLModel, table=True):
     target_type: ArtifactType
     target_id: uuid.UUID
     link_type: LinkType
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class LlmSetting(SQLModel, table=True):
@@ -351,8 +351,8 @@ class LlmSetting(SQLModel, table=True):
     temperature: float = Field(default=0.7)
     max_tokens: int = Field(default=4096)
     is_active: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class AgentMemory(SQLModel, table=True):
@@ -365,7 +365,7 @@ class AgentMemory(SQLModel, table=True):
     content: str
     embedding_id: Optional[str] = Field(default=None, max_length=255)
     importance_score: float = Field(default=0.5)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class Sprint(SQLModel, table=True):
@@ -382,8 +382,8 @@ class Sprint(SQLModel, table=True):
     status: SprintStatus = Field(default=SprintStatus.not_started)
     story_points_total: int = Field(default=0)
     story_points_done: int = Field(default=0)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class Milestone(SQLModel, table=True):
@@ -397,8 +397,8 @@ class Milestone(SQLModel, table=True):
     actual_date: Optional[date] = Field(default=None)
     status: MilestoneStatus = Field(default=MilestoneStatus.not_started)
     mvp_number: int
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class McpToolCategory(str, Enum):
@@ -435,8 +435,8 @@ class McpTool(SQLModel, table=True):
     server_config_json: Optional[dict[str, Any]] = Field(
         default=None, sa_column=Column(sa.JSON)
     )
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class McpToolCall(SQLModel, table=True):
@@ -456,7 +456,7 @@ class McpToolCall(SQLModel, table=True):
     error_message: Optional[str] = Field(default=None)
     requested_by: Optional[str] = Field(default=None, max_length=255)
     resolved_by: Optional[str] = Field(default=None, max_length=255)
-    requested_at: datetime = Field(default_factory=datetime.utcnow)
+    requested_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     resolved_at: Optional[datetime] = Field(default=None)
 
 
@@ -470,8 +470,8 @@ class GitHubSetting(SQLModel, table=True):
     repo_name: str = Field(max_length=255)
     access_token: str
     default_branch: str = Field(default="main", max_length=255)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class GitHubIssue(SQLModel, table=True):
@@ -484,7 +484,7 @@ class GitHubIssue(SQLModel, table=True):
     title: str = Field(max_length=500)
     requirement_ids: Optional[str] = Field(default=None, max_length=500)
     state: str = Field(default="open", max_length=50)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class RagChunk(SQLModel, table=True):
@@ -497,4 +497,4 @@ class RagChunk(SQLModel, table=True):
     chunk_index: int
     chunk_text: str
     embedding_json: Optional[str] = Field(default=None, sa_column=Column(sa.Text))
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

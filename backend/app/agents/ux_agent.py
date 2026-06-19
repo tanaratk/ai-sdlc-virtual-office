@@ -1,11 +1,11 @@
-"""UX Agent — Pipeline Step 5.
+﻿"""UX Agent โ€” Pipeline Step 5.
 
 Reads the approved BRD, FSD, and User Story Backlog and produces:
   - Screen Specification (screen list, field spec, user flows, wireframe notes)
 """
 import logging
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -33,7 +33,7 @@ STEP_NAME = "ux_documents"
 TIMEOUT_SECONDS = 180.0
 
 
-# ── Output schema ──────────────────────────────────────────────────────────────
+# โ”€โ”€ Output schema โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 class _Field(BaseModel):
     name: str
@@ -66,7 +66,7 @@ class UXAgentOutput(BaseModel):
     user_flows: list[_UserFlow] = Field(default_factory=list)
 
 
-# ── Prompts ────────────────────────────────────────────────────────────────────
+# โ”€โ”€ Prompts โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 _SYSTEM_PROMPT = """\
 You are the UX Agent in an AI-powered software factory.
@@ -75,18 +75,18 @@ Your job is to read the BRD, FSD, and User Story Backlog and produce:
   2. User interaction flows (user journeys)
 
 Rules:
-- Every screen must have a unique ID (UI-001, UI-002, …).
+- Every screen must have a unique ID (UI-001, UI-002, โ€ฆ).
 - Every screen must reference a requirement ID (FR-XXX) in requirement_refs.
 - Every field must have a type: text, number, date, dropdown, checkbox, textarea, file, password.
-- Every user flow must have a unique ID (FLOW-001, FLOW-002, …).
+- Every user flow must have a unique ID (FLOW-001, FLOW-002, โ€ฆ).
 - Write flow steps as clear imperative sentences (e.g., "User clicks Submit button").
-- You MUST return ONLY a valid JSON object — no prose, no markdown wrapping.
+- You MUST return ONLY a valid JSON object โ€” no prose, no markdown wrapping.
 """
 
 _TASK_TEMPLATE = """\
 Analyze the following BA documents and produce a Screen Specification
 with a complete field list and user interaction flows.
-Return ONLY the JSON — no explanation, no code fences.
+Return ONLY the JSON โ€” no explanation, no code fences.
 
 Schema:
 {{
@@ -136,26 +136,26 @@ USER STORY BACKLOG:
 """
 
 
-# ── Markdown renderer ──────────────────────────────────────────────────────────
+# โ”€โ”€ Markdown renderer โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 def _render_screen_spec(data: UXAgentOutput, project_id: str, doc_id: str) -> str:
     # Screen list summary table
     screen_rows = ""
     for s in data.screens:
-        refs = ", ".join(s.requirement_refs) if s.requirement_refs else "—"
-        screen_rows += f"| {s.id} | {s.name} | {s.user_role or '—'} | {refs} |\n"
+        refs = ", ".join(s.requirement_refs) if s.requirement_refs else "โ€”"
+        screen_rows += f"| {s.id} | {s.name} | {s.user_role or 'โ€”'} | {refs} |\n"
     if not screen_rows:
-        screen_rows = "| — | No screens defined | — | — |\n"
+        screen_rows = "| โ€” | No screens defined | โ€” | โ€” |\n"
 
     # Detailed screen specs
     screens_detail = ""
     for s in data.screens:
-        refs = ", ".join(s.requirement_refs) if s.requirement_refs else "—"
+        refs = ", ".join(s.requirement_refs) if s.requirement_refs else "โ€”"
 
         field_rows = ""
         for f in s.fields:
             req_str = "Yes" if f.required else "No"
-            val = f.validation if f.validation else "—"
+            val = f.validation if f.validation else "โ€”"
             field_rows += f"| `{f.name}` | {f.type} | {req_str} | {val} | {f.description} |\n"
 
         actions_str = "\n".join(f"- `{a}`" for a in s.actions) if s.actions else "> No actions defined."
@@ -164,9 +164,9 @@ def _render_screen_spec(data: UXAgentOutput, project_id: str, doc_id: str) -> st
         _fld_block = (_fld_hdr + field_rows) if field_rows else "> No input fields on this screen."
 
         screens_detail += f"""
-### {s.id} — {s.name}
+### {s.id} โ€” {s.name}
 
-**User Role:** {s.user_role or "—"}
+**User Role:** {s.user_role or "โ€”"}
 **Requirement Refs:** {refs}
 
 {s.description}
@@ -189,11 +189,11 @@ def _render_screen_spec(data: UXAgentOutput, project_id: str, doc_id: str) -> st
     # User flows
     flows_detail = ""
     for flow in data.user_flows:
-        ref = f" ← {flow.requirement_ref}" if flow.requirement_ref else ""
+        ref = f" โ {flow.requirement_ref}" if flow.requirement_ref else ""
         steps_str = "\n".join(f"{step}" for step in flow.steps) if flow.steps \
             else "> No steps defined."
         flows_detail += f"""
-### {flow.id}{ref} — {flow.name}
+### {flow.id}{ref} โ€” {flow.name}
 
 {steps_str}
 
@@ -207,7 +207,7 @@ def _render_screen_spec(data: UXAgentOutput, project_id: str, doc_id: str) -> st
 **Document ID:** `{doc_id}`
 **Generated By:** UX Agent v1.0.0
 **Pipeline Step:** 5 of 10
-**Status:** Draft → Awaiting Review
+**Status:** Draft โ’ Awaiting Review
 **Total Screens:** {len(data.screens)}
 **Total User Flows:** {len(data.user_flows)}
 
@@ -228,7 +228,7 @@ def _render_screen_spec(data: UXAgentOutput, project_id: str, doc_id: str) -> st
 {flows_detail if flows_detail else "> No user flows defined."}"""
 
 
-# ── Agent runner ───────────────────────────────────────────────────────────────
+# โ”€โ”€ Agent runner โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 class UXAgentRunner:
     def __init__(self, session: Session) -> None:
@@ -242,7 +242,7 @@ class UXAgentRunner:
             run = self._get_run(run_id)
 
             if run.status == PipelineRunStatus.failed:
-                logger.info("UXAgent skipped — run %s already failed", run_id)
+                logger.info("UXAgent skipped โ€” run %s already failed", run_id)
                 return
 
             step = self._get_step(run_id)
@@ -251,10 +251,10 @@ class UXAgentRunner:
             run.status = PipelineRunStatus.running
             run.current_step = STEP_NAME
             step.status = PipelineStepStatus.running
-            step.started_at = datetime.utcnow()
+            step.started_at = datetime.now(UTC)
             if agent_row:
                 agent_row.status = AgentStatus.working
-                agent_row.updated_at = datetime.utcnow()
+                agent_row.updated_at = datetime.now(UTC)
             self.session.commit()
 
             brd_doc, fsd_doc, us_doc = self._load_ba_documents(run.project_id)
@@ -291,15 +291,15 @@ class UXAgentRunner:
             step.status = PipelineStepStatus.completed
             step.agent_id = agent_row.id if agent_row else None
             step.output_document_id = screen_doc.id
-            step.completed_at = datetime.utcnow()
+            step.completed_at = datetime.now(UTC)
 
-            # Gate 4 — wait for human review of Screen Specification
+            # Gate 4 โ€” wait for human review of Screen Specification
             run.status = PipelineRunStatus.waiting_for_user
             run.current_step = STEP_NAME
 
             if agent_row:
                 agent_row.status = AgentStatus.done
-                agent_row.updated_at = datetime.utcnow()
+                agent_row.updated_at = datetime.now(UTC)
 
             self._log_activity(
                 run.project_id, agent_row,
@@ -325,12 +325,12 @@ class UXAgentRunner:
                     step.error_message = str(exc)[:2000]
                 if agent_row:
                     agent_row.status = AgentStatus.error
-                    agent_row.updated_at = datetime.utcnow()
+                    agent_row.updated_at = datetime.now(UTC)
                 self.session.commit()
             except Exception:
                 logger.exception("Failed to persist failure state for run=%s", run_id)
 
-    # ── helpers ────────────────────────────────────────────────────────────────
+    # โ”€โ”€ helpers โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
     def _get_run(self, run_id: uuid.UUID) -> PipelineRun:
         run = self.session.get(PipelineRun, run_id)

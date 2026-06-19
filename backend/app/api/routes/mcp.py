@@ -1,6 +1,6 @@
-"""MCP API — tool registry and call management."""
+﻿"""MCP API โ€” tool registry and call management."""
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -16,14 +16,14 @@ from app.db.models import (
 )
 from app.services.mcp_service import run_call
 
-# Global tool registry (prefix: none  → /mcp/tools/...)
+# Global tool registry (prefix: none  โ’ /mcp/tools/...)
 tool_router = APIRouter()
 
-# Per-project call management (prefix: /projects → /projects/{project_id}/mcp/...)
+# Per-project call management (prefix: /projects โ’ /projects/{project_id}/mcp/...)
 call_router = APIRouter()
 
 
-# ── Schemas ────────────────────────────────────────────────────────────────────
+# โ”€โ”€ Schemas โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 class McpToolResponse(BaseModel):
     id: uuid.UUID
@@ -69,7 +69,7 @@ class ResolveRequest(BaseModel):
     resolved_by: str = "user"
 
 
-# ── Tool registry (global) ────────────────────────────────────────────────────
+# โ”€โ”€ Tool registry (global) โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 @tool_router.get(
     "/mcp/tools",
@@ -99,13 +99,13 @@ def update_mcp_tool(
     if not tool:
         raise HTTPException(status_code=404, detail=f"Tool '{tool_name}' not found")
     tool.is_enabled = body.is_enabled
-    tool.updated_at = datetime.utcnow()
+    tool.updated_at = datetime.now(UTC)
     session.commit()
     session.refresh(tool)
     return McpToolResponse.model_validate(tool)
 
 
-# ── Per-project call routes ────────────────────────────────────────────────────
+# โ”€โ”€ Per-project call routes โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 @call_router.get(
     "/{project_id}/mcp/calls",
@@ -236,13 +236,13 @@ def reject_mcp_call(
     call = _get_pending_call(session, project_id, call_id)
     call.status = McpCallStatus.rejected
     call.resolved_by = body.resolved_by
-    call.resolved_at = datetime.utcnow()
+    call.resolved_at = datetime.now(UTC)
     session.commit()
     session.refresh(call)
     return _call_response(call)
 
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
+# โ”€โ”€ Helpers โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 def _get_pending_call(
     session: Session, project_id: uuid.UUID, call_id: uuid.UUID
@@ -258,7 +258,7 @@ def _get_pending_call(
     if call.status != McpCallStatus.pending:
         raise HTTPException(
             status_code=409,
-            detail=f"Call is already '{call.status}' — only pending calls can be resolved",
+            detail=f"Call is already '{call.status}' โ€” only pending calls can be resolved",
         )
     return call
 

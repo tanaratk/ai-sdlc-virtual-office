@@ -1,11 +1,11 @@
-"""MCP tool executor — runs approved tool calls.
+﻿"""MCP tool executor โ€” runs approved tool calls.
 
 Each tool either executes real logic (github.* tools via github_service)
 or returns a stub result for tools not yet implemented.
 Agents will be wired to this service when LangGraph is added.
 """
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlmodel import Session, select
@@ -43,7 +43,7 @@ def execute_call(call: McpToolCall, session: Session) -> dict[str, Any]:
     return _stub_result(call.tool_name)
 
 
-# ── GitHub executors ───────────────────────────────────────────────────────────
+# โ”€โ”€ GitHub executors โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 def _get_github_repo(call: McpToolCall, session: Session) -> GitHubRepo:
     setting = session.exec(
@@ -101,7 +101,7 @@ def _exec_github_list_issues(call: McpToolCall, session: Session) -> dict[str, A
         raise McpExecutionError(str(e))
 
 
-# ── Stub ───────────────────────────────────────────────────────────────────────
+# โ”€โ”€ Stub โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 def _stub_result(tool_name: str) -> dict[str, Any]:
     return {
@@ -113,7 +113,7 @@ def _stub_result(tool_name: str) -> dict[str, Any]:
     }
 
 
-# ── Call lifecycle helper ──────────────────────────────────────────────────────
+# โ”€โ”€ Call lifecycle helper โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 def run_call(call: McpToolCall, session: Session) -> McpToolCall:
     """Execute a call and update its status in the DB. Returns updated call."""
@@ -134,7 +134,7 @@ def run_call(call: McpToolCall, session: Session) -> McpToolCall:
         call.error_message = f"Unexpected error: {exc}"
         logger.exception("MCP call %s unexpected error", call.id)
     finally:
-        call.resolved_at = datetime.utcnow()
+        call.resolved_at = datetime.now(UTC)
         session.commit()
         session.refresh(call)
 

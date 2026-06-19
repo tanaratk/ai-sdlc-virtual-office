@@ -1,6 +1,6 @@
-"""GitHub Integration API — /projects/{project_id}/github/..."""
+﻿"""GitHub Integration API โ€” /projects/{project_id}/github/..."""
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -23,7 +23,7 @@ from app.services.github_service import (
 router = APIRouter()
 
 
-# ── Request / Response schemas ─────────────────────────────────────────────────
+# โ”€โ”€ Request / Response schemas โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 class GitHubSettingUpsert(BaseModel):
     repo_owner: str = Field(min_length=1, max_length=255)
@@ -82,7 +82,7 @@ class CreateBranchResponse(BaseModel):
     sha: str
 
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
+# โ”€โ”€ Helpers โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 def _get_project_or_404(session: Session, project_id: uuid.UUID) -> Project:
     project = session.get(Project, project_id)
@@ -113,7 +113,7 @@ def _to_repo(s: GitHubSetting) -> GitHubRepo:
     )
 
 
-# ── Settings routes ────────────────────────────────────────────────────────────
+# โ”€โ”€ Settings routes โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 @router.get(
     "/{project_id}/github/settings",
@@ -166,7 +166,7 @@ def upsert_github_settings(
         select(GitHubSetting).where(GitHubSetting.project_id == project_id)
     ).first()
 
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     if existing:
         existing.repo_owner = body.repo_owner
         existing.repo_name = body.repo_name
@@ -223,7 +223,7 @@ def verify_github(
     )
 
 
-# ── Issues routes ──────────────────────────────────────────────────────────────
+# โ”€โ”€ Issues routes โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 @router.get(
     "/{project_id}/github/issues",
@@ -342,7 +342,7 @@ def create_github_issues(
     )
 
 
-# ── Branch route ───────────────────────────────────────────────────────────────
+# โ”€โ”€ Branch route โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 @router.post(
     "/{project_id}/github/branches",

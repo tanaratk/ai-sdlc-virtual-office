@@ -1,5 +1,5 @@
-import uuid
-from datetime import datetime
+﻿import uuid
+from datetime import UTC, datetime
 
 from sqlmodel import Session, func, select
 
@@ -46,7 +46,7 @@ class ProjectService:
             return None
         for field, value in data.model_dump(exclude_unset=True).items():
             setattr(project, field, value)
-        project.updated_at = datetime.utcnow()
+        project.updated_at = datetime.now(UTC)
         self.session.add(project)
         self.session.commit()
         self.session.refresh(project)

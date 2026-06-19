@@ -1,4 +1,4 @@
-"""QA Agent — Pipeline Step 7.
+﻿"""QA Agent โ€” Pipeline Step 7.
 
 Reads approved FSD, User Stories, API Spec, and (optionally) Screen Spec to produce:
   - Test Cases document (functional, API, edge-case, negative)
@@ -6,7 +6,7 @@ Reads approved FSD, User Stories, API Spec, and (optionally) Screen Spec to prod
 """
 import logging
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -39,7 +39,7 @@ STEP_NAME = "test_cases"
 TIMEOUT_SECONDS = 300.0
 
 
-# ── Output schemas ─────────────────────────────────────────────────────────────
+# โ”€โ”€ Output schemas โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 class _FunctionalTC(BaseModel):
     id: str = "TC-001"
@@ -57,7 +57,7 @@ class _ApiTC(BaseModel):
     api_ref: str = ""
     method: str = "GET"
     endpoint: str
-    request_body: str = "—"
+    request_body: str = "โ€”"
     expected_status: int = 200
     expected_response: str = ""
     priority: str = "High"
@@ -98,7 +98,7 @@ class QAAgentOutput(BaseModel):
     minimum_pass_rate: int = 95
 
 
-# ── Prompts ────────────────────────────────────────────────────────────────────
+# โ”€โ”€ Prompts โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 _SYSTEM_PROMPT = """\
 You are the QA Agent in an AI-powered software factory.
@@ -108,16 +108,16 @@ then produce comprehensive Test Cases and a UAT Script.
 CRITICAL RULES:
 - Every FSD specification (FSD-XXX) must have at least one functional test case.
 - Every API endpoint (API-XXX) must have at least one API test case (happy path + at least one error case).
-- Assign TC-XXX IDs GLOBALLY — do not restart numbering per section.
+- Assign TC-XXX IDs GLOBALLY โ€” do not restart numbering per section.
   Functional: TC-001..., API: TC-010+, Edge: TC-020+, Negative: TC-030+.
-- UAT scenarios must be written in plain language for non-technical business users — no technical jargon.
-- Do NOT write test code — test case descriptions and steps only.
-- You MUST return ONLY a valid JSON object — no prose, no markdown wrapping.
+- UAT scenarios must be written in plain language for non-technical business users โ€” no technical jargon.
+- Do NOT write test code โ€” test case descriptions and steps only.
+- You MUST return ONLY a valid JSON object โ€” no prose, no markdown wrapping.
 """
 
 _TASK_TEMPLATE = """\
 Analyze the following approved documents and produce a comprehensive QA document.
-Return ONLY the JSON — no explanation, no code fences.
+Return ONLY the JSON โ€” no explanation, no code fences.
 
 Schema:
 {{
@@ -160,7 +160,7 @@ Schema:
       "fsd_ref": "FSD-001",
       "scenario": "missing required field X",
       "invalid_input": "request without field X",
-      "expected_error": "422 VALIDATION_ERROR — field required"
+      "expected_error": "422 VALIDATION_ERROR โ€” field required"
     }}
   ],
   "uat_scenarios": [
@@ -194,16 +194,16 @@ SCREEN SPECIFICATION:
 """
 
 
-# ── Markdown renderers ─────────────────────────────────────────────────────────
+# โ”€โ”€ Markdown renderers โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 def _render_test_cases(data: QAAgentOutput, project_id: str, doc_id: str,
                        fsd_id: str, story_id: str, api_id: str) -> str:
     def _func_rows(tests: list[_FunctionalTC]) -> str:
         if not tests:
-            return "| — | — | — | — | — | — | — | — |\n"
+            return "| โ€” | โ€” | โ€” | โ€” | โ€” | โ€” | โ€” | โ€” |\n"
         rows = ""
         for t in tests:
-            steps = " ".join(f"{i+1}. {s}" for i, s in enumerate(t.steps)) or "—"
+            steps = " ".join(f"{i+1}. {s}" for i, s in enumerate(t.steps)) or "โ€”"
             rows += (
                 f"| {t.id} | {t.fsd_ref} | {t.story_ref} | {t.description} "
                 f"| {t.precondition} | {steps} | {t.expected_result} | {t.priority} |\n"
@@ -212,7 +212,7 @@ def _render_test_cases(data: QAAgentOutput, project_id: str, doc_id: str,
 
     def _api_rows(tests: list[_ApiTC]) -> str:
         if not tests:
-            return "| — | — | — | — | — | — | — | — |\n"
+            return "| โ€” | โ€” | โ€” | โ€” | โ€” | โ€” | โ€” | โ€” |\n"
         rows = ""
         for t in tests:
             rows += (
@@ -223,7 +223,7 @@ def _render_test_cases(data: QAAgentOutput, project_id: str, doc_id: str,
 
     def _edge_rows(tests: list[_EdgeTC]) -> str:
         if not tests:
-            return "| — | — | — | — | — |\n"
+            return "| โ€” | โ€” | โ€” | โ€” | โ€” |\n"
         return "".join(
             f"| {t.id} | {t.fsd_ref} | {t.scenario} | {t.input} | {t.expected_behaviour} |\n"
             for t in tests
@@ -231,7 +231,7 @@ def _render_test_cases(data: QAAgentOutput, project_id: str, doc_id: str,
 
     def _neg_rows(tests: list[_NegativeTC]) -> str:
         if not tests:
-            return "| — | — | — | — | — |\n"
+            return "| โ€” | โ€” | โ€” | โ€” | โ€” |\n"
         return "".join(
             f"| {t.id} | {t.fsd_ref} | {t.scenario} | {t.invalid_input} | {t.expected_error} |\n"
             for t in tests
@@ -248,7 +248,7 @@ def _render_test_cases(data: QAAgentOutput, project_id: str, doc_id: str,
 **Generated By:** QA Agent v1.0.0
 **Pipeline Step:** 7 of 10
 **Source Documents:** FSD `{fsd_id}`, User Stories `{story_id}`, API Spec `{api_id}`
-**Status:** Draft → Awaiting Review
+**Status:** Draft โ’ Awaiting Review
 
 ---
 
@@ -299,13 +299,13 @@ def _render_test_cases(data: QAAgentOutput, project_id: str, doc_id: str,
 def _render_uat_script(data: QAAgentOutput, project_id: str, doc_id: str) -> str:
     def _uat_rows(scenarios: list[_UATScenario]) -> str:
         if not scenarios:
-            return "| — | — | — | — | — | — | — |\n"
+            return "| โ€” | โ€” | โ€” | โ€” | โ€” | โ€” | โ€” |\n"
         rows = ""
         for s in scenarios:
-            steps = " ".join(f"{i+1}. {st}" for i, st in enumerate(s.steps)) or "—"
+            steps = " ".join(f"{i+1}. {st}" for i, st in enumerate(s.steps)) or "โ€”"
             rows += (
                 f"| {s.id} | {s.story_ref} | {s.description} | {s.actor} "
-                f"| {steps} | {s.expected_outcome} | ☐ Pass / ☐ Fail |\n"
+                f"| {steps} | {s.expected_outcome} | โ Pass / โ Fail |\n"
             )
         return rows
 
@@ -319,7 +319,7 @@ def _render_uat_script(data: QAAgentOutput, project_id: str, doc_id: str) -> str
 **Document ID:** `{doc_id}`
 **Generated By:** QA Agent v1.0.0
 **Pipeline Step:** 7 of 10
-**Status:** Draft → Awaiting Review
+**Status:** Draft โ’ Awaiting Review
 
 ---
 
@@ -356,7 +356,7 @@ def _render_uat_script(data: QAAgentOutput, project_id: str, doc_id: str) -> str
 """
 
 
-# ── Agent runner ───────────────────────────────────────────────────────────────
+# โ”€โ”€ Agent runner โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 class QAAgentRunner:
     def __init__(self, session: Session) -> None:
@@ -370,7 +370,7 @@ class QAAgentRunner:
             run = self._get_run(run_id)
 
             if run.status == PipelineRunStatus.failed:
-                logger.info("QAAgent skipped — run %s already failed", run_id)
+                logger.info("QAAgent skipped โ€” run %s already failed", run_id)
                 return
 
             step = self._get_step(run_id)
@@ -379,10 +379,10 @@ class QAAgentRunner:
             run.status = PipelineRunStatus.running
             run.current_step = STEP_NAME
             step.status = PipelineStepStatus.running
-            step.started_at = datetime.utcnow()
+            step.started_at = datetime.now(UTC)
             if agent_row:
                 agent_row.status = AgentStatus.working
-                agent_row.updated_at = datetime.utcnow()
+                agent_row.updated_at = datetime.now(UTC)
             self.session.commit()
 
             fsd_doc, story_doc, api_doc, screen_doc = \
@@ -441,15 +441,15 @@ class QAAgentRunner:
             step.status = PipelineStepStatus.completed
             step.agent_id = agent_row.id if agent_row else None
             step.output_document_id = tc_doc.id
-            step.completed_at = datetime.utcnow()
+            step.completed_at = datetime.now(UTC)
 
-            # Gate 6 — wait for human review before proceeding
+            # Gate 6 โ€” wait for human review before proceeding
             run.status = PipelineRunStatus.waiting_for_user
             run.current_step = STEP_NAME
 
             if agent_row:
                 agent_row.status = AgentStatus.done
-                agent_row.updated_at = datetime.utcnow()
+                agent_row.updated_at = datetime.now(UTC)
 
             total_tc = (len(output.functional_tests) + len(output.api_tests)
                         + len(output.edge_case_tests) + len(output.negative_tests))
@@ -479,12 +479,12 @@ class QAAgentRunner:
                     step.error_message = str(exc)[:2000]
                 if agent_row:
                     agent_row.status = AgentStatus.error
-                    agent_row.updated_at = datetime.utcnow()
+                    agent_row.updated_at = datetime.now(UTC)
                 self.session.commit()
             except Exception:
                 logger.exception("Failed to persist failure state for run=%s", run_id)
 
-    # ── helpers ────────────────────────────────────────────────────────────────
+    # โ”€โ”€ helpers โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
     def _get_run(self, run_id: uuid.UUID) -> PipelineRun:
         run = self.session.get(PipelineRun, run_id)
