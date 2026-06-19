@@ -8,6 +8,7 @@ from app.api.routes import (
     change_impact,
     documents,
     documentation,
+    generated_code,
     github,
     health,
     inputs,
@@ -48,3 +49,4 @@ api_router.include_router(github.router, prefix="/projects", tags=["GitHub"])
 api_router.include_router(mcp.tool_router, tags=["MCP"])
 api_router.include_router(mcp.call_router, prefix="/projects", tags=["MCP"])
 api_router.include_router(rag.router, prefix="/projects", tags=["RAG"])
+api_router.include_router(generated_code.router, prefix="/projects", tags=["Generated Code"])

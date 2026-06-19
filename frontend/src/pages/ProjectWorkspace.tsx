@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import {
   Upload, Bot, FileText, GitBranch, Building2, Zap,
-  Github, Wrench, BookOpen, ClipboardList, Database,
+  Github, Wrench, BookOpen, ClipboardList, Database, Code2,
   CheckCircle2, Circle, ArrowRight,
 } from "lucide-react";
 import { projectApi } from "@/services/projectApi";
@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 // ── Tool links grid ───────────────────────────────────────────────────────────
 
 const TOOLS = [
+  { label: "Generated Code", icon: Code2,        sub: "View & download code files", href: (id: string) => `/projects/${id}/generated-code` },
   { label: "Traceability",   icon: GitBranch,    sub: "Coverage matrix",          href: (id: string) => `/projects/${id}/traceability` },
   { label: "Virtual Office", icon: Building2,    sub: "Live agent status",        href: (id: string) => `/projects/${id}/office` },
   { label: "Change Impact",  icon: Zap,          sub: "Analyse requirement changes", href: (id: string) => `/projects/${id}/change-impact` },

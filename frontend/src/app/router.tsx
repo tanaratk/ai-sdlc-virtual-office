@@ -26,6 +26,7 @@ import McpPage from "@/pages/McpPage";
 import RAGPage from "@/pages/RAGPage";
 import Settings from "@/pages/Settings";
 import MonitoringPage from "@/pages/MonitoringPage";
+import GeneratedCodePage from "@/pages/GeneratedCodePage";
 
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
@@ -63,6 +64,7 @@ export const router = createBrowserRouter([
       { path: "projects/:projectId/github", element: <GitHubPage /> },
       { path: "projects/:projectId/mcp", element: <McpPage /> },
       { path: "projects/:projectId/rag", element: <RAGPage /> },
+      { path: "projects/:projectId/generated-code", element: <GeneratedCodePage /> },
       { path: "mcp", element: <McpPage /> },
       { path: "intake", element: <RequirementIntake /> },
       { path: "agents", element: <AgentManagerPage /> },
