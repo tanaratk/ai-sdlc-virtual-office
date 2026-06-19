@@ -63,7 +63,7 @@
 | **Phase 3** | **Enterprise Pipeline (3-Layer Architecture)** | 🔲 Next |
 | 30-pre | Agent Skill Document (skill.md per agent, editable in UI) | ✅ Done |
 | 30 | Pipeline Rewire — 3-Layer Architecture | ✅ Done |
-| 31 | Agent File Output — write docs to workspace | 🔲 Planned |
+| 31 | Agent File Output — write docs to workspace | ✅ Done |
 | 32 | Technical Design Agent (NEW) | 🔲 Planned |
 | 33 | Code Review Agent (NEW) | 🔲 Planned |
 | 34 | QA Agent Rewrite — gen test files + run | 🔲 Planned |
