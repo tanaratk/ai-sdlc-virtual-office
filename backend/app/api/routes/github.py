@@ -1,4 +1,6 @@
-﻿"""GitHub Integration API โ€” /projects/{project_id}/github/..."""
+"""GitHub Integration API -- /projects/{project_id}/github/..."""
+import os
+import re
 import uuid
 from datetime import UTC, datetime
 from typing import Annotated, Optional
@@ -15,15 +17,17 @@ from app.services.github_service import (
     build_issue_body,
     create_branch,
     create_issue,
+    create_repo,
     list_issues,
     parse_tasks_from_markdown,
+    push_file,
     verify_connection,
 )
 
 router = APIRouter()
 
 
-# โ”€โ”€ Request / Response schemas โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# โ"€โ"€ Request / Response schemas โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€
 
 class GitHubSettingUpsert(BaseModel):
     repo_owner: str = Field(min_length=1, max_length=255)
@@ -82,7 +86,7 @@ class CreateBranchResponse(BaseModel):
     sha: str
 
 
-# โ”€โ”€ Helpers โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# โ"€โ"€ Helpers โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€
 
 def _get_project_or_404(session: Session, project_id: uuid.UUID) -> Project:
     project = session.get(Project, project_id)
@@ -113,7 +117,7 @@ def _to_repo(s: GitHubSetting) -> GitHubRepo:
     )
 
 
-# โ”€โ”€ Settings routes โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# โ"€โ"€ Settings routes โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€
 
 @router.get(
     "/{project_id}/github/settings",
@@ -223,7 +227,7 @@ def verify_github(
     )
 
 
-# โ”€โ”€ Issues routes โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# โ"€โ"€ Issues routes โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€
 
 @router.get(
     "/{project_id}/github/issues",
@@ -342,7 +346,7 @@ def create_github_issues(
     )
 
 
-# โ”€โ”€ Branch route โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# โ"€โ"€ Branch route โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€
 
 @router.post(
     "/{project_id}/github/branches",
@@ -363,3 +367,102 @@ def create_github_branch(
     except GitHubServiceError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return CreateBranchResponse(**result)
+
+
+# ── Push Generated Application to a new GitHub repo ──────────────────────────
+
+class PushAppRequest(BaseModel):
+    repo_name: Optional[str] = None   # defaults to {project_name}-app
+    private: bool = False
+
+
+class PushAppResponse(BaseModel):
+    repo_url: str
+    repo_full_name: str
+    files_pushed: int
+    errors: list[str]
+
+
+def _resolve_generated_dir(project: Project) -> str:
+    raw = project.workspace_path or "/workspace"
+    container_path = re.sub(
+        r"^[A-Za-z]:[/\\]workspace", "/workspace", raw, flags=re.IGNORECASE
+    )
+    if not container_path.startswith("/workspace"):
+        container_path = "/workspace"
+    safe_name = re.sub(r"[^\w\-]", "_", project.name or "project")
+    return os.path.join(container_path, safe_name, "generated_app")
+
+
+def _safe_repo_name(name: str) -> str:
+    slug = re.sub(r"[^\w\-.]", "-", name).strip("-").lower()
+    return f"{slug or 'project'}-app"
+
+
+@router.post(
+    "/{project_id}/github/push-app",
+    response_model=PushAppResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a new GitHub repo and push the generated application files",
+)
+def push_generated_app(
+    project_id: uuid.UUID,
+    body: PushAppRequest,
+    session: Annotated[Session, Depends(get_session)],
+) -> PushAppResponse:
+    project = _get_project_or_404(session, project_id)
+    s = _get_settings_or_404(session, project_id)
+
+    gen_dir = _resolve_generated_dir(project)
+    if not os.path.isdir(gen_dir):
+        raise HTTPException(
+            status_code=404,
+            detail="No generated code found. Run the Developer Agent pipeline step first.",
+        )
+
+    repo_name = body.repo_name or _safe_repo_name(project.name or "project")
+
+    # Create the new repo
+    try:
+        repo_info = create_repo(
+            token=s.access_token,
+            repo_name=repo_name,
+            description=f"Generated by AI-SDLC Working Office — {project.name}",
+            private=body.private,
+        )
+    except GitHubServiceError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    push_repo = GitHubRepo(
+        owner=s.repo_owner,
+        name=repo_name,
+        token=s.access_token,
+    )
+
+    # Collect and push all files
+    errors: list[str] = []
+    pushed = 0
+
+    for root, _dirs, files in os.walk(gen_dir):
+        for fname in sorted(files):
+            full_path = os.path.join(root, fname)
+            rel_path = os.path.relpath(full_path, gen_dir).replace("\\", "/")
+            try:
+                with open(full_path, "rb") as f:
+                    content = f.read()
+                push_file(
+                    repo=push_repo,
+                    path=rel_path,
+                    content_bytes=content,
+                    commit_message=f"feat: add {rel_path}",
+                )
+                pushed += 1
+            except (GitHubServiceError, OSError) as exc:
+                errors.append(f"{rel_path}: {exc}")
+
+    return PushAppResponse(
+        repo_url=repo_info["html_url"],
+        repo_full_name=repo_info["full_name"],
+        files_pushed=pushed,
+        errors=errors,
+    )

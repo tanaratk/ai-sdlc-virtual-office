@@ -1,4 +1,5 @@
 """GitHub REST API service — wraps httpx calls to api.github.com."""
+import base64
 import re
 from dataclasses import dataclass
 
@@ -197,6 +198,64 @@ def parse_tasks_from_markdown(markdown: str) -> list[ParsedTask]:
         ))
 
     return tasks
+
+
+def create_repo(
+    token: str,
+    repo_name: str,
+    description: str = "",
+    private: bool = False,
+) -> dict:
+    """Create a new GitHub repo under the authenticated user."""
+    url = f"{_BASE}/user/repos"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    with httpx.Client(timeout=_TIMEOUT) as client:
+        resp = client.post(url, headers=headers, json={
+            "name":        repo_name,
+            "description": description,
+            "private":     private,
+            "auto_init":   False,
+        })
+    if resp.status_code == 422:
+        raise GitHubServiceError(
+            f"Repo '{repo_name}' already exists or name is invalid. "
+            "Change the repo name or delete the existing repo first."
+        )
+    if not resp.is_success:
+        raise GitHubServiceError(f"Cannot create repo: {resp.status_code} {resp.text[:300]}")
+    data = resp.json()
+    return {"html_url": data["html_url"], "full_name": data["full_name"]}
+
+
+def push_file(
+    repo: GitHubRepo,
+    path: str,
+    content_bytes: bytes,
+    commit_message: str,
+) -> None:
+    """Create or update a single file in the repo via Contents API."""
+    url = f"{_BASE}/repos/{repo.owner}/{repo.name}/contents/{path}"
+    b64 = base64.b64encode(content_bytes).decode()
+
+    # Check if file exists (need SHA to update)
+    sha: str | None = None
+    with httpx.Client(timeout=_TIMEOUT) as client:
+        check = client.get(url, headers=repo._headers)
+        if check.status_code == 200:
+            sha = check.json().get("sha")
+
+    payload: dict = {"message": commit_message, "content": b64}
+    if sha:
+        payload["sha"] = sha
+
+    with httpx.Client(timeout=_TIMEOUT) as client:
+        resp = client.put(url, headers=repo._headers, json=payload)
+    if not resp.is_success:
+        raise GitHubServiceError(f"Failed to push '{path}': {resp.status_code} {resp.text[:200]}")
 
 
 def build_issue_body(task: ParsedTask, project_name: str) -> str:

@@ -43,6 +43,18 @@ export interface GitHubSettingUpsert {
   default_branch?: string;
 }
 
+export interface PushAppRequest {
+  repo_name?: string;
+  private?: boolean;
+}
+
+export interface PushAppResponse {
+  repo_url: string;
+  repo_full_name: string;
+  files_pushed: number;
+  errors: string[];
+}
+
 async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
   if (!res.ok) {
@@ -79,5 +91,12 @@ export const githubApi = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ branch_name: branchName, from_branch: fromBranch ?? null }),
+    }),
+
+  pushApp: (projectId: string, body?: PushAppRequest) =>
+    apiFetch<PushAppResponse>(`${base(projectId)}/push-app`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body ?? {}),
     }),
 };

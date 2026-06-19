@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { Download, FileCode2, FolderOpen, Loader2, AlertCircle, Code2 } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Download, FileCode2, FolderOpen, Loader2, AlertCircle, Code2, Github, ExternalLink, CheckCircle2, XCircle } from "lucide-react";
 import { generatedCodeApi, type FileEntry } from "@/services/generatedCodeApi";
+import { githubApi, type PushAppResponse } from "@/services/githubApi";
 import { cn } from "@/lib/utils";
 
 // ── Language badge colour ─────────────────────────────────────────────────────
@@ -111,6 +112,8 @@ function FileTree({ files, selectedPath, onSelect }: FileTreeProps) {
 export default function GeneratedCodePage() {
   const { projectId } = useParams<{ projectId: string }>();
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [pushResult, setPushResult] = useState<PushAppResponse | null>(null);
+  const [pushError, setPushError] = useState<string | null>(null);
 
   const { data: tree, isLoading: treeLoading } = useQuery({
     queryKey: ["generated-code-tree", projectId],
@@ -126,8 +129,20 @@ export default function GeneratedCodePage() {
     staleTime: 60_000,
   });
 
-  const downloadUrl = projectId ? generatedCodeApi.getDownloadUrl(projectId) : null;
+  const pushMutation = useMutation({
+    mutationFn: () => githubApi.pushApp(projectId!),
+    onSuccess: (data) => {
+      setPushResult(data);
+      setPushError(null);
+    },
+    onError: (err: Error) => {
+      setPushError(err.message);
+      setPushResult(null);
+    },
+  });
 
+  const downloadUrl = projectId ? generatedCodeApi.getDownloadUrl(projectId) : null;
+  const hasFiles = !treeLoading && tree?.exists && tree.files.length > 0;
   const noFiles = !treeLoading && tree && (!tree.exists || tree.files.length === 0);
 
   return (
@@ -143,17 +158,81 @@ export default function GeneratedCodePage() {
             </span>
           )}
         </div>
-        {tree?.exists && downloadUrl && (
-          <a
-            href={downloadUrl}
-            download
-            className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
-            <Download className="h-3.5 w-3.5" />
-            Download ZIP
-          </a>
-        )}
+        <div className="flex items-center gap-2">
+          {hasFiles && (
+            <button
+              onClick={() => pushMutation.mutate()}
+              disabled={pushMutation.isPending}
+              className="flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {pushMutation.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Github className="h-3.5 w-3.5" />
+              )}
+              {pushMutation.isPending ? "Pushing…" : "Push to GitHub"}
+            </button>
+          )}
+          {hasFiles && downloadUrl && (
+            <a
+              href={downloadUrl}
+              download
+              className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Download ZIP
+            </a>
+          )}
+        </div>
       </div>
+
+      {/* Push result banner */}
+      {pushResult && (
+        <div className="flex items-start gap-3 border-b bg-green-50 px-4 py-3">
+          <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-green-800">
+              Pushed {pushResult.files_pushed} file{pushResult.files_pushed !== 1 ? "s" : ""} to GitHub
+            </p>
+            <a
+              href={pushResult.repo_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-green-700 underline underline-offset-2 mt-0.5"
+            >
+              {pushResult.repo_full_name}
+              <ExternalLink className="h-3 w-3" />
+            </a>
+            {pushResult.errors.length > 0 && (
+              <p className="text-xs text-yellow-700 mt-1">
+                {pushResult.errors.length} file(s) failed: {pushResult.errors[0]}
+                {pushResult.errors.length > 1 && ` (+${pushResult.errors.length - 1} more)`}
+              </p>
+            )}
+          </div>
+          <button
+            onClick={() => setPushResult(null)}
+            className="text-green-500 hover:text-green-700 text-xs"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Push error banner */}
+      {pushError && (
+        <div className="flex items-start gap-3 border-b bg-red-50 px-4 py-3">
+          <XCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-red-800">Failed to push to GitHub</p>
+            <p className="text-xs text-red-700 mt-0.5">{pushError}</p>
+          </div>
+          <button onClick={() => setPushError(null)} className="text-red-500 hover:text-red-700 text-xs">
+            ✕
+          </button>
+        </div>
+      )}
+
 
       {/* Body */}
       {treeLoading ? (
