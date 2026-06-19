@@ -150,7 +150,7 @@ def run_devops_agent(self, run_id: str) -> None:
         DevOpsAgentRunner(session).run(uuid.UUID(run_id))
 
 
-# ── Step 6: Technical Design Agent (placeholder until Sprint 32) ─────────────
+# ── Step 6: Technical Design Agent ───────────────────────────────────────────
 
 @celery_app.task(
     base=_AgentTask,
@@ -161,63 +161,11 @@ def run_devops_agent(self, run_id: str) -> None:
     autoretry_for=_RETRY_ON,
 )
 def run_technical_design(self, run_id: str) -> None:
-    """Placeholder for Technical Design Agent (real implementation in Sprint 32).
-
-    Creates a stub dev_tasks.md so the pipeline gate works end-to-end.
-    Human review of this stub will unlock the Delivery Layer.
-    """
-    from app.db.models import Document, DocumentStatus, DocumentType, PipelineRun, Project
+    from app.agents.technical_design_agent import TechnicalDesignAgentRunner
     from app.db.session import engine
 
-    STEP = "technical_design"
-    _id = uuid.UUID(run_id)
-
     with Session(engine) as session:
-        run, step = _step_init(session, _id, STEP)
-        if not run:
-            return
-        try:
-            project = session.get(Project, run.project_id)
-            project_name = project.name if project else "Project"
-
-            stub_md = f"""\
-# Technical Design — {project_name}
-
-> **Status:** Placeholder — Technical Design Agent (Sprint 32) not yet implemented.
-> Review this stub and approve to proceed to the Delivery Layer,
-> or wait for Sprint 32 to generate a real dev_tasks.md.
-
-## dev_tasks.md (stub)
-
-| Task | Domain | File | FR-ref |
-|------|--------|------|--------|
-| TASK-001 | backend | app/backend/main.py | FR-001 |
-| TASK-002 | frontend | app/frontend/src/App.tsx | FR-001 |
-| TASK-003 | database | app/db/migrations/0001_init.py | FR-002 |
-
-**Estimated instances:** 1 Developer Agent
-"""
-            doc_id = uuid.uuid4()
-            doc = Document(
-                id=doc_id,
-                project_id=run.project_id,
-                document_type=DocumentType.technical_design,
-                title=f"Technical Design — {project_name} (Placeholder)",
-                content_markdown=stub_md,
-                version=1,
-                status=DocumentStatus.draft,
-            )
-            session.add(doc)
-            session.flush()
-            _step_complete(session, _id, STEP, doc_id)
-
-            from app.agents._workspace import write_workspace_docs
-            write_workspace_docs(session, run.project_id, {"dev_tasks.md": stub_md})
-            logger.info("Technical Design placeholder created run=%s", _id)
-        except Exception as exc:
-            logger.exception("run_technical_design failed run=%s: %s", _id, exc)
-            session.rollback()
-            _step_fail(session, _id, STEP, str(exc))
+        TechnicalDesignAgentRunner(session).run(uuid.UUID(run_id))
 
 
 # ── Step 8: QA Agent ──────────────────────────────────────────────────────────
