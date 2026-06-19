@@ -59,13 +59,13 @@
 | 26 | Code Output Viewer + ZIP Download | ✅ Done |
 | 27 | DevOps Agent (Dockerfile + CI/CD gen) | ✅ Done |
 | 28 | Pipeline Steps 8–10 Completion | ✅ Done |
-| 29 | GitHub Push of Generated Application | 🔲 Next |
+| 29 | GitHub Push of Generated Application | ✅ Done |
 
 ## Project Status
 
 **Phase 1 COMPLETE (Sprint 0–23)** — SDLC Document Pipeline ครบทุก agent, infra, UI, RAG, GitHub, MCP
 
-**Phase 2 IN PROGRESS** — Code Generation Factory (Sprint 24–29)
+**Phase 2 COMPLETE** — Code Generation Factory (Sprint 24–29)
 - Sprint 24: Per-Agent LLM Selection — ✅ Done
 - Sprint 25: Developer Agent Rewrite — Real Code Generation — **NEXT**
 - Sprint 25: Developer Agent Rewrite — Real Code Generation
