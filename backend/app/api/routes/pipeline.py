@@ -29,7 +29,10 @@ _NEXT_STEP: dict[str, str | None] = {
     "ux_documents":  "dev_tasks",
     "dev_tasks":     "devops_tasks",
     "devops_tasks":  "test_cases",
-    "test_cases":    None,
+    "test_cases":    "change_impact",
+    "change_impact": "documentation",
+    "documentation": "pm_summary",
+    "pm_summary":    None,
 }
 
 # step_name → task key to dispatch on approval
@@ -40,6 +43,9 @@ _NEXT_TASK: dict[str, str] = {
     "ux_documents":  "dev_tasks",
     "dev_tasks":     "devops_tasks",
     "devops_tasks":  "test_cases",
+    "test_cases":    "change_impact",
+    "change_impact": "documentation",
+    "documentation": "pm_summary",
 }
 
 # step_name → which task key retries that step
@@ -52,6 +58,9 @@ _RETRY_TASK: dict[str, str] = {
     "dev_tasks":           "dev_tasks",
     "devops_tasks":        "devops_tasks",
     "test_cases":          "test_cases",
+    "change_impact":       "change_impact",
+    "documentation":       "documentation",
+    "pm_summary":          "pm_summary",
 }
 
 

@@ -5,8 +5,10 @@ Tasks create their own DB session to be safe across worker processes.
 """
 import logging
 import uuid
+from datetime import UTC, datetime
 
 from celery import Task
+from sqlmodel import Session, select
 
 from app.worker.celery_app import celery_app
 
@@ -167,6 +169,186 @@ def run_qa_agent(self, run_id: str) -> None:
         QAAgentRunner(session).run(uuid.UUID(run_id))
 
 
+# ── Pipeline step helper ──────────────────────────────────────────────────────
+
+def _step_init(session: Session, run_id: uuid.UUID, step_name: str):
+    """Set run + step to running state. Returns (run, step) or (None, None)."""
+    from app.db.models import PipelineRun, PipelineRunStatus, PipelineStep, PipelineStepStatus
+
+    run = session.get(PipelineRun, run_id)
+    if not run or run.status == PipelineRunStatus.failed:
+        return None, None
+
+    step = session.exec(
+        select(PipelineStep).where(
+            PipelineStep.pipeline_run_id == run_id,
+            PipelineStep.step_name == step_name,
+        )
+    ).first()
+    if not step:
+        logger.error("No %s step found for run %s", step_name, run_id)
+        return None, None
+
+    run.status = PipelineRunStatus.running
+    run.current_step = step_name
+    step.status = PipelineStepStatus.running
+    step.started_at = datetime.now(UTC)
+    session.commit()
+    return run, step
+
+
+def _step_complete(session: Session, run_id: uuid.UUID, step_name: str, doc_id: uuid.UUID) -> None:
+    """Mark step completed, set run to waiting_for_user."""
+    from app.db.models import PipelineRun, PipelineRunStatus, PipelineStep, PipelineStepStatus
+
+    run = session.get(PipelineRun, run_id)
+    step = session.exec(
+        select(PipelineStep).where(
+            PipelineStep.pipeline_run_id == run_id,
+            PipelineStep.step_name == step_name,
+        )
+    ).first()
+    if step:
+        step.status = PipelineStepStatus.completed
+        step.output_document_id = doc_id
+        step.completed_at = datetime.now(UTC)
+    if run:
+        run.status = PipelineRunStatus.waiting_for_user
+        run.current_step = step_name
+    session.commit()
+
+
+def _step_fail(session: Session, run_id: uuid.UUID, step_name: str, error: str) -> None:
+    """Mark step + run as failed."""
+    from app.db.models import PipelineRun, PipelineRunStatus, PipelineStep, PipelineStepStatus
+
+    try:
+        run = session.get(PipelineRun, run_id)
+        step = session.exec(
+            select(PipelineStep).where(
+                PipelineStep.pipeline_run_id == run_id,
+                PipelineStep.step_name == step_name,
+            )
+        ).first()
+        if run:
+            run.status = PipelineRunStatus.failed
+        if step:
+            step.status = PipelineStepStatus.failed
+            step.error_message = error[:2000]
+        session.commit()
+    except Exception:
+        logger.exception("Failed to persist failure state run=%s step=%s", run_id, step_name)
+
+
+# ── Step 8: Change Impact Agent (pipeline baseline) ──────────────────────────
+
+@celery_app.task(
+    base=_AgentTask,
+    bind=True,
+    name="tasks.run_change_impact_pipeline",
+    max_retries=_MAX_RETRIES,
+    default_retry_delay=_RETRY_DELAY,
+    autoretry_for=_RETRY_ON,
+)
+def run_change_impact_pipeline(self, run_id: str) -> None:
+    from app.agents.change_impact_agent import ChangeImpactAgentRunner
+    from app.db.session import engine
+
+    STEP = "change_impact"
+    _id = uuid.UUID(run_id)
+
+    with Session(engine) as session:
+        run, step = _step_init(session, _id, STEP)
+        if not run:
+            return
+        try:
+            doc = ChangeImpactAgentRunner(session).run(
+                project_id=run.project_id,
+                change_description=(
+                    "Pipeline Step 8 — automated baseline impact assessment of all project requirements."
+                ),
+                changed_requirement_ids=[],
+                context_notes="Generated automatically during SDLC pipeline execution.",
+            )
+            _step_complete(session, _id, STEP, doc.id)
+        except Exception as exc:
+            logger.exception("Change Impact pipeline task failed run=%s: %s", _id, exc)
+            session.rollback()
+            _step_fail(session, _id, STEP, str(exc))
+
+
+# ── Step 9: Documentation Agent ───────────────────────────────────────────────
+
+@celery_app.task(
+    base=_AgentTask,
+    bind=True,
+    name="tasks.run_documentation_pipeline",
+    max_retries=_MAX_RETRIES,
+    default_retry_delay=_RETRY_DELAY,
+    autoretry_for=_RETRY_ON,
+)
+def run_documentation_pipeline(self, run_id: str) -> None:
+    from app.agents.documentation_agent import DocumentationAgentRunner
+    from app.db.models import PipelineRun, Project
+    from app.db.session import engine
+
+    STEP = "documentation"
+    _id = uuid.UUID(run_id)
+
+    with Session(engine) as session:
+        run, step = _step_init(session, _id, STEP)
+        if not run:
+            return
+        project = session.get(Project, run.project_id)
+        project_name = project.name if project else "Project"
+        try:
+            doc = DocumentationAgentRunner(session).run(
+                project_id=run.project_id,
+                project_name=project_name,
+            )
+            _step_complete(session, _id, STEP, doc.id)
+        except Exception as exc:
+            logger.exception("Documentation pipeline task failed run=%s: %s", _id, exc)
+            session.rollback()
+            _step_fail(session, _id, STEP, str(exc))
+
+
+# ── Step 10: PM Agent ─────────────────────────────────────────────────────────
+
+@celery_app.task(
+    base=_AgentTask,
+    bind=True,
+    name="tasks.run_pm_pipeline",
+    max_retries=_MAX_RETRIES,
+    default_retry_delay=_RETRY_DELAY,
+    autoretry_for=_RETRY_ON,
+)
+def run_pm_pipeline(self, run_id: str) -> None:
+    from app.agents.pm_agent import PMAgentRunner
+    from app.db.models import PipelineRun, Project
+    from app.db.session import engine
+
+    STEP = "pm_summary"
+    _id = uuid.UUID(run_id)
+
+    with Session(engine) as session:
+        run, step = _step_init(session, _id, STEP)
+        if not run:
+            return
+        project = session.get(Project, run.project_id)
+        project_name = project.name if project else "Project"
+        try:
+            project_summary_doc, _delivery_doc = PMAgentRunner(session).run(
+                project_id=run.project_id,
+                project_name=project_name,
+            )
+            _step_complete(session, _id, STEP, project_summary_doc.id)
+        except Exception as exc:
+            logger.exception("PM pipeline task failed run=%s: %s", _id, exc)
+            session.rollback()
+            _step_fail(session, _id, STEP, str(exc))
+
+
 # ── Dispatch helper ───────────────────────────────────────────────────────────
 # Maps step_name → task function.  Used by pipeline.py so it has one place to look.
 
@@ -178,4 +360,7 @@ STEP_TASKS: dict[str, object] = {
     "dev_tasks":      run_dev_agent,
     "devops_tasks":   run_devops_agent,
     "test_cases":     run_qa_agent,
+    "change_impact":  run_change_impact_pipeline,
+    "documentation":  run_documentation_pipeline,
+    "pm_summary":     run_pm_pipeline,
 }
