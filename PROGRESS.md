@@ -1,6 +1,6 @@
 # AI-SDLC Virtual Office — Progress Tracker
 
-**Last Updated:** 2026-06-18 (Sprint 17 — RAG MVP complete — ALL sprints DONE)  
+**Last Updated:** 2026-06-19 (Phase 2 planning — Code Generation Factory)  
 **Project:** ai-sdlc-virtual-office  
 **Repo:** https://github.com/tanaratk/ai-sdlc-virtual-office  
 **Working Directory:** D:\AI_Office
@@ -53,10 +53,28 @@
 | 21 | Documentation Agent MVP | ✅ Done |
 | 22 | PM Agent MVP | ✅ Done |
 | 23 | Docker + CI/CD | ✅ Done |
+| **Phase 2** | **Code Generation Factory** | **In Progress** |
+| 24 | Per-Agent LLM Selection | 🔲 Next |
+| 25 | Developer Agent — Real Code Generation | 🔲 Planned |
+| 26 | Code Output Viewer + ZIP Download | 🔲 Planned |
+| 27 | DevOps Agent (Dockerfile + CI/CD gen) | 🔲 Planned |
+| 28 | Pipeline Steps 8–10 Completion | 🔲 Planned |
+| 29 | GitHub Push of Generated Application | 🔲 Planned |
 
 ## Project Status
 
-**ALL 24 sprints COMPLETE (0–23 + 17).** Every pipeline agent, infra, and feature is shipped.
+**Phase 1 COMPLETE (Sprint 0–23)** — SDLC Document Pipeline ครบทุก agent, infra, UI, RAG, GitHub, MCP
+
+**Phase 2 IN PROGRESS** — Code Generation Factory (Sprint 24–29)
+- Sprint 24: Per-Agent LLM Selection — **NEXT**
+- Sprint 25: Developer Agent Rewrite — Real Code Generation
+- Sprint 26: Code Output Viewer + ZIP Download
+- Sprint 27: DevOps Agent (Dockerfile + CI/CD)
+- Sprint 28: Pipeline Steps 8–10 Completion
+- Sprint 29: GitHub Push of Generated Application
+
+**Goal shift:** Developer Agent ต้องสร้างไฟล์ code จริง (`.py`, `.tsx`, `.sql`) ไม่ใช่แค่ task list
+Spec อัปเดตแล้วใน `Requirement Spec/AI-SDLC-Working-Office-Spec.md`
 
 ---
 
