@@ -23,21 +23,23 @@ class _RejectBody(BaseModel):
 # step_name → next step name to create on approval (None = pipeline done)
 
 _NEXT_STEP: dict[str, str | None] = {
-    "gap_analysis": "ba_documents",
-    "ba_documents": "sa_documents",
-    "sa_documents": "ux_documents",
-    "ux_documents": "dev_tasks",
-    "dev_tasks":    "test_cases",
-    "test_cases":   None,
+    "gap_analysis":  "ba_documents",
+    "ba_documents":  "sa_documents",
+    "sa_documents":  "ux_documents",
+    "ux_documents":  "dev_tasks",
+    "dev_tasks":     "devops_tasks",
+    "devops_tasks":  "test_cases",
+    "test_cases":    None,
 }
 
 # step_name → task key to dispatch on approval
 _NEXT_TASK: dict[str, str] = {
-    "gap_analysis": "ba_documents",
-    "ba_documents": "sa_documents",
-    "sa_documents": "ux_documents",
-    "ux_documents": "dev_tasks",
-    "dev_tasks":    "test_cases",
+    "gap_analysis":  "ba_documents",
+    "ba_documents":  "sa_documents",
+    "sa_documents":  "ux_documents",
+    "ux_documents":  "dev_tasks",
+    "dev_tasks":     "devops_tasks",
+    "devops_tasks":  "test_cases",
 }
 
 # step_name → which task key retries that step
@@ -48,6 +50,7 @@ _RETRY_TASK: dict[str, str] = {
     "sa_documents":        "sa_documents",
     "ux_documents":        "ux_documents",
     "dev_tasks":           "dev_tasks",
+    "devops_tasks":        "devops_tasks",
     "test_cases":          "test_cases",
 }
 

@@ -129,7 +129,26 @@ def run_dev_agent(self, run_id: str) -> None:
         DevAgentRunner(session).run(uuid.UUID(run_id))
 
 
-# ── Step 7: QA Agent ──────────────────────────────────────────────────────────
+# ── Step 7: DevOps Agent ─────────────────────────────────────────────────────
+
+@celery_app.task(
+    base=_AgentTask,
+    bind=True,
+    name="tasks.run_devops_agent",
+    max_retries=_MAX_RETRIES,
+    default_retry_delay=_RETRY_DELAY,
+    autoretry_for=_RETRY_ON,
+)
+def run_devops_agent(self, run_id: str) -> None:
+    from app.agents.devops_agent import DevOpsAgentRunner
+    from app.db.session import engine
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        DevOpsAgentRunner(session).run(uuid.UUID(run_id))
+
+
+# ── Step 8: QA Agent ──────────────────────────────────────────────────────────
 
 @celery_app.task(
     base=_AgentTask,
@@ -157,5 +176,6 @@ STEP_TASKS: dict[str, object] = {
     "sa_documents":   run_sa_agent,
     "ux_documents":   run_ux_agent,
     "dev_tasks":      run_dev_agent,
+    "devops_tasks":   run_devops_agent,
     "test_cases":     run_qa_agent,
 }
