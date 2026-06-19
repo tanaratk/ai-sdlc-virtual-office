@@ -3680,3 +3680,173 @@ Created on-demand via migration if not exists.
 | 37 | Multi-Developer Agent | Fan-out Celery tasks, N instances, work distribution |
 | 38 | Agent Contract Refactor | SA/UX/Dev read FSD directly (remove stale BA dependency) |
 | 39 | Change Impact On-demand | UI trigger, re-run from affected layer |
+
+
+---
+
+# 38. Agent Skill Document (skill.md)
+
+> **Decision Date:** 2026-06-19
+> **Status:** APPROVED — prerequisite before Sprint 30
+> **Scope:** Agent Manager UI + Backend agents table
+
+---
+
+## 38.1 Concept
+
+Each agent owns a **Skill Document** (`skill.md`) that describes:
+- Role and responsibilities
+- Capabilities and limitations
+- Input contract (what it needs)
+- Output contract (what it produces)
+- Prompting style / behaviour notes
+- Example use cases
+
+The Skill Document serves two purposes:
+1. **Human-readable reference** — team members understand what each agent does
+2. **LLM context injection** — agent uses its own skill.md as part of the system prompt
+
+---
+
+## 38.2 Storage
+
+| Option | Decision |
+|--------|----------|
+| DB field `skill_markdown` in `agents` table | ✅ Primary storage (editable via API) |
+| File `{workspace}/agents/{agent-name}/skill.md` | Optional export only |
+
+Storing in DB allows the Agent Manager UI to fetch, display, and edit without filesystem access.
+
+---
+
+## 38.3 Skill Document Structure
+
+```markdown
+# {Agent Name} — Skill Document
+
+## Role
+{one-paragraph description of what this agent does in the pipeline}
+
+## Layer
+{Business | Design | Delivery | On-demand}
+
+## Pipeline Position
+Step {N} of 12
+
+## Capabilities
+- {capability 1}
+- {capability 2}
+...
+
+## Input Contract
+| Field | Source | Required |
+|-------|--------|----------|
+| {field} | {previous agent / user} | Yes/No |
+
+## Output Contract
+| File | Description |
+|------|-------------|
+| {filename} | {description} |
+
+## Behaviour Notes
+- {prompting style note}
+- {known limitation}
+- {LLM model preference}
+
+## Example
+**Input:** {brief example input}
+**Output:** {brief example output excerpt}
+```
+
+---
+
+## 38.4 DB Schema Change
+
+Add column to `agents` table:
+
+```sql
+ALTER TABLE agents ADD COLUMN skill_markdown TEXT;
+```
+
+Migration: `0011_agent_skill_markdown.py`
+
+Default value: auto-generated skill.md content per agent role (seeded in migration).
+
+---
+
+## 38.5 API Changes
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/agents/{agent_id}` | Already returns agent — add `skill_markdown` field |
+| PATCH | `/agents/{agent_id}` | Already exists — accept `skill_markdown` in body |
+
+No new endpoints needed — extend existing ones.
+
+---
+
+## 38.6 Agent Manager UI Changes
+
+### Current AgentDetailPanel shows:
+- Name, Role, Status, Model, Zone
+
+### After this feature:
+- All existing fields
+- **Skill Document tab** — rendered markdown view of skill.md
+- **Edit button** — switches to raw textarea editor
+- **Save button** — calls PATCH /agents/{id} with updated skill_markdown
+- **Reset button** — restore to default skill content
+
+### UI Layout:
+
+```
+┌─────────────────────────────────────────────────┐
+│  developer-agent                    [Edit] [✕]  │
+│  Role: developer | Status: Idle                 │
+│  Model: coder14b:latest | Zone: developer_zone  │
+├─────────────────────────────────────────────────┤
+│  [Info]  [Skill Document]                       │
+├─────────────────────────────────────────────────┤
+│                                                 │
+│  # Developer Agent — Skill Document             │
+│  ## Role                                        │
+│  Generates real source code files from ...      │
+│  ## Capabilities                                │
+│  - Python/FastAPI backend generation            │
+│  - React/TypeScript frontend generation         │
+│  ...                                            │
+│                                [Edit Skill]     │
+└─────────────────────────────────────────────────┘
+```
+
+---
+
+## 38.7 Default Skill Content Per Agent
+
+| Agent | Model | Layer |
+|-------|-------|-------|
+| requirement-agent | qwen3:8b | Business |
+| gap-analysis-agent | qwen3.5:9b | Business |
+| ba-agent | qwen3.5:9b | Business |
+| architect-agent | qwen3.5:9b | Design |
+| ux-agent | qwen3:8b | Design |
+| technical-design-agent | qwen3.5:9b | Design |
+| developer-agent | coder14b:latest | Delivery |
+| code-review-agent | deepseek-r1:14b | Delivery |
+| qa-agent | qwen3:8b | Delivery |
+| devops-agent | coder14b:latest | Delivery |
+| monitoring-agent | qwen3:8b | Delivery |
+| change-impact-agent | deepseek-r1:14b | On-demand |
+
+---
+
+## 38.8 Implementation Sprints
+
+| Sprint | Scope |
+|--------|-------|
+| 30-pre | Add `skill_markdown` column (migration 0011) |
+| 30-pre | Seed default skill.md content for all 12 agents |
+| 30-pre | Update AgentResponse schema + PATCH endpoint |
+| 30-pre | Update AgentDetailPanel — show + edit skill.md |
+
+This sprint must complete before Sprint 30 (Pipeline Rewire) begins.
