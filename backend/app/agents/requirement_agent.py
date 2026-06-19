@@ -340,6 +340,9 @@ class RequirementAgentRunner:
 
             self._log_activity(run.project_id, agent_row, f"Requirement summary created. FRs: {len(output.functional_requirements)}, Open questions: {len(output.open_questions)}. Proceeding to gap analysis.")
             self.session.commit()
+
+            from app.agents._workspace import write_workspace_docs
+            write_workspace_docs(self.session, run.project_id, {"requirements.md": markdown})
             logger.info("RequirementAgent completed run=%s doc=%s", run_id, doc_id)
 
         except Exception as exc:

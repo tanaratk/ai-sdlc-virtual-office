@@ -525,6 +525,13 @@ class SAAgentRunner:
                 f"API ({len(output.api_spec.endpoints)} endpoints). Awaiting Gate 3 review.",
             )
             self.session.commit()
+
+            from app.agents._workspace import write_workspace_docs
+            write_workspace_docs(self.session, run.project_id, {
+                "architecture.md": arch_doc.content_markdown,
+                "db_schema.md":    db_doc.content_markdown,
+                "api_spec.md":     api_doc.content_markdown,
+            })
             logger.info(
                 "SAAgent completed run=%s arch=%s db=%s api=%s",
                 run_id, arch_id, db_id, api_id,

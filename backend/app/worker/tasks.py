@@ -210,6 +210,9 @@ def run_technical_design(self, run_id: str) -> None:
             session.add(doc)
             session.flush()
             _step_complete(session, _id, STEP, doc_id)
+
+            from app.agents._workspace import write_workspace_docs
+            write_workspace_docs(session, run.project_id, {"dev_tasks.md": stub_md})
             logger.info("Technical Design placeholder created run=%s", _id)
         except Exception as exc:
             logger.exception("run_technical_design failed run=%s: %s", _id, exc)

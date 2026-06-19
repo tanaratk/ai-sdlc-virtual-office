@@ -420,6 +420,13 @@ class BAAgentRunner:
                 f"User Stories ({len(output.user_stories)}). Awaiting Gate 2 review.",
             )
             self.session.commit()
+
+            from app.agents._workspace import write_workspace_docs
+            write_workspace_docs(self.session, run.project_id, {
+                "brd.md":          brd_doc.content_markdown,
+                "fsd.md":          fsd_doc.content_markdown,
+                "user_stories.md": us_doc.content_markdown,
+            })
             logger.info(
                 "BAAgent completed run=%s brd=%s fsd=%s us=%s",
                 run_id, brd_id, fsd_id, us_id,

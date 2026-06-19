@@ -267,6 +267,9 @@ class GapAnalysisAgentRunner:
                 f"Gap analysis complete. Gaps found: {len(output.gaps)}. Score: {output.completeness_score}/100. Awaiting Gate 1 review.",
             )
             self.session.commit()
+
+            from app.agents._workspace import write_workspace_docs
+            write_workspace_docs(self.session, run.project_id, {"gap_report.md": markdown})
             logger.info("GapAnalysisAgent completed run=%s doc=%s gaps=%d", run_id, doc_id, len(output.gaps))
 
         except Exception as exc:

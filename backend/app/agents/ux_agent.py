@@ -347,6 +347,9 @@ class UXAgentRunner:
                 f"{len(output.user_flows)} user flows. Awaiting Gate 4 review.",
             )
             self.session.commit()
+
+            from app.agents._workspace import write_workspace_docs
+            write_workspace_docs(self.session, run.project_id, {"screen_spec.md": screen_doc.content_markdown})
             logger.info(
                 "UXAgent completed run=%s screen_doc=%s screens=%d flows=%d",
                 run_id, screen_id, len(output.screens), len(output.user_flows),
