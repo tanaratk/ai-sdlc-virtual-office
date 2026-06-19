@@ -9,7 +9,7 @@ from collections import Counter
 from datetime import UTC, datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlmodel import Session, select
 
 from app.db.models import (
@@ -35,13 +35,30 @@ TIMEOUT_SECONDS = 120.0
 
 # โ”€โ”€ Output schema โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
+def _first(data: dict, *keys: str, fallback: str = "") -> str:
+    for k in keys:
+        if k in data and data[k]:
+            return str(data[k])
+    return fallback
+
+
 class _Gap(BaseModel):
     id: str = "GAP-001"
     category: str = "missing_requirement"
     severity: str = "Medium"
-    description: str
+    description: str = ""
     related_requirement_id: Optional[str] = None
-    question: str
+    question: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _remap(cls, v: dict) -> dict:
+        if isinstance(v, dict):
+            if not v.get("description"):
+                v["description"] = _first(v, "text", "detail", "details", "summary", fallback="(no description)")
+            if not v.get("question"):
+                v["question"] = _first(v, "clarification", "note", "action", fallback="")
+        return v
 
 
 class GapAnalysisOutput(BaseModel):

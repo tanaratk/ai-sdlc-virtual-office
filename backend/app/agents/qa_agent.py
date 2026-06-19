@@ -9,7 +9,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlmodel import Session, select
 
 from app.db.models import (
@@ -41,6 +41,13 @@ TIMEOUT_SECONDS = 480.0
 
 # โ”€โ”€ Output schemas (all fields optional to tolerate LLM schema drift) โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
+def _first(data: dict, *keys: str, fallback: str = “”) -> str:
+    for k in keys:
+        if k in data and data[k]:
+            return str(data[k])
+    return fallback
+
+
 class _LenientBase(BaseModel):
     model_config = ConfigDict(extra=”ignore”)
 
@@ -55,16 +62,44 @@ class _FunctionalTC(_LenientBase):
     expected_result: str = “”
     priority: str = “High”
 
+    @model_validator(mode=”before”)
+    @classmethod
+    def _remap(cls, v: dict) -> dict:
+        if isinstance(v, dict):
+            if not v.get(“description”):
+                v[“description”] = _first(v, “title”, “name”, “test_description”, “summary”, fallback=””)
+            if not v.get(“expected_result”):
+                v[“expected_result”] = _first(v, “expected”, “result”, “expected_outcome”, “outcome”, fallback=””)
+            if not v.get(“fsd_ref”):
+                v[“fsd_ref”] = _first(v, “fsd”, “spec_ref”, “requirement_ref”, “ref”, fallback=””)
+        return v
+
 
 class _ApiTC(_LenientBase):
     id: str = “TC-010”
     api_ref: str = “”
     method: str = “GET”
     endpoint: str = “”
-    request_body: str = “โ€””
+    request_body: str = “—“
     expected_status: int = 200
     expected_response: str = “”
     priority: str = “High”
+
+    @model_validator(mode=”before”)
+    @classmethod
+    def _remap(cls, v: dict) -> dict:
+        if isinstance(v, dict):
+            if not v.get(“endpoint”):
+                v[“endpoint”] = _first(v, “url”, “path”, “route”, “api_path”, fallback=””)
+            if not v.get(“api_ref”):
+                v[“api_ref”] = _first(v, “api”, “ref”, “endpoint_ref”, fallback=””)
+            # expected_status might come as string
+            if “expected_status” in v and isinstance(v[“expected_status”], str):
+                try:
+                    v[“expected_status”] = int(v[“expected_status”])
+                except ValueError:
+                    v[“expected_status”] = 200
+        return v
 
 
 class _EdgeTC(_LenientBase):
@@ -74,6 +109,16 @@ class _EdgeTC(_LenientBase):
     input: str = “”
     expected_behaviour: str = “”
 
+    @model_validator(mode=”before”)
+    @classmethod
+    def _remap(cls, v: dict) -> dict:
+        if isinstance(v, dict):
+            if not v.get(“scenario”):
+                v[“scenario”] = _first(v, “description”, “name”, “title”, “test_case”, fallback=””)
+            if not v.get(“expected_behaviour”):
+                v[“expected_behaviour”] = _first(v, “expected_behavior”, “expected”, “outcome”, “result”, fallback=””)
+        return v
+
 
 class _NegativeTC(_LenientBase):
     id: str = “TC-030”
@@ -81,6 +126,18 @@ class _NegativeTC(_LenientBase):
     scenario: str = “”
     invalid_input: str = “”
     expected_error: str = “”
+
+    @model_validator(mode=”before”)
+    @classmethod
+    def _remap(cls, v: dict) -> dict:
+        if isinstance(v, dict):
+            if not v.get(“scenario”):
+                v[“scenario”] = _first(v, “description”, “name”, “title”, “test_case”, fallback=””)
+            if not v.get(“expected_error”):
+                v[“expected_error”] = _first(v, “error”, “expected”, “error_message”, “outcome”, fallback=””)
+            if not v.get(“invalid_input”):
+                v[“invalid_input”] = _first(v, “input”, “bad_input”, “test_input”, fallback=””)
+        return v
 
 
 class _UATScenario(_LenientBase):
@@ -90,6 +147,18 @@ class _UATScenario(_LenientBase):
     actor: str = “”
     steps: list[str] = Field(default_factory=list)
     expected_outcome: str = “”
+
+    @model_validator(mode=”before”)
+    @classmethod
+    def _remap(cls, v: dict) -> dict:
+        if isinstance(v, dict):
+            if not v.get(“description”):
+                v[“description”] = _first(v, “name”, “title”, “scenario_name”, “summary”, fallback=””)
+            if not v.get(“actor”):
+                v[“actor”] = _first(v, “role”, “user”, “persona”, “stakeholder”, fallback=””)
+            if not v.get(“expected_outcome”):
+                v[“expected_outcome”] = _first(v, “outcome”, “expected”, “result”, “expected_result”, fallback=””)
+        return v
 
 
 class QAAgentOutput(_LenientBase):

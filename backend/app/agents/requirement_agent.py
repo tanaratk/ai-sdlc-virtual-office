@@ -9,7 +9,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlmodel import Session, select
 
 from app.db.models import (
@@ -40,29 +40,57 @@ TIMEOUT_SECONDS = 120.0
 
 # โ”€โ”€ Output schema (Pydantic validation) โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
+def _first(data: dict, *keys: str, fallback: str = "") -> str:
+    for k in keys:
+        if k in data and data[k]:
+            return str(data[k])
+    return fallback
+
+
 class _FR(BaseModel):
     id: str = "FR-001"
-    requirement: str
+    requirement: str = ""
     source: str = "input"
     priority: str = "Medium"
+
+    @model_validator(mode="before")
+    @classmethod
+    def _remap(cls, v: dict) -> dict:
+        if isinstance(v, dict) and not v.get("requirement"):
+            v["requirement"] = _first(v, "description", "text", "content", "detail", "requirements", fallback="(no text)")
+        return v
 
 
 class _NFR(BaseModel):
     id: str = "NFR-001"
-    requirement: str
+    requirement: str = ""
     category: str = "Other"
     priority: str = "Medium"
 
+    @model_validator(mode="before")
+    @classmethod
+    def _remap(cls, v: dict) -> dict:
+        if isinstance(v, dict) and not v.get("requirement"):
+            v["requirement"] = _first(v, "description", "text", "content", "detail", "requirements", fallback="(no text)")
+        return v
+
 
 class _Stakeholder(BaseModel):
-    role: str
+    role: str = ""
     responsibility: str = ""
     involvement: str = "Informed"
 
 
 class _BR(BaseModel):
     id: str = "BR-001"
-    rule: str
+    rule: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _remap(cls, v: dict) -> dict:
+        if isinstance(v, dict) and not v.get("rule"):
+            v["rule"] = _first(v, "description", "text", "content", fallback="(no text)")
+        return v
 
 
 class RequirementSummaryOutput(BaseModel):

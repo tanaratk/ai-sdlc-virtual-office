@@ -16,7 +16,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlmodel import Session, select
 
 from app.db.models import (
@@ -49,11 +49,18 @@ TIMEOUT_SECONDS = 240.0
 
 # โ”€โ”€ Output schema โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
+def _first(data: dict, *keys: str, fallback: str = "") -> str:
+    for k in keys:
+        if k in data and data[k]:
+            return str(data[k])
+    return fallback
+
+
 class _Task(BaseModel):
     id: str = "TASK-001"
     category: str = "backend"
-    title: str
-    description: str
+    title: str = ""
+    description: str = ""
     requirement_refs: list[str] = Field(default_factory=list)
     api_refs: list[str] = Field(default_factory=list)
     db_refs: list[str] = Field(default_factory=list)
@@ -61,13 +68,35 @@ class _Task(BaseModel):
     priority: str = "High"
     estimated_hours: int = 4
 
+    @model_validator(mode="before")
+    @classmethod
+    def _remap(cls, v: dict) -> dict:
+        if isinstance(v, dict):
+            if not v.get("title"):
+                v["title"] = _first(v, "name", "task", "summary", fallback="(untitled)")
+            if not v.get("description"):
+                v["description"] = _first(v, "detail", "details", "summary", "notes", fallback="")
+        return v
+
 
 class _MigrationTask(BaseModel):
     id: str = "MIG-001"
-    table: str
+    table: str = ""
     operation: str = "create_table"
-    description: str
+    description: str = ""
     db_ref: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _remap(cls, v: dict) -> dict:
+        if isinstance(v, dict):
+            if not v.get("operation"):
+                v["operation"] = _first(v, "type", "action", "op", fallback="create_table")
+            if not v.get("description"):
+                v["description"] = _first(v, "detail", "details", "summary", "notes", fallback="")
+            if not v.get("table"):
+                v["table"] = _first(v, "table_name", "name", fallback="unknown")
+        return v
 
 
 class DevAgentOutput(BaseModel):

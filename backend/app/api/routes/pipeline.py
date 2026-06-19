@@ -1,14 +1,16 @@
-﻿import uuid
+import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from app.db.models import PipelineRun, PipelineRunStatus, PipelineStep, PipelineStepStatus
-from app.db.session import engine, get_session
+from app.core.auth import get_current_user
+from app.db.models import PipelineRun, PipelineRunStatus, PipelineStep, PipelineStepStatus, Project, User
+from app.db.session import get_session
 from app.schemas.pipeline import PipelineRunResponse, PipelineStepResponse
 from app.services.pipeline_service import PipelineService
+from app.worker.tasks import STEP_TASKS
 
 router = APIRouter()
 
@@ -17,98 +19,55 @@ class _RejectBody(BaseModel):
     reason: str = "Rejected by user"
 
 
-# โ”€โ”€ Background tasks โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# ── Gate map ──────────────────────────────────────────────────────────────────
+# step_name → next step name to create on approval (None = pipeline done)
 
-def _run_pipeline_background(run_id: uuid.UUID) -> None:
-    """Steps 1+2: Requirement Agent โ’ Gap Analysis Agent (auto-chained)."""
-    from app.agents.gap_analysis_agent import GapAnalysisAgentRunner
-    from app.agents.requirement_agent import RequirementAgentRunner
-    from sqlmodel import Session as _Session
-
-    with _Session(engine) as session:
-        RequirementAgentRunner(session).run(run_id)
-
-    with _Session(engine) as session:
-        GapAnalysisAgentRunner(session).run(run_id)
-
-
-def _run_ba_agent_background(run_id: uuid.UUID) -> None:
-    """Step 3: BA Agent โ€” triggered by Gate 1 approval."""
-    from app.agents.ba_agent import BAAgentRunner
-    from sqlmodel import Session as _Session
-
-    with _Session(engine) as session:
-        BAAgentRunner(session).run(run_id)
-
-
-def _run_sa_agent_background(run_id: uuid.UUID) -> None:
-    """Step 4: SA Agent โ€” triggered by Gate 2 approval."""
-    from app.agents.sa_agent import SAAgentRunner
-    from sqlmodel import Session as _Session
-
-    with _Session(engine) as session:
-        SAAgentRunner(session).run(run_id)
-
-
-def _run_ux_agent_background(run_id: uuid.UUID) -> None:
-    """Step 5: UX Agent โ€” triggered by Gate 3 approval."""
-    from app.agents.ux_agent import UXAgentRunner
-    from sqlmodel import Session as _Session
-
-    with _Session(engine) as session:
-        UXAgentRunner(session).run(run_id)
-
-
-def _run_dev_agent_background(run_id: uuid.UUID) -> None:
-    """Step 6: Developer Agent โ€” triggered by Gate 4 approval."""
-    from app.agents.dev_agent import DevAgentRunner
-    from sqlmodel import Session as _Session
-
-    with _Session(engine) as session:
-        DevAgentRunner(session).run(run_id)
-
-
-def _run_qa_agent_background(run_id: uuid.UUID) -> None:
-    """Step 7: QA Agent โ€” triggered by Gate 5 approval."""
-    from app.agents.qa_agent import QAAgentRunner
-    from sqlmodel import Session as _Session
-
-    with _Session(engine) as session:
-        QAAgentRunner(session).run(run_id)
-
-
-# โ”€โ”€ Gate approval helpers โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
-
-# Maps step_name โ’ next step to create on approval
 _NEXT_STEP: dict[str, str | None] = {
-    "gap_analysis": "ba_documents",   # Gate 1: approve โ’ run BA Agent
-    "ba_documents": "sa_documents",   # Gate 2: approve โ’ run SA Agent
-    "sa_documents": "ux_documents",   # Gate 3: approve โ’ run UX Agent
-    "ux_documents": "dev_tasks",      # Gate 4: approve โ’ run Developer Agent
-    "dev_tasks":    "test_cases",     # Gate 5: approve โ’ run QA Agent
-    "test_cases":   None,             # Gate 6: approve โ’ pipeline completed
+    "gap_analysis": "ba_documents",
+    "ba_documents": "sa_documents",
+    "sa_documents": "ux_documents",
+    "ux_documents": "dev_tasks",
+    "dev_tasks":    "test_cases",
+    "test_cases":   None,
 }
 
-_NEXT_BACKGROUND: dict[str, object] = {
-    "ba_documents": _run_ba_agent_background,
-    "sa_documents": _run_sa_agent_background,
-    "ux_documents": _run_ux_agent_background,
-    "dev_tasks":    _run_dev_agent_background,
-    "test_cases":   _run_qa_agent_background,
+# step_name → task key to dispatch on approval
+_NEXT_TASK: dict[str, str] = {
+    "gap_analysis": "ba_documents",
+    "ba_documents": "sa_documents",
+    "sa_documents": "ux_documents",
+    "ux_documents": "dev_tasks",
+    "dev_tasks":    "test_cases",
+}
+
+# step_name → which task key retries that step
+_RETRY_TASK: dict[str, str] = {
+    "requirement_summary": "pipeline_start",
+    "gap_analysis":        "pipeline_start",
+    "ba_documents":        "ba_documents",
+    "sa_documents":        "sa_documents",
+    "ux_documents":        "ux_documents",
+    "dev_tasks":           "dev_tasks",
+    "test_cases":          "test_cases",
 }
 
 
-# โ”€โ”€ Routes โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+def _dispatch(task_key: str, run_id: uuid.UUID) -> None:
+    task = STEP_TASKS.get(task_key)
+    if task:
+        task.delay(str(run_id))  # type: ignore[union-attr]
+
+
+# ── Routes ────────────────────────────────────────────────────────────────────
 
 @router.post("/{project_id}/pipeline/runs", response_model=PipelineRunResponse, status_code=201)
 def start_pipeline_run(
     project_id: uuid.UUID,
-    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
 ):
     svc = PipelineService(session)
     run = svc.create_run(project_id)
-    background_tasks.add_task(_run_pipeline_background, run.id)
+    _dispatch("pipeline_start", run.id)
     return PipelineRunResponse.model_validate(run)
 
 
@@ -146,7 +105,6 @@ def approve_step(
     project_id: uuid.UUID,
     run_id: uuid.UUID,
     step_id: uuid.UUID,
-    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
 ):
     run = session.exec(
@@ -169,7 +127,6 @@ def approve_step(
     next_step_name = _NEXT_STEP.get(step.step_name)
 
     if next_step_name is not None:
-        # Create next step and fire its background agent
         next_step = PipelineStep(
             pipeline_run_id=run_id,
             step_name=next_step_name,
@@ -179,12 +136,13 @@ def approve_step(
         run.status = PipelineRunStatus.running
         run.current_step = None
         session.commit()
-        background_fn = _NEXT_BACKGROUND.get(next_step_name)
-        if background_fn:
-            background_tasks.add_task(background_fn, run_id)
+
+        task_key = _NEXT_TASK.get(step.step_name)
+        if task_key:
+            _dispatch(task_key, run_id)
+
         return {"status": "approved", "next": next_step_name}
     else:
-        # Gate 6 (test_cases) โ€” pipeline complete
         run.status = PipelineRunStatus.completed
         run.completed_at = datetime.now(UTC)
         session.commit()
@@ -223,11 +181,91 @@ def reject_step(
     return {"status": "rejected", "run_id": str(run_id)}
 
 
-@router.post("/{project_id}/pipeline/runs/{run_id}/steps/{step_id}/rerun", status_code=501)
+@router.post("/{project_id}/pipeline/runs/{run_id}/steps/{step_id}/rerun", status_code=200)
 def rerun_step(
     project_id: uuid.UUID,
     run_id: uuid.UUID,
     step_id: uuid.UUID,
     session: Session = Depends(get_session),
 ):
-    raise HTTPException(status_code=501, detail={"error_code": "NOT_IMPLEMENTED", "message": "Step rerun โ€” Sprint 14"})
+    """Retry a failed pipeline step without creating a new run.
+
+    Resets step + run status and re-dispatches the Celery task.
+    """
+    run = session.exec(
+        select(PipelineRun).where(
+            PipelineRun.id == run_id,
+            PipelineRun.project_id == project_id,
+        )
+    ).first()
+    if not run:
+        raise HTTPException(status_code=404, detail={"error_code": "NOT_FOUND", "message": "Run not found"})
+    if run.status != PipelineRunStatus.failed:
+        raise HTTPException(status_code=400, detail={"error_code": "INVALID_STATE", "message": f"Run is {run.status.value} — only failed runs can be retried"})
+
+    step = session.get(PipelineStep, step_id)
+    if not step or step.pipeline_run_id != run_id:
+        raise HTTPException(status_code=404, detail={"error_code": "NOT_FOUND", "message": "Step not found"})
+    if step.status != PipelineStepStatus.failed:
+        raise HTTPException(status_code=400, detail={"error_code": "INVALID_STATE", "message": f"Step is {step.status.value} — only failed steps can be retried"})
+
+    task_key = _RETRY_TASK.get(step.step_name)
+    if not task_key:
+        raise HTTPException(status_code=400, detail={"error_code": "NO_TASK", "message": f"No retry task defined for step {step.step_name!r}"})
+
+    step.status = PipelineStepStatus.pending
+    step.error_message = None
+    step.started_at = None
+    step.completed_at = None
+    run.status = PipelineRunStatus.running
+    run.current_step = None
+    session.commit()
+
+    _dispatch(task_key, run_id)
+    return {"status": "retrying", "step": step.step_name, "task": task_key}
+
+
+@router.post("/{project_id}/pipeline/runs/{run_id}/cancel", status_code=200)
+def cancel_run(
+    project_id: uuid.UUID,
+    run_id: uuid.UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Force-stop a running or waiting pipeline run.
+
+    Marks the run as failed so the Celery task skips further work on
+    its next DB read. Admin-only to prevent accidental cancellation.
+    """
+    if current_user.role not in ("admin", "manager"):
+        raise HTTPException(status_code=403, detail={"error_code": "FORBIDDEN", "message": "Only admin or manager can cancel a pipeline run"})
+
+    run = session.exec(
+        select(PipelineRun).where(
+            PipelineRun.id == run_id,
+            PipelineRun.project_id == project_id,
+        )
+    ).first()
+    if not run:
+        raise HTTPException(status_code=404, detail={"error_code": "NOT_FOUND", "message": "Run not found"})
+    if run.status not in (PipelineRunStatus.running, PipelineRunStatus.waiting_for_user):
+        raise HTTPException(status_code=400, detail={"error_code": "INVALID_STATE", "message": f"Run is already {run.status.value}"})
+
+    # Mark any in-progress step as failed too
+    in_progress = session.exec(
+        select(PipelineStep).where(
+            PipelineStep.pipeline_run_id == run_id,
+            PipelineStep.status == PipelineStepStatus.running,
+        )
+    ).all()
+    for step in in_progress:
+        step.status = PipelineStepStatus.failed
+        step.error_message = f"Cancelled by {current_user.email}"
+        step.completed_at = datetime.now(UTC)
+
+    run.status = PipelineRunStatus.failed
+    run.completed_at = datetime.now(UTC)
+    session.commit()
+    return {"status": "cancelled", "run_id": str(run_id)}
+
+

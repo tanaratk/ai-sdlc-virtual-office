@@ -10,7 +10,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlmodel import Session, select
 
 from app.db.models import (
@@ -37,20 +37,49 @@ TIMEOUT_SECONDS = 240.0
 
 # โ”€โ”€ Output schema โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
+def _first(data: dict, *keys: str, fallback: str = "") -> str:
+    for k in keys:
+        if k in data and data[k]:
+            return str(data[k])
+    return fallback
+
+
 class _Component(BaseModel):
     id: str = "COMP-001"
-    name: str
+    name: str = ""
     type: str = "service"
-    technology: str
-    description: str
+    technology: str = ""
+    description: str = ""
     responsibilities: list[str] = Field(default_factory=list)
     requirement_refs: list[str] = Field(default_factory=list)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _remap(cls, v: dict) -> dict:
+        if isinstance(v, dict):
+            if not v.get("name"):
+                v["name"] = _first(v, "component_name", "title", fallback="(unnamed)")
+            if not v.get("technology"):
+                v["technology"] = _first(v, "tech", "stack", "language", fallback="unspecified")
+            if not v.get("description"):
+                v["description"] = _first(v, "detail", "details", "summary", fallback="")
+        return v
+
 
 class _IntegrationPoint(BaseModel):
-    system: str
+    system: str = ""
     protocol: str = "REST"
-    description: str
+    description: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _remap(cls, v: dict) -> dict:
+        if isinstance(v, dict):
+            if not v.get("system"):
+                v["system"] = _first(v, "name", "service", "target", fallback="unknown")
+            if not v.get("description"):
+                v["description"] = _first(v, "detail", "details", "summary", fallback="")
+        return v
 
 
 class ArchitectureOutput(BaseModel):
@@ -70,10 +99,20 @@ class _DBColumn(BaseModel):
 
 class _DBTable(BaseModel):
     id: str = "DB-001"
-    name: str
-    description: str
+    name: str = ""
+    description: str = ""
     columns: list[_DBColumn] = Field(default_factory=list)
     requirement_ref: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _remap(cls, v: dict) -> dict:
+        if isinstance(v, dict):
+            if not v.get("name"):
+                v["name"] = _first(v, "table_name", "table", fallback="unknown_table")
+            if not v.get("description"):
+                v["description"] = _first(v, "detail", "details", "summary", "purpose", fallback="")
+        return v
 
 
 class _DBRelationship(BaseModel):
@@ -98,11 +137,21 @@ class _APIField(BaseModel):
 class _APIEndpoint(BaseModel):
     id: str = "API-001"
     method: str = "GET"
-    path: str
-    description: str
+    path: str = "/"
+    description: str = ""
     request_fields: list[_APIField] = Field(default_factory=list)
     response_fields: list[_APIField] = Field(default_factory=list)
     requirement_ref: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _remap(cls, v: dict) -> dict:
+        if isinstance(v, dict):
+            if not v.get("path"):
+                v["path"] = _first(v, "url", "endpoint", "route", fallback="/")
+            if not v.get("description"):
+                v["description"] = _first(v, "detail", "details", "summary", fallback="")
+        return v
 
 
 class APISpecOutput(BaseModel):

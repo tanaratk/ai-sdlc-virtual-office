@@ -8,7 +8,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlmodel import Session, select
 
 from app.db.models import (
@@ -35,30 +35,69 @@ TIMEOUT_SECONDS = 180.0
 
 # โ”€โ”€ Output schema โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
+def _first(data: dict, *keys: str, fallback: str = "") -> str:
+    for k in keys:
+        if k in data and data[k]:
+            return str(data[k])
+    return fallback
+
+
 class _Field(BaseModel):
-    name: str
+    name: str = ""
     type: str = "text"
     required: bool = True
     validation: str = ""
     description: str = ""
 
+    @model_validator(mode="before")
+    @classmethod
+    def _remap(cls, v: dict) -> dict:
+        if isinstance(v, dict):
+            if not v.get("name"):
+                v["name"] = _first(v, "field_name", "label", "title", fallback="field")
+            if not v.get("description"):
+                v["description"] = _first(v, "detail", "purpose", "note", fallback="")
+        return v
+
 
 class _Screen(BaseModel):
     id: str = "UI-001"
-    name: str
-    description: str
+    name: str = ""
+    description: str = ""
     user_role: str = ""
     requirement_refs: list[str] = Field(default_factory=list)
     fields: list[_Field] = Field(default_factory=list)
     actions: list[str] = Field(default_factory=list)
     navigation: list[str] = Field(default_factory=list)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _remap(cls, v: dict) -> dict:
+        if isinstance(v, dict):
+            if not v.get("name"):
+                v["name"] = _first(v, "screen_name", "title", "label", fallback="Screen")
+            if not v.get("description"):
+                v["description"] = _first(v, "detail", "purpose", "summary", "overview", fallback="")
+            if not v.get("user_role"):
+                v["user_role"] = _first(v, "role", "actor", "persona", fallback="")
+        return v
+
 
 class _UserFlow(BaseModel):
     id: str = "FLOW-001"
-    name: str
+    name: str = ""
     steps: list[str] = Field(default_factory=list)
     requirement_ref: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _remap(cls, v: dict) -> dict:
+        if isinstance(v, dict):
+            if not v.get("name"):
+                v["name"] = _first(v, "flow_name", "title", "label", fallback="Flow")
+            if not v.get("requirement_ref"):
+                v["requirement_ref"] = _first(v, "requirement_refs", "ref", fallback="")
+        return v
 
 
 class UXAgentOutput(BaseModel):

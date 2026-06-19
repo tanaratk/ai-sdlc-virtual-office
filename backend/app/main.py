@@ -1,3 +1,6 @@
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -6,6 +9,45 @@ from app.core.config import settings
 from app.core.logging import setup_logging
 
 setup_logging()
+logger = logging.getLogger(__name__)
+
+
+def _recover_stuck_runs() -> None:
+    """Mark pipeline runs left in status=running as failed on server restart.
+
+    Without this, the DB stays 'running' forever when the Celery worker
+    or backend restarts mid-task.
+    """
+    try:
+        from app.db.models import PipelineRun, PipelineRunStatus
+        from app.db.session import engine
+        from sqlmodel import Session, select
+
+        with Session(engine) as session:
+            stuck = session.exec(
+                select(PipelineRun).where(
+                    PipelineRun.status == PipelineRunStatus.running
+                )
+            ).all()
+            if stuck:
+                for run in stuck:
+                    run.status = PipelineRunStatus.failed
+                session.commit()
+                logger.warning(
+                    "Startup recovery: marked %d stuck pipeline run(s) as failed. "
+                    "Use the Retry button to re-run.",
+                    len(stuck),
+                )
+    except Exception:
+        # Never block startup — DB may not be ready on first boot.
+        logger.exception("Startup recovery failed (non-fatal)")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    _recover_stuck_runs()
+    yield
+
 
 app = FastAPI(
     title="AI-SDLC Working Office",
@@ -14,6 +56,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
+    lifespan=lifespan,
 )
 
 _origins = (

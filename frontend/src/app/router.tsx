@@ -7,6 +7,8 @@ import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
 import ProfilePage from "@/pages/ProfilePage";
 import UserManagementPage from "@/pages/UserManagementPage";
+import AdminProjectsPage from "@/pages/AdminProjectsPage";
+import PipelineMonitorPage from "@/pages/PipelineMonitorPage";
 import ProjectsList from "@/pages/ProjectsList";
 import NewProject from "@/pages/NewProject";
 import ProjectWorkspace from "@/pages/ProjectWorkspace";
@@ -38,6 +40,14 @@ export const router = createBrowserRouter([
       {
         path: "users",
         element: <AdminRoute><UserManagementPage /></AdminRoute>,
+      },
+      {
+        path: "admin/projects",
+        element: <AdminRoute><AdminProjectsPage /></AdminRoute>,
+      },
+      {
+        path: "admin/pipeline",
+        element: <AdminRoute><PipelineMonitorPage /></AdminRoute>,
       },
       { path: "projects", element: <ProjectsList /> },
       { path: "projects/new", element: <NewProject /> },

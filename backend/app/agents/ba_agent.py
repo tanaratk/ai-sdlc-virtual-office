@@ -9,7 +9,7 @@ import logging
 import uuid
 from datetime import UTC, datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlmodel import Session, select
 
 from app.db.models import (
@@ -35,14 +35,29 @@ TIMEOUT_SECONDS = 180.0
 
 # โ”€โ”€ Output schema โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
+def _first(data: dict, *keys: str, fallback: str = “”) -> str:
+    for k in keys:
+        if k in data and data[k]:
+            return str(data[k])
+    return fallback
+
+
 class _BRDRisk(BaseModel):
-    id: str = "RISK-001"
-    description: str
-    impact: str = "Medium"
+    id: str = “RISK-001”
+    description: str = “”
+    impact: str = “Medium”
+
+    @model_validator(mode=”before”)
+    @classmethod
+    def _remap(cls, v: dict) -> dict:
+        if isinstance(v, dict):
+            if not v.get(“description”):
+                v[“description”] = _first(v, “text”, “detail”, “risk”, “summary”, fallback=””)
+        return v
 
 
 class _BRDOutput(BaseModel):
-    business_need: str = ""
+    business_need: str = “”
     objectives: list[str] = Field(default_factory=list)
     success_criteria: list[str] = Field(default_factory=list)
     assumptions: list[str] = Field(default_factory=list)
@@ -51,26 +66,52 @@ class _BRDOutput(BaseModel):
 
 
 class _FSDSpec(BaseModel):
-    id: str = "FSD-001"
-    requirement_ref: str = ""
-    feature: str
-    description: str
+    id: str = “FSD-001”
+    requirement_ref: str = “”
+    feature: str = “”
+    description: str = “”
     acceptance_criteria: list[str] = Field(default_factory=list)
+
+    @model_validator(mode=”before”)
+    @classmethod
+    def _remap(cls, v: dict) -> dict:
+        if isinstance(v, dict):
+            if not v.get(“feature”):
+                v[“feature”] = _first(v, “name”, “title”, “feature_name”, “spec_name”, fallback=”Feature”)
+            if not v.get(“description”):
+                v[“description”] = _first(v, “detail”, “summary”, “spec”, “specification”, fallback=””)
+            if not v.get(“requirement_ref”):
+                v[“requirement_ref”] = _first(v, “req_ref”, “fr_ref”, “requirement_id”, fallback=””)
+        return v
 
 
 class _FSDOutput(BaseModel):
-    system_overview: str = ""
+    system_overview: str = “”
     functional_specs: list[_FSDSpec] = Field(default_factory=list)
 
 
 class _UserStory(BaseModel):
-    id: str = "US-001"
-    requirement_ref: str = ""
-    as_a: str
-    i_want: str
-    so_that: str
+    id: str = “US-001”
+    requirement_ref: str = “”
+    as_a: str = “”
+    i_want: str = “”
+    so_that: str = “”
     acceptance_criteria: list[str] = Field(default_factory=list)
-    priority: str = "Must Have"
+    priority: str = “Must Have”
+
+    @model_validator(mode=”before”)
+    @classmethod
+    def _remap(cls, v: dict) -> dict:
+        if isinstance(v, dict):
+            if not v.get(“as_a”):
+                v[“as_a”] = _first(v, “role”, “user”, “persona”, “actor”, “as”, fallback=”User”)
+            if not v.get(“i_want”):
+                v[“i_want”] = _first(v, “want”, “need”, “goal”, “action”, “feature”, “i_want_to”, fallback=””)
+            if not v.get(“so_that”):
+                v[“so_that”] = _first(v, “benefit”, “reason”, “purpose”, “value”, “outcome”, “so_that_i_can”, fallback=””)
+            if not v.get(“requirement_ref”):
+                v[“requirement_ref”] = _first(v, “req_ref”, “fr_ref”, “requirement_id”, fallback=””)
+        return v
 
 
 class BAAgentOutput(BaseModel):

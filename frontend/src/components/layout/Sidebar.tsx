@@ -10,6 +10,7 @@ import {
   Activity,
   Users,
   Cpu,
+  Radio,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -28,6 +29,8 @@ const baseNavItems = [
 
 const adminNavItems = [
   { to: "/users", icon: Users, label: "User Management" },
+  { to: "/admin/projects", icon: FolderOpen, label: "Project Management" },
+  { to: "/admin/pipeline", icon: Radio, label: "Pipeline Monitor" },
 ];
 
 const bottomNavItems: { to: string; icon: React.ElementType; label: string }[] = [];

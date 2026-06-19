@@ -21,6 +21,8 @@ dependencies = [
     "python-jose[cryptography]==3.3.0",
     "bcrypt==4.2.1",
     "python-multipart==0.0.12",
+    "celery[redis]==5.4.0",
+    "redis==5.2.1",
 ]
 
 [project.optional-dependencies]
