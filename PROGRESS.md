@@ -58,8 +58,8 @@
 | 25 | Developer Agent — Real Code Generation | ✅ Done |
 | 26 | Code Output Viewer + ZIP Download | ✅ Done |
 | 27 | DevOps Agent (Dockerfile + CI/CD gen) | ✅ Done |
-| 28 | Pipeline Steps 8–10 Completion | 🔲 Next |
-| 29 | GitHub Push of Generated Application | 🔲 Planned |
+| 28 | Pipeline Steps 8–10 Completion | ✅ Done |
+| 29 | GitHub Push of Generated Application | 🔲 Next |
 
 ## Project Status
 
