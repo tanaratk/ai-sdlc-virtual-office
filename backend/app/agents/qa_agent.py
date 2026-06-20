@@ -1,15 +1,21 @@
-"""QA Agent -- Pipeline Step 7.
+"""QA Agent -- Sprint 34.
 
-Reads approved FSD, User Stories, API Spec, and (optionally) Screen Spec to produce:
-  - Test Cases document (functional, API, edge-case, negative)
-  - UAT Script document (UAT scenarios + sign-off criteria)
+Generates executable test files for the generated application workspace, runs the
+test commands that are available in the current environment, and stores a
+test_report document plus docs/test_report.md in the project workspace.
 """
 import logging
+import os
+import re
+import shutil
+import subprocess
+import sys
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlmodel import Session, select
 
 from app.db.models import (
@@ -24,412 +30,232 @@ from app.db.models import (
     PipelineRunStatus,
     PipelineStep,
     PipelineStepStatus,
+    Project,
 )
-from app.llm import client as _llm
 
 logger = logging.getLogger(__name__)
 
 AGENT_NAME = "qa-agent"
-
-
-def _esc(s: str) -> str:
-    """Escape braces in document content so str.format() doesn't misinterpret them."""
-    return s.replace("{", "{{").replace("}", "}}")
 STEP_NAME = "test_cases"
-TIMEOUT_SECONDS = 480.0
+
+PYTEST_TIMEOUT_SECONDS = 120
+PLAYWRIGHT_TIMEOUT_SECONDS = 180
 
 
-# โ"€โ"€ Output schemas (all fields optional to tolerate LLM schema drift) โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€
-
-def _first(data: dict, *keys: str, fallback: str = "") -> str:
-    for k in keys:
-        if k in data and data[k]:
-            return str(data[k])
-    return fallback
-
-
-class _LenientBase(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+@dataclass
+class TestCommandResult:
+    name: str
+    command: str
+    status: str
+    exit_code: int | None
+    stdout: str
+    stderr: str
 
 
-class _FunctionalTC(_LenientBase):
-    id: str = "TC-001"
-    fsd_ref: str = ""
-    story_ref: str = ""
-    description: str = ""
-    precondition: str = ""
-    steps: list[str] = Field(default_factory=list)
-    expected_result: str = ""
-    priority: str = "High"
-
-    @model_validator(mode="before")
-    @classmethod
-    def _remap(cls, v: dict) -> dict:
-        if isinstance(v, dict):
-            if not v.get("description"):
-                v["description"] = _first(v, "title", "name", "test_description", "summary", fallback="")
-            if not v.get("expected_result"):
-                v["expected_result"] = _first(v, "expected", "result", "expected_outcome", "outcome", fallback="")
-            if not v.get("fsd_ref"):
-                v["fsd_ref"] = _first(v, "fsd", "spec_ref", "requirement_ref", "ref", fallback="")
-        return v
+def _sanitize_project_name(name: str) -> str:
+    return re.sub(r"[^\w\-]", "_", name)
 
 
-class _ApiTC(_LenientBase):
-    id: str = "TC-010"
-    api_ref: str = ""
-    method: str = "GET"
-    endpoint: str = ""
-    request_body: str = "—"
-    expected_status: int = 200
-    expected_response: str = ""
-    priority: str = "High"
-
-    @model_validator(mode="before")
-    @classmethod
-    def _remap(cls, v: dict) -> dict:
-        if isinstance(v, dict):
-            if not v.get("endpoint"):
-                v["endpoint"] = _first(v, "url", "path", "route", "api_path", fallback="")
-            if not v.get("api_ref"):
-                v["api_ref"] = _first(v, "api", "ref", "endpoint_ref", fallback="")
-            # expected_status might come as string
-            if "expected_status" in v and isinstance(v["expected_status"], str):
-                try:
-                    v["expected_status"] = int(v["expected_status"])
-                except ValueError:
-                    v["expected_status"] = 200
-        return v
+def _container_workspace_path(raw: str | None) -> str:
+    workspace = raw or "/workspace"
+    workspace = re.sub(r"^[A-Za-z]:[/\\]workspace", "/workspace", workspace, flags=re.IGNORECASE)
+    if not workspace.startswith("/workspace"):
+        workspace = "/workspace"
+    return workspace
 
 
-class _EdgeTC(_LenientBase):
-    id: str = "TC-020"
-    fsd_ref: str = ""
-    scenario: str = ""
-    input: str = ""
-    expected_behaviour: str = ""
-
-    @model_validator(mode="before")
-    @classmethod
-    def _remap(cls, v: dict) -> dict:
-        if isinstance(v, dict):
-            if not v.get("scenario"):
-                v["scenario"] = _first(v, "description", "name", "title", "test_case", fallback="")
-            if not v.get("expected_behaviour"):
-                v["expected_behaviour"] = _first(v, "expected_behavior", "expected", "outcome", "result", fallback="")
-        return v
+def _safe_write(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
 
 
-class _NegativeTC(_LenientBase):
-    id: str = "TC-030"
-    fsd_ref: str = ""
-    scenario: str = ""
-    invalid_input: str = ""
-    expected_error: str = ""
-
-    @model_validator(mode="before")
-    @classmethod
-    def _remap(cls, v: dict) -> dict:
-        if isinstance(v, dict):
-            if not v.get("scenario"):
-                v["scenario"] = _first(v, "description", "name", "title", "test_case", fallback="")
-            if not v.get("expected_error"):
-                v["expected_error"] = _first(v, "error", "expected", "error_message", "outcome", fallback="")
-            if not v.get("invalid_input"):
-                v["invalid_input"] = _first(v, "input", "bad_input", "test_input", fallback="")
-        return v
+def _short(text: str, limit: int = 5000) -> str:
+    if len(text) <= limit:
+        return text
+    return text[:limit] + "\n... output truncated ..."
 
 
-class _UATScenario(_LenientBase):
-    id: str = "UAT-001"
-    story_ref: str = ""
-    description: str = ""
-    actor: str = ""
-    steps: list[str] = Field(default_factory=list)
-    expected_outcome: str = ""
-
-    @model_validator(mode="before")
-    @classmethod
-    def _remap(cls, v: dict) -> dict:
-        if isinstance(v, dict):
-            if not v.get("description"):
-                v["description"] = _first(v, "name", "title", "scenario_name", "summary", fallback="")
-            if not v.get("actor"):
-                v["actor"] = _first(v, "role", "user", "persona", "stakeholder", fallback="")
-            if not v.get("expected_outcome"):
-                v["expected_outcome"] = _first(v, "outcome", "expected", "result", "expected_result", fallback="")
-        return v
+def _find_source_files(app_dir: Path) -> list[Path]:
+    if not app_dir.exists():
+        return []
+    ignored_parts = {"node_modules", ".git", "dist", "build", "__pycache__"}
+    source_exts = {".py", ".ts", ".tsx", ".js", ".jsx", ".json", ".yaml", ".yml", ".toml"}
+    files: list[Path] = []
+    for path in app_dir.rglob("*"):
+        if not path.is_file():
+            continue
+        if any(part in ignored_parts for part in path.parts):
+            continue
+        if path.suffix.lower() in source_exts or path.name in {"Dockerfile", "requirements.txt"}:
+            files.append(path)
+    return sorted(files)
 
 
-class QAAgentOutput(_LenientBase):
-    functional_tests: list[_FunctionalTC] = Field(default_factory=list)
-    api_tests: list[_ApiTC] = Field(default_factory=list)
-    edge_case_tests: list[_EdgeTC] = Field(default_factory=list)
-    negative_tests: list[_NegativeTC] = Field(default_factory=list)
-    uat_scenarios: list[_UATScenario] = Field(default_factory=list)
-    sign_off_criteria: list[str] = Field(default_factory=list)
-    minimum_pass_rate: int = 95
+def _extract_api_refs(api_spec: str) -> list[str]:
+    refs = sorted(set(re.findall(r"\bAPI-\d{3}\b", api_spec)))
+    return refs or ["API-001"]
 
 
-# โ"€โ"€ Prompts โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€
+def _extract_screen_refs(screen_spec: str) -> list[str]:
+    refs = sorted(set(re.findall(r"\bUI-\d{3}\b", screen_spec)))
+    return refs or ["UI-001"]
 
-_SYSTEM_PROMPT = """\
-You are the QA Agent in an AI-powered software factory.
-Your job is to read the approved FSD, User Stories, and API Specification,
-then produce comprehensive Test Cases and a UAT Script.
 
-CRITICAL RULES:
-- Every FSD specification (FSD-XXX) must have at least one functional test case.
-- Every API endpoint (API-XXX) must have at least one API test case (happy path + at least one error case).
-- Assign TC-XXX IDs GLOBALLY -- do not restart numbering per section.
-  Functional: TC-001..., API: TC-010+, Edge: TC-020+, Negative: TC-030+.
-- UAT scenarios must be written in plain language for non-technical business users -- no technical jargon.
-- Do NOT write test code -- test case descriptions and steps only.
-- You MUST return ONLY a valid JSON object -- no prose, no markdown wrapping.
+def _render_pytest_workspace_test() -> str:
+    return '''"""Generated by AI-SDLC QA Agent.
+
+Static smoke checks for generated source files.
 """
+from pathlib import Path
 
-_TASK_TEMPLATE = """\
-Analyze the following approved documents and produce a comprehensive QA document.
-Return ONLY the JSON -- no explanation, no code fences.
 
-Schema:
-{{
-  "functional_tests": [
-    {{
-      "id": "TC-001",
-      "fsd_ref": "FSD-001",
-      "story_ref": "US-001",
-      "description": "one-sentence test description",
-      "precondition": "what must be true before the test",
-      "steps": ["Step 1: ...", "Step 2: ..."],
-      "expected_result": "exact observable outcome",
-      "priority": "Critical|High|Medium|Low"
-    }}
-  ],
-  "api_tests": [
-    {{
-      "id": "TC-010",
-      "api_ref": "API-001",
-      "method": "POST",
-      "endpoint": "/projects",
-      "request_body": "{{\"name\": \"Test\"}}",
-      "expected_status": 201,
-      "expected_response": "id, name, status fields present",
-      "priority": "Critical|High|Medium|Low"
-    }}
-  ],
-  "edge_case_tests": [
-    {{
-      "id": "TC-020",
-      "fsd_ref": "FSD-001",
-      "scenario": "boundary condition description",
-      "input": "input at boundary",
-      "expected_behaviour": "expected result"
-    }}
-  ],
-  "negative_tests": [
-    {{
-      "id": "TC-030",
-      "fsd_ref": "FSD-001",
-      "scenario": "missing required field X",
-      "invalid_input": "request without field X",
-      "expected_error": "422 VALIDATION_ERROR -- field required"
-    }}
-  ],
-  "uat_scenarios": [
-    {{
-      "id": "UAT-001",
-      "story_ref": "US-001",
-      "description": "plain-language scenario description",
-      "actor": "business role performing the test",
-      "steps": ["Go to ...", "Click ...", "Verify ..."],
-      "expected_outcome": "what the user should see"
-    }}
-  ],
-  "sign_off_criteria": [
-    "TC-001 (critical path login) must pass",
-    "All Critical priority test cases must pass"
-  ],
-  "minimum_pass_rate": 95
-}}
+ROOT = Path(__file__).resolve().parents[2]
+APP_DIR = ROOT / "generated_app"
 
-FUNCTIONAL SPECIFICATION DOCUMENT (FSD):
-{fsd}
 
-USER STORIES:
-{user_story}
+def test_generated_app_directory_exists():
+    assert APP_DIR.exists(), f"generated_app directory is missing: {APP_DIR}"
 
-API SPECIFICATION:
-{api_spec}
 
-SCREEN SPECIFICATION:
-{screen_spec}
+def test_generated_app_contains_source_files():
+    source_exts = {".py", ".ts", ".tsx", ".js", ".jsx", ".json", ".yaml", ".yml", ".toml"}
+    files = [
+        p for p in APP_DIR.rglob("*")
+        if p.is_file()
+        and "node_modules" not in p.parts
+        and "__pycache__" not in p.parts
+        and (p.suffix in source_exts or p.name in {"Dockerfile", "requirements.txt"})
+    ]
+    assert files, "No generated source/config files found"
+
+
+def test_generated_files_are_not_empty():
+    empty = [
+        str(p.relative_to(APP_DIR))
+        for p in APP_DIR.rglob("*")
+        if p.is_file()
+        and "node_modules" not in p.parts
+        and "__pycache__" not in p.parts
+        and p.stat().st_size == 0
+    ]
+    assert not empty, f"Generated files must not be empty: {empty}"
+'''
+
+
+def _render_pytest_api_contract_test(api_refs: list[str]) -> str:
+    refs_literal = repr(api_refs)
+    return f'''"""Generated by AI-SDLC QA Agent.
+
+Static API contract checks derived from docs/api_spec.md.
 """
+from pathlib import Path
 
 
-# โ"€โ"€ Markdown renderers โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€
+ROOT = Path(__file__).resolve().parents[2]
+API_SPEC = ROOT / "docs" / "api_spec.md"
+EXPECTED_API_REFS = {refs_literal}
 
-def _render_test_cases(data: QAAgentOutput, project_id: str, doc_id: str,
-                       fsd_id: str, story_id: str, api_id: str) -> str:
-    def _func_rows(tests: list[_FunctionalTC]) -> str:
-        if not tests:
-            return "| -- | -- | -- | -- | -- | -- | -- | -- |\n"
-        rows = ""
-        for t in tests:
-            steps = " ".join(f"{i+1}. {s}" for i, s in enumerate(t.steps)) or "--"
-            rows += (
-                f"| {t.id} | {t.fsd_ref} | {t.story_ref} | {t.description} "
-                f"| {t.precondition} | {steps} | {t.expected_result} | {t.priority} |\n"
-            )
-        return rows
 
-    def _api_rows(tests: list[_ApiTC]) -> str:
-        if not tests:
-            return "| -- | -- | -- | -- | -- | -- | -- | -- |\n"
-        rows = ""
-        for t in tests:
-            rows += (
-                f"| {t.id} | {t.api_ref} | {t.method} | `{t.endpoint}` "
-                f"| `{t.request_body}` | {t.expected_status} | {t.expected_response} | {t.priority} |\n"
-            )
-        return rows
+def test_api_spec_document_exists():
+    assert API_SPEC.exists(), f"Missing API spec document: {{API_SPEC}}"
 
-    def _edge_rows(tests: list[_EdgeTC]) -> str:
-        if not tests:
-            return "| -- | -- | -- | -- | -- |\n"
-        return "".join(
-            f"| {t.id} | {t.fsd_ref} | {t.scenario} | {t.input} | {t.expected_behaviour} |\n"
-            for t in tests
-        )
 
-    def _neg_rows(tests: list[_NegativeTC]) -> str:
-        if not tests:
-            return "| -- | -- | -- | -- | -- |\n"
-        return "".join(
-            f"| {t.id} | {t.fsd_ref} | {t.scenario} | {t.invalid_input} | {t.expected_error} |\n"
-            for t in tests
-        )
+def test_expected_api_references_are_documented():
+    content = API_SPEC.read_text(encoding="utf-8")
+    missing = [ref for ref in EXPECTED_API_REFS if ref not in content]
+    assert not missing, f"API references missing from api_spec.md: {{missing}}"
+'''
 
-    total = (len(data.functional_tests) + len(data.api_tests)
-             + len(data.edge_case_tests) + len(data.negative_tests))
 
-    return f"""\
-# Test Cases
+def _render_playwright_smoke_test(screen_refs: list[str]) -> str:
+    refs = ", ".join(screen_refs)
+    return f'''import {{ test, expect }} from "@playwright/test";
 
-**Project ID:** `{project_id}`
-**Document ID:** `{doc_id}`
-**Generated By:** QA Agent v1.0.0
-**Pipeline Step:** 7 of 10
-**Source Documents:** FSD `{fsd_id}`, User Stories `{story_id}`, API Spec `{api_id}`
-**Status:** Draft โ' Awaiting Review
+// Generated by AI-SDLC QA Agent.
+// Screen refs covered by this smoke spec: {refs}
+
+test("generated frontend can load", async ({{ page }}) => {{
+  const baseURL = process.env.PLAYWRIGHT_BASE_URL || "http://localhost:3000";
+  await page.goto(baseURL);
+  await expect(page.locator("body")).toBeVisible();
+}});
+'''
+
+
+def _render_test_report(
+    project_id: uuid.UUID,
+    doc_id: uuid.UUID,
+    generated_files: list[str],
+    source_file_count: int,
+    results: list[TestCommandResult],
+) -> str:
+    now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
+    passed = sum(1 for r in results if r.status == "passed")
+    failed = sum(1 for r in results if r.status == "failed")
+    skipped = sum(1 for r in results if r.status == "skipped")
+    overall = "PASS" if failed == 0 else "FAIL"
+
+    file_rows = "\n".join(f"| `{path}` | generated |" for path in generated_files)
+    result_rows = "\n".join(
+        f"| {r.name} | `{r.command}` | {r.status.upper()} | {r.exit_code if r.exit_code is not None else '-'} |"
+        for r in results
+    )
+    output_blocks = "\n".join(
+        f"""### {r.name}
+
+**Command:** `{r.command}`  
+**Status:** {r.status.upper()}  
+**Exit code:** {r.exit_code if r.exit_code is not None else "-"}
+
+```text
+STDOUT:
+{_short(r.stdout)}
+
+STDERR:
+{_short(r.stderr)}
+```
+"""
+        for r in results
+    )
+
+    return f"""# Test Report
+
+**Project ID:** `{project_id}`  
+**Document ID:** `{doc_id}`  
+**Generated By:** QA Agent  
+**Pipeline Step:** 9 of 12  
+**Generated At:** {now}  
+**Overall Status:** {overall}
 
 ---
 
-## 1. Test Summary
+## Summary
 
-| Type | Count |
+| Metric | Count |
+|---|---:|
+| Generated app source files scanned | {source_file_count} |
+| Test files generated | {len(generated_files)} |
+| Commands passed | {passed} |
+| Commands failed | {failed} |
+| Commands skipped | {skipped} |
+
+## Generated Test Files
+
+| File | Status |
 |---|---|
-| Functional Tests | {len(data.functional_tests)} |
-| API Tests | {len(data.api_tests)} |
-| Edge Case Tests | {len(data.edge_case_tests)} |
-| Negative Tests | {len(data.negative_tests)} |
-| **Total** | **{total}** |
+{file_rows}
 
----
+## Command Results
 
-## 2. Functional Test Cases
+| Runner | Command | Status | Exit Code |
+|---|---|---|---:|
+{result_rows}
 
-| TC ID | FSD Ref | Story Ref | Test Description | Precondition | Steps | Expected Result | Priority |
-|---|---|---|---|---|---|---|---|
-{_func_rows(data.functional_tests)}
+## Runner Output
 
----
-
-## 3. API Test Cases
-
-| TC ID | API Ref | Method | Endpoint | Request Body | Expected Status | Expected Response | Priority |
-|---|---|---|---|---|---|---|---|
-{_api_rows(data.api_tests)}
-
----
-
-## 4. Edge Case Tests
-
-| TC ID | FSD Ref | Scenario | Input | Expected Behaviour |
-|---|---|---|---|---|
-{_edge_rows(data.edge_case_tests)}
-
----
-
-## 5. Negative Tests
-
-| TC ID | FSD Ref | Scenario | Invalid Input | Expected Error |
-|---|---|---|---|---|
-{_neg_rows(data.negative_tests)}
+{output_blocks}
 """
 
-
-def _render_uat_script(data: QAAgentOutput, project_id: str, doc_id: str) -> str:
-    def _uat_rows(scenarios: list[_UATScenario]) -> str:
-        if not scenarios:
-            return "| -- | -- | -- | -- | -- | -- | -- |\n"
-        rows = ""
-        for s in scenarios:
-            steps = " ".join(f"{i+1}. {st}" for i, st in enumerate(s.steps)) or "--"
-            rows += (
-                f"| {s.id} | {s.story_ref} | {s.description} | {s.actor} "
-                f"| {steps} | {s.expected_outcome} | โ Pass / โ Fail |\n"
-            )
-        return rows
-
-    criteria = "\n".join(f"- {c}" for c in data.sign_off_criteria) \
-        if data.sign_off_criteria else "> No sign-off criteria defined."
-
-    return f"""\
-# UAT Script
-
-**Project ID:** `{project_id}`
-**Document ID:** `{doc_id}`
-**Generated By:** QA Agent v1.0.0
-**Pipeline Step:** 7 of 10
-**Status:** Draft โ' Awaiting Review
-
----
-
-## 1. UAT Overview
-
-**Objective:** Verify that all user-facing features work correctly and meet business requirements.
-**Scope:** All features described in the approved User Stories.
-**Target Users:** Business stakeholders and product owners.
-**Minimum Pass Rate for Sign-Off:** {data.minimum_pass_rate}%
-
----
-
-## 2. UAT Scenarios
-
-| Scenario ID | Story Ref | Scenario Description | Actor | Steps | Expected Outcome | Pass / Fail |
-|---|---|---|---|---|---|---|
-{_uat_rows(data.uat_scenarios)}
-
----
-
-## 3. Sign-Off Criteria
-
-{criteria}
-
----
-
-## 4. Sign-Off
-
-| Role | Name | Signature | Date |
-|---|---|---|---|
-| Product Owner | | | |
-| Business Analyst | | | |
-| QA Lead | | | |
-"""
-
-
-# โ"€โ"€ Agent runner โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€
 
 class QAAgentRunner:
     def __init__(self, session: Session) -> None:
@@ -441,7 +267,6 @@ class QAAgentRunner:
 
         try:
             run = self._get_run(run_id)
-
             if run.status == PipelineRunStatus.failed:
                 logger.info("QAAgent skipped -- run %s already failed", run_id)
                 return
@@ -458,66 +283,47 @@ class QAAgentRunner:
                 agent_row.updated_at = datetime.now(UTC)
             self.session.commit()
 
-            fsd_doc, story_doc, api_doc, screen_doc = \
-                self._load_source_documents(run.project_id)
+            project_root = self._get_project_root(run.project_id)
+            app_dir = project_root / "generated_app"
+            docs_dir = project_root / "docs"
+            tests_dir = project_root / "tests"
 
-            raw_json = _llm.call_ollama(
-                system_prompt=_SYSTEM_PROMPT,
-                user_prompt=_TASK_TEMPLATE.format(
-                    fsd=_esc(fsd_doc.content_markdown),
-                    user_story=_esc(story_doc.content_markdown),
-                    api_spec=_esc(api_doc.content_markdown),
-                    screen_spec=_esc(screen_doc.content_markdown) if screen_doc else "(not available)",
-                ),
-                model=agent_row.model_name if agent_row else None,
-                timeout=TIMEOUT_SECONDS,
+            api_doc, screen_doc = self._load_contract_documents(run.project_id)
+            api_refs = _extract_api_refs(api_doc.content_markdown if api_doc else "")
+            screen_refs = _extract_screen_refs(screen_doc.content_markdown if screen_doc else "")
+
+            source_files = _find_source_files(app_dir)
+            generated_files = self._write_test_files(tests_dir, api_refs, screen_refs)
+
+            results = self._run_tests(project_root)
+
+            doc_id = uuid.uuid4()
+            markdown = _render_test_report(
+                project_id=run.project_id,
+                doc_id=doc_id,
+                generated_files=generated_files,
+                source_file_count=len(source_files),
+                results=results,
             )
 
-            parsed = _llm.extract_json(raw_json)
-            output = QAAgentOutput.model_validate(parsed)
-
-            pid = str(run.project_id)
-            fsd_id = str(fsd_doc.id)
-            story_id = str(story_doc.id)
-            api_id = str(api_doc.id)
-
-            # Save Test Cases document
-            tc_doc_id = uuid.uuid4()
-            tc_doc = Document(
-                id=tc_doc_id,
+            report_doc = Document(
+                id=doc_id,
                 project_id=run.project_id,
-                document_type=DocumentType.test_cases,
-                title="Test Cases",
-                content_markdown=_render_test_cases(
-                    output, pid, str(tc_doc_id), fsd_id, story_id, api_id
-                ),
+                document_type=DocumentType.test_report,
+                title="Test Report",
+                content_markdown=markdown,
                 version=1,
                 status=DocumentStatus.review,
                 created_by_agent_id=agent_row.id if agent_row else None,
             )
-            self.session.add(tc_doc)
-
-            # Save UAT Script document
-            uat_doc_id = uuid.uuid4()
-            uat_doc = Document(
-                id=uat_doc_id,
-                project_id=run.project_id,
-                document_type=DocumentType.uat_script,
-                title="UAT Script",
-                content_markdown=_render_uat_script(output, pid, str(uat_doc_id)),
-                version=1,
-                status=DocumentStatus.review,
-                created_by_agent_id=agent_row.id if agent_row else None,
-            )
-            self.session.add(uat_doc)
+            self.session.add(report_doc)
             self.session.flush()
 
             step.status = PipelineStepStatus.completed
             step.agent_id = agent_row.id if agent_row else None
-            step.output_document_id = tc_doc.id
+            step.output_document_id = report_doc.id
             step.completed_at = datetime.now(UTC)
 
-            # Gate 6 -- wait for human review before proceeding
             run.status = PipelineRunStatus.waiting_for_user
             run.current_step = STEP_NAME
 
@@ -525,25 +331,31 @@ class QAAgentRunner:
                 agent_row.status = AgentStatus.done
                 agent_row.updated_at = datetime.now(UTC)
 
-            total_tc = (len(output.functional_tests) + len(output.api_tests)
-                        + len(output.edge_case_tests) + len(output.negative_tests))
+            failed = sum(1 for r in results if r.status == "failed")
+            passed = sum(1 for r in results if r.status == "passed")
+            skipped = sum(1 for r in results if r.status == "skipped")
             self._log_activity(
-                run.project_id, agent_row,
-                f"QA documents created: {total_tc} test cases "
-                f"({len(output.functional_tests)} functional, {len(output.api_tests)} API, "
-                f"{len(output.edge_case_tests)} edge, {len(output.negative_tests)} negative), "
-                f"{len(output.uat_scenarios)} UAT scenarios. Awaiting Gate 6 review.",
+                run.project_id,
+                agent_row,
+                (
+                    f"QA generated {len(generated_files)} test file(s), scanned "
+                    f"{len(source_files)} source file(s), commands: {passed} passed, "
+                    f"{failed} failed, {skipped} skipped. Awaiting QA review."
+                ),
             )
             self.session.commit()
+
+            from app.agents._workspace import write_workspace_docs
+
+            write_workspace_docs(self.session, run.project_id, {"test_report.md": markdown})
             logger.info(
-                "QAAgent completed run=%s tc_doc=%s uat_doc=%s total_tc=%d uat=%d",
-                run_id, tc_doc_id, uat_doc_id, total_tc, len(output.uat_scenarios),
+                "QAAgent completed run=%s report=%s generated_tests=%d failed_commands=%d",
+                run_id, doc_id, len(generated_files), failed,
             )
 
         except Exception as exc:
             logger.exception("QAAgent failed run=%s: %s", run_id, exc)
             self.session.rollback()
-
             try:
                 run = self.session.get(PipelineRun, run_id)
                 if run:
@@ -551,14 +363,103 @@ class QAAgentRunner:
                 if step:
                     step.status = PipelineStepStatus.failed
                     step.error_message = str(exc)[:2000]
+                    step.completed_at = datetime.now(UTC)
                 if agent_row:
                     agent_row.status = AgentStatus.error
                     agent_row.updated_at = datetime.now(UTC)
                 self.session.commit()
             except Exception:
-                logger.exception("Failed to persist failure state for run=%s", run_id)
+                logger.exception("Failed to persist QA failure state for run=%s", run_id)
 
-    # โ"€โ"€ helpers โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€โ"€
+    def _write_test_files(self, tests_dir: Path, api_refs: list[str], screen_refs: list[str]) -> list[str]:
+        files = {
+            "tests/unit/test_generated_workspace.py": _render_pytest_workspace_test(),
+            "tests/api/test_api_contract_static.py": _render_pytest_api_contract_test(api_refs),
+            "tests/e2e/test_smoke.spec.ts": _render_playwright_smoke_test(screen_refs),
+        }
+        for rel_path, content in files.items():
+            _safe_write(tests_dir.parent / rel_path, content)
+        return sorted(files.keys())
+
+    def _run_tests(self, project_root: Path) -> list[TestCommandResult]:
+        results: list[TestCommandResult] = []
+        pytest_targets = ["tests/unit", "tests/api"]
+
+        pytest_cmd = [sys.executable, "-m", "pytest", *pytest_targets]
+        results.append(self._run_command("pytest", pytest_cmd, project_root, PYTEST_TIMEOUT_SECONDS))
+
+        frontend_dir = project_root / "generated_app" / "frontend"
+        playwright_configured = (project_root / "tests" / "e2e").exists() and (
+            (frontend_dir / "package.json").exists() or (project_root / "generated_app" / "package.json").exists()
+        )
+        npx = shutil.which("npx.cmd") or shutil.which("npx")
+        if playwright_configured and npx:
+            results.append(self._run_command(
+                "playwright",
+                [npx, "--no-install", "playwright", "test", "tests/e2e"],
+                project_root,
+                PLAYWRIGHT_TIMEOUT_SECONDS,
+            ))
+        else:
+            results.append(TestCommandResult(
+                name="playwright",
+                command="npx --no-install playwright test tests/e2e",
+                status="skipped",
+                exit_code=None,
+                stdout="Playwright skipped: generated frontend package or npx is not available.",
+                stderr="",
+            ))
+
+        return results
+
+    def _run_command(
+        self,
+        name: str,
+        command: list[str],
+        cwd: Path,
+        timeout: int,
+    ) -> TestCommandResult:
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=str(cwd),
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                check=False,
+            )
+            return TestCommandResult(
+                name=name,
+                command=" ".join(command),
+                status="passed" if completed.returncode == 0 else "failed",
+                exit_code=completed.returncode,
+                stdout=completed.stdout,
+                stderr=completed.stderr,
+            )
+        except FileNotFoundError as exc:
+            return TestCommandResult(
+                name=name,
+                command=" ".join(command),
+                status="skipped",
+                exit_code=None,
+                stdout=f"Skipped: {exc}",
+                stderr="",
+            )
+        except subprocess.TimeoutExpired as exc:
+            return TestCommandResult(
+                name=name,
+                command=" ".join(command),
+                status="failed",
+                exit_code=None,
+                stdout=exc.stdout or "",
+                stderr=f"Timed out after {timeout} seconds. {exc.stderr or ''}",
+            )
+
+    def _get_project_root(self, project_id: uuid.UUID) -> Path:
+        project = self.session.get(Project, project_id)
+        workspace = _container_workspace_path(project.workspace_path if project else None)
+        safe_name = _sanitize_project_name(project.name if project else "project")
+        return Path(workspace) / safe_name
 
     def _get_run(self, run_id: uuid.UUID) -> PipelineRun:
         run = self.session.get(PipelineRun, run_id)
@@ -578,40 +479,25 @@ class QAAgentRunner:
         return step
 
     def _get_agent_row(self) -> Optional[Agent]:
-        return self.session.exec(
-            select(Agent).where(Agent.name == AGENT_NAME)
-        ).first()
+        return self.session.exec(select(Agent).where(Agent.name == AGENT_NAME)).first()
 
-    def _load_source_documents(
-        self, project_id: uuid.UUID
-    ) -> tuple[Document, Document, Document, Optional[Document]]:
+    def _load_contract_documents(self, project_id: uuid.UUID) -> tuple[Optional[Document], Optional[Document]]:
         def _latest(doc_type: DocumentType) -> Optional[Document]:
             return self.session.exec(
-                select(Document).where(
+                select(Document)
+                .where(
                     Document.project_id == project_id,
                     Document.document_type == doc_type,
-                ).order_by(Document.created_at.desc())
+                )
+                .order_by(Document.created_at.desc())  # type: ignore[union-attr]
             ).first()
 
-        fsd = _latest(DocumentType.fsd)
-        story = _latest(DocumentType.user_story)
-        api = _latest(DocumentType.api_spec)
-        screen = _latest(DocumentType.screen_spec)
-
-        missing = [
-            name for name, doc in [("FSD", fsd), ("User Stories", story), ("API Spec", api)]
-            if not doc
-        ]
-        if missing:
-            raise ValueError(f"Missing source documents: {', '.join(missing)}")
-
-        return fsd, story, api, screen  # type: ignore[return-value]
+        return _latest(DocumentType.api_spec), _latest(DocumentType.screen_spec)
 
     def _log_activity(self, project_id: uuid.UUID, agent_row: Optional[Agent], message: str) -> None:
-        log = ActivityLog(
+        self.session.add(ActivityLog(
             project_id=project_id,
             agent_id=agent_row.id if agent_row else None,
             event_type=EventType.document_created,
             message=message,
-        )
-        self.session.add(log)
+        ))
