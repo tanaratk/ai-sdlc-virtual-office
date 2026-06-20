@@ -1,4 +1,4 @@
-﻿"""UX Agent โ€” Pipeline Step 5.
+"""UX Agent โ€” Pipeline Step 5.
 
 Reads the approved BRD, FSD, and User Story Backlog and produces:
   - Screen Specification (screen list, field spec, user flows, wireframe notes)

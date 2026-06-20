@@ -1,4 +1,4 @@
-﻿"""Gap Analysis Agent โ€” Pipeline Step 2.
+"""Gap Analysis Agent โ€” Pipeline Step 2.
 
 Reads the requirement_summary document and detects:
   missing, unclear, conflicting requirements, missing actors, business rules, etc.

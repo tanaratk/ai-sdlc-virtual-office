@@ -1,4 +1,4 @@
-﻿"""Requirement Agent โ€” Pipeline Step 1.
+"""Requirement Agent โ€” Pipeline Step 1.
 
 Runtime pattern:
   load inputs โ’ build prompt โ’ call LLM โ’ validate JSON โ’ render Markdown

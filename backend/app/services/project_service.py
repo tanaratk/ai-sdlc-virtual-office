@@ -1,4 +1,4 @@
-﻿import uuid
+import uuid
 from datetime import UTC, datetime
 
 from sqlmodel import Session, func, select

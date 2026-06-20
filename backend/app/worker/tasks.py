@@ -320,8 +320,8 @@ def run_change_impact_pipeline(self, run_id: str) -> None:
                 change_description=(
                     "Pipeline Step 8 — automated baseline impact assessment of all project requirements."
                 ),
-                changed_requirement_ids=[],
-                context_notes="Generated automatically during SDLC pipeline execution.",
+                changed_requirement_ids=["ALL"],
+                context_notes="Automated baseline assessment — all requirements in scope.",
             )
             _step_complete(session, _id, STEP, doc.id)
         except Exception as exc:

@@ -81,7 +81,7 @@ def _status_from_results(commands: list[CommandResult], endpoints: list[Endpoint
     command_failed = any(r.status == "failed" for r in commands)
     endpoint_passed = any(r.status == "passed" for r in endpoints)
     endpoint_failed = any(r.status == "failed" for r in endpoints)
-    if command_failed or endpoint_failed and not endpoint_passed:
+    if command_failed or (endpoint_failed and not endpoint_passed):
         return "FAIL"
     if any(r.status == "skipped" for r in commands) or any(r.status == "skipped" for r in endpoints):
         return "PARTIAL"

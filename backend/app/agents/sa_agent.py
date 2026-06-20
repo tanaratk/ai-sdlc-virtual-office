@@ -1,4 +1,4 @@
-﻿"""Solution Architect Agent โ€” Pipeline Step 4.
+"""Solution Architect Agent โ€” Pipeline Step 4.
 
 Reads the approved BRD, FSD, and User Story Backlog and produces:
   - Architecture Design (system components, deployment, security, integrations)
@@ -91,10 +91,20 @@ class ArchitectureOutput(BaseModel):
 
 
 class _DBColumn(BaseModel):
-    name: str
-    type: str
+    name: str = ""
+    type: str = ""
     nullable: bool = True
     description: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _remap(cls, v: dict) -> dict:
+        if isinstance(v, dict):
+            if not v.get("name"):
+                v["name"] = _first(v, "column_name", "field", "col", fallback="column")
+            if not v.get("type"):
+                v["type"] = _first(v, "data_type", "sql_type", "dtype", fallback="VARCHAR(255)")
+        return v
 
 
 class _DBTable(BaseModel):
@@ -116,10 +126,20 @@ class _DBTable(BaseModel):
 
 
 class _DBRelationship(BaseModel):
-    from_table: str
-    to_table: str
+    from_table: str = ""
+    to_table: str = ""
     type: str = "one_to_many"
     description: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _remap(cls, v: dict) -> dict:
+        if isinstance(v, dict):
+            if not v.get("from_table"):
+                v["from_table"] = _first(v, "from", "source", "table_a", fallback="unknown")
+            if not v.get("to_table"):
+                v["to_table"] = _first(v, "to", "target", "table_b", fallback="unknown")
+        return v
 
 
 class DatabaseOutput(BaseModel):
@@ -128,10 +148,20 @@ class DatabaseOutput(BaseModel):
 
 
 class _APIField(BaseModel):
-    name: str
-    type: str
+    name: str = ""
+    type: str = ""
     required: bool = True
     description: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _remap(cls, v: dict) -> dict:
+        if isinstance(v, dict):
+            if not v.get("name"):
+                v["name"] = _first(v, "field_name", "param", "key", fallback="field")
+            if not v.get("type"):
+                v["type"] = _first(v, "data_type", "dtype", "kind", fallback="string")
+        return v
 
 
 class _APIEndpoint(BaseModel):

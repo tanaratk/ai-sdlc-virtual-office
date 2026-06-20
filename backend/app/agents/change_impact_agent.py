@@ -1,4 +1,4 @@
-﻿"""Change Impact Agent โ€” Pipeline Step 8.
+"""Change Impact Agent โ€” Pipeline Step 8.
 
 Triggered manually when a requirement changes after BA/SA work has begun.
 Reads all available project documents and produces a Change Impact Report
@@ -536,7 +536,7 @@ class ChangeImpactAgentRunner:
             DocumentType.api_spec:            "api_spec",
             DocumentType.database_design:     "database",
             DocumentType.screen_spec:         "screen_spec",
-            DocumentType.test_cases:          "test_cases",
+            DocumentType.test_report:         "test_cases",
         }
         result: dict[str, str] = {}
         for doc_type, key in type_key.items():

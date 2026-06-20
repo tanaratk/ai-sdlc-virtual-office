@@ -1,4 +1,4 @@
-﻿"""MCP API โ€” tool registry and call management."""
+"""MCP API โ€” tool registry and call management."""
 import uuid
 from datetime import UTC, datetime
 from typing import Annotated, Any, Optional

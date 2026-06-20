@@ -1,4 +1,4 @@
-﻿"""MCP tool executor โ€” runs approved tool calls.
+"""MCP tool executor โ€” runs approved tool calls.
 
 Each tool either executes real logic (github.* tools via github_service)
 or returns a stub result for tools not yet implemented.

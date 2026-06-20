@@ -1,4 +1,4 @@
-﻿"""PM Agent โ€” Pipeline Step 10 (final step).
+"""PM Agent โ€” Pipeline Step 10 (final step).
 
 Reads project metadata and all available documents, calls the LLM to
 produce an executive-level Project Summary, then assembles a data-driven

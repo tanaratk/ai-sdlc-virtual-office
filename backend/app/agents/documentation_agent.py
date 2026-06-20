@@ -1,4 +1,4 @@
-﻿"""Documentation Agent โ€” Pipeline Step 9.
+"""Documentation Agent โ€” Pipeline Step 9.
 
 Collects all available project documents, asks the LLM to write a brief
 executive summary, then assembles the full Compiled Document Set in one
