@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     # OpenAI (optional)
     openai_api_key: str = ""
 
+    # Anthropic / Claude (optional)
+    anthropic_api_key: str = ""
+
     # Redis / Celery
     redis_url: str = "redis://localhost:6379/0"
 

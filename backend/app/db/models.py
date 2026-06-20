@@ -42,6 +42,7 @@ class SpriteDirection(str, Enum):
 class ModelProvider(str, Enum):
     ollama = "ollama"
     openai = "openai"
+    anthropic = "anthropic"
 
 
 class TaskStatus(str, Enum):
