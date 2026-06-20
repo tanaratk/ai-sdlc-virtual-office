@@ -1,6 +1,6 @@
 # AI-SDLC Virtual Office — Progress Tracker
 
-**Last Updated:** 2026-06-19 (Phase 3 in progress — Sprint 39 implementation done, next sprint planning needed)  
+**Last Updated:** 2026-06-20 (Phase 3 in progress — Bug fix session: 6 backend bugs + UI redesign complete)  
 **Project:** ai-sdlc-virtual-office  
 **Repo:** https://github.com/tanaratk/ai-sdlc-virtual-office  
 **Working Directory:** D:\AI_Office
@@ -73,6 +73,8 @@
 | 37 | Multi-Developer Agent fan-out | ✅ Done |
 | 38 | Agent Contract Refactor | ✅ Done |
 | 39 | Change Impact On-demand Trigger | ✅ Done |
+| 39-fix | UI Redesign (sidebar groups, pipeline control center, agent console) | ✅ Done |
+| 39-bugfix | Backend: 6 bugs fixed (SA validation, change_impact doctype, BOM removal) | ✅ Done |
 
 ## Project Status
 
