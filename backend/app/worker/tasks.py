@@ -293,6 +293,63 @@ def _step_fail(session: Session, run_id: uuid.UUID, step_name: str, error: str) 
         logger.exception("Failed to persist failure state run=%s step=%s", run_id, step_name)
 
 
+def _step_complete_and_chain(
+    session: Session,
+    run_id: uuid.UUID,
+    step_name: str,
+    doc_id: uuid.UUID,
+    next_step_name: str,
+    next_task_fn,
+) -> None:
+    """Mark step completed and auto-dispatch the next step (no user approval gate)."""
+    from app.db.models import PipelineRun, PipelineRunStatus, PipelineStep, PipelineStepStatus
+
+    run = session.get(PipelineRun, run_id)
+    step = session.exec(
+        select(PipelineStep).where(
+            PipelineStep.pipeline_run_id == run_id,
+            PipelineStep.step_name == step_name,
+        )
+    ).first()
+    if step:
+        step.status = PipelineStepStatus.completed
+        step.output_document_id = doc_id
+        step.completed_at = datetime.now(UTC)
+    if run:
+        next_step = PipelineStep(
+            pipeline_run_id=run_id,
+            step_name=next_step_name,
+            status=PipelineStepStatus.pending,
+        )
+        session.add(next_step)
+        run.status = PipelineRunStatus.running
+        run.current_step = None
+    session.commit()
+    next_task_fn.delay(str(run_id))
+
+
+def _step_complete_final(session: Session, run_id: uuid.UUID, step_name: str, doc_id: uuid.UUID) -> None:
+    """Mark step completed and pipeline run as done (last step, no further gate)."""
+    from app.db.models import PipelineRun, PipelineRunStatus, PipelineStep, PipelineStepStatus
+
+    run = session.get(PipelineRun, run_id)
+    step = session.exec(
+        select(PipelineStep).where(
+            PipelineStep.pipeline_run_id == run_id,
+            PipelineStep.step_name == step_name,
+        )
+    ).first()
+    if step:
+        step.status = PipelineStepStatus.completed
+        step.output_document_id = doc_id
+        step.completed_at = datetime.now(UTC)
+    if run:
+        run.status = PipelineRunStatus.completed
+        run.completed_at = datetime.now(UTC)
+        run.current_step = None
+    session.commit()
+
+
 # ── Step 8: Change Impact Agent (pipeline baseline) ──────────────────────────
 
 @celery_app.task(
@@ -359,7 +416,7 @@ def run_documentation_pipeline(self, run_id: str) -> None:
                 project_id=run.project_id,
                 project_name=project_name,
             )
-            _step_complete(session, _id, STEP, doc.id)
+            _step_complete_and_chain(session, _id, STEP, doc.id, "pm_summary", run_pm_pipeline)
         except Exception as exc:
             logger.exception("Documentation pipeline task failed run=%s: %s", _id, exc)
             session.rollback()
@@ -395,7 +452,7 @@ def run_pm_pipeline(self, run_id: str) -> None:
                 project_id=run.project_id,
                 project_name=project_name,
             )
-            _step_complete(session, _id, STEP, project_summary_doc.id)
+            _step_complete_final(session, _id, STEP, project_summary_doc.id)
         except Exception as exc:
             logger.exception("PM pipeline task failed run=%s: %s", _id, exc)
             session.rollback()

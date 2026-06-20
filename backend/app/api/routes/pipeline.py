@@ -27,9 +27,10 @@ class _RejectBody(BaseModel):
 # DESIGN LAYER:    sa_documents → ux_documents → technical_design
 #   [HARD GATE] technical_design approved → unlock Delivery Layer
 #
-# DELIVERY LAYER:  dev_tasks → code_review → test_cases → devops_tasks → monitoring → DONE
+# DELIVERY LAYER:  dev_tasks → code_review → test_cases → devops_tasks → monitoring
+#                  → documentation (auto) → pm_summary (auto) → DONE
 #
-# ON-DEMAND (removed from auto-chain): change_impact, documentation, pm_summary
+# ON-DEMAND: change_impact
 
 # step_name → next step name to create on approval (None = pipeline done)
 _NEXT_STEP: dict[str, str | None] = {
@@ -45,7 +46,7 @@ _NEXT_STEP: dict[str, str | None] = {
     "code_review":       "test_cases",
     "test_cases":        "devops_tasks",
     "devops_tasks":      "monitoring",
-    "monitoring":        None,                 # Pipeline complete
+    "monitoring":        "documentation",      # Triggers auto-chain: doc → pm → done
 }
 
 # step_name → task key to dispatch on approval
@@ -59,6 +60,7 @@ _NEXT_TASK: dict[str, str] = {
     "code_review":       "test_cases",
     "test_cases":        "devops_tasks",
     "devops_tasks":      "monitoring",
+    "monitoring":        "documentation",      # dispatch doc task on monitoring approval
 }
 
 # step_name → which task key retries that step
@@ -74,6 +76,8 @@ _RETRY_TASK: dict[str, str] = {
     "devops_tasks":        "devops_tasks",
     "test_cases":          "test_cases",
     "monitoring":          "monitoring",
+    "documentation":       "documentation",
+    "pm_summary":          "pm_summary",
 }
 
 # Hard gates — approve at these steps triggers a layer transition message
@@ -95,6 +99,8 @@ _STEP_LAYER: dict[str, str] = {
     "devops_tasks":        "delivery",
     "test_cases":          "delivery",
     "monitoring":          "delivery",
+    "documentation":       "delivery",
+    "pm_summary":          "delivery",
 }
 
 
