@@ -27,6 +27,49 @@ export interface AgentUpdate {
   is_active?: boolean;
 }
 
+export type AgentContractLayer = "business" | "design" | "delivery" | "on_demand";
+
+export interface AgentContractStep {
+  name: string;
+  order: number;
+  total: number;
+  auto_chain: boolean;
+}
+
+export interface AgentContractSummary {
+  id: string;
+  name: string;
+  role: string;
+  layer: AgentContractLayer;
+  step: AgentContractStep;
+  outputs: {
+    documents: string[];
+    workspace_files: string[];
+  };
+  handoff: {
+    next_agent: string | null;
+    review_gate: boolean;
+    failure_action?: string;
+  };
+}
+
+export interface AgentContract extends AgentContractSummary {
+  model: {
+    provider: string;
+    default: string;
+  };
+  inputs: {
+    required_documents: string[];
+    optional_documents: string[];
+    runtime_inputs: string[];
+  };
+  responsibilities: string[];
+  workspace: {
+    home_zone: string;
+    writes_to: string[];
+  };
+}
+
 export interface OllamaModel {
   name: string;
   size: number | null;

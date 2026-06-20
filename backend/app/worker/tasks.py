@@ -131,7 +131,7 @@ def run_dev_agent(self, run_id: str) -> None:
         DevAgentRunner(session).run(uuid.UUID(run_id))
 
 
-# ── Step 7: DevOps Agent ─────────────────────────────────────────────────────
+# ── Step 10: DevOps Agent ────────────────────────────────────────────────────
 
 @celery_app.task(
     base=_AgentTask,
@@ -148,6 +148,23 @@ def run_devops_agent(self, run_id: str) -> None:
 
     with Session(engine) as session:
         DevOpsAgentRunner(session).run(uuid.UUID(run_id))
+
+
+@celery_app.task(
+    base=_AgentTask,
+    bind=True,
+    name="tasks.run_monitoring_agent",
+    max_retries=_MAX_RETRIES,
+    default_retry_delay=_RETRY_DELAY,
+    autoretry_for=_RETRY_ON,
+)
+def run_monitoring_agent(self, run_id: str) -> None:
+    from app.agents.monitoring_agent import MonitoringAgentRunner
+    from app.db.session import engine
+    from sqlmodel import Session
+
+    with Session(engine) as session:
+        MonitoringAgentRunner(session).run(uuid.UUID(run_id))
 
 
 # ── Step 6: Technical Design Agent ───────────────────────────────────────────
@@ -168,7 +185,7 @@ def run_technical_design(self, run_id: str) -> None:
         TechnicalDesignAgentRunner(session).run(uuid.UUID(run_id))
 
 
-# ── Step 7: Code Review Agent ─────────────────────────────────────────────────
+# ── Step 8: Code Review Agent ─────────────────────────────────────────────────
 
 @celery_app.task(
     base=_AgentTask,
@@ -186,7 +203,7 @@ def run_code_review(self, run_id: str) -> None:
         CodeReviewAgentRunner(session).run(uuid.UUID(run_id))
 
 
-# ── Step 8: QA Agent ──────────────────────────────────────────────────────────
+# ── Step 9: QA Agent ──────────────────────────────────────────────────────────
 
 @celery_app.task(
     base=_AgentTask,
@@ -401,6 +418,7 @@ STEP_TASKS: dict[str, object] = {
     "code_review":       run_code_review,
     "devops_tasks":      run_devops_agent,
     "test_cases":        run_qa_agent,
+    "monitoring":        run_monitoring_agent,
     # On-demand (not in auto-chain)
     "change_impact":     run_change_impact_pipeline,
     "documentation":     run_documentation_pipeline,
