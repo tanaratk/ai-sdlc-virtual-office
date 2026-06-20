@@ -73,6 +73,9 @@ def _build_ollama_payload(
     return payload
 
 
+_MAX_PROMPT_CHARS = 6000  # safety limit for thinking models on long-document steps
+
+
 def _ollama_post(url: str, payload: dict, timeout: float) -> str:
     with httpx.Client(timeout=timeout) as http:
         resp = http.post(url, json=payload)
@@ -89,11 +92,10 @@ def _call_ollama(
 ) -> str:
     url = f"{settings.ollama_base_url}/api/chat"
 
-    # Attempt 1 — standard (with format=json, thinking suppressed for known models)
+    # Attempt 1 — standard (format=json, thinking suppressed for known models)
     payload = _build_ollama_payload(model, system_prompt, user_prompt, response_format)
     content = _ollama_post(url, payload, timeout)
     logger.info("Ollama attempt 1 model=%s response=%d chars", model, len(content))
-
     if content.strip():
         return content
 
@@ -107,20 +109,43 @@ def _call_ollama(
     )
     content = _ollama_post(url, payload2, timeout)
     logger.info("Ollama attempt 2 model=%s response=%d chars", model, len(content))
-
     if content.strip():
         return content
 
-    # Attempt 3 — drop format=json entirely; rely on prompt instructions + extract_json
-    # Fixes: thinking models where grammar-constrained JSON + thinking tokens exhaust context
+    # Attempt 3 — drop format=json + truncate prompt
+    # Thinking models where grammar+thinking exhaust context need shorter input
     logger.warning(
-        "Ollama model=%s: still empty, retrying WITHOUT format=json (grammar conflict)", model
+        "Ollama model=%s: still empty, retrying without format=json and with truncated prompt",
+        model,
+    )
+    truncated_user = (
+        user_prompt[:_MAX_PROMPT_CHARS] + "\n[input truncated for context limit]"
+        if len(user_prompt) > _MAX_PROMPT_CHARS
+        else user_prompt
     )
     payload3 = _build_ollama_payload(
-        model, system_prompt, user_prompt, response_format, no_think=True, no_grammar=True
+        model, system_prompt, truncated_user, response_format, no_think=True, no_grammar=True
     )
     content = _ollama_post(url, payload3, timeout)
     logger.info("Ollama attempt 3 model=%s response=%d chars", model, len(content))
+    if content.strip():
+        return content
+
+    # Attempt 4 — fall back to default Ollama model (qwen3:8b) which is known to work
+    fallback = settings.ollama_model
+    if model == fallback:
+        logger.error("Ollama model=%s: all attempts returned empty, no fallback available", model)
+        return content  # empty; extract_json will raise a clear error
+
+    logger.warning(
+        "Ollama model=%s: all attempts returned empty, falling back to default model=%s",
+        model, fallback,
+    )
+    fallback_payload = _build_ollama_payload(
+        fallback, system_prompt, user_prompt, response_format
+    )
+    content = _ollama_post(url, fallback_payload, timeout)
+    logger.info("Ollama fallback model=%s response=%d chars", fallback, len(content))
     return content
 
 
