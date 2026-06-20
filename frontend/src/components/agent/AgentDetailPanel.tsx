@@ -2,70 +2,76 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   X, Bot, Save, CheckCircle2, Loader2, XCircle, Clock,
-  FileText, Settings, Pencil, RotateCcw,
+  FileText, Settings, Pencil, RotateCcw, LayoutDashboard,
+  ScrollText, AlertCircle,
 } from "lucide-react";
 import { agentApi } from "@/services/agentApi";
 import type { Agent, ModelProvider } from "@/types/agent";
 import { cn } from "@/lib/utils";
 
-const STATUS_BADGES = {
-  idle:    { icon: Clock,        cls: "text-muted-foreground bg-muted" },
-  working: { icon: Loader2,      cls: "text-blue-700 bg-blue-100", spin: true },
-  done:    { icon: CheckCircle2, cls: "text-green-700 bg-green-100" },
-  error:   { icon: XCircle,      cls: "text-red-700 bg-red-100" },
-} as const;
+// ── Static maps ───────────────────────────────────────────────────────────────
 
 const STEP_MAP: Record<string, number> = {
-  "requirement-agent":       1,
-  "gap-analysis-agent":      2,
-  "ba-agent":                3,
-  "architect-agent":         4,
-  "ux-agent":                5,
-  "technical-design-agent":  6,
-  "developer-agent":         7,
+  "requirement-agent":        1,
+  "gap-analysis-agent":       2,
+  "ba-agent":                 3,
+  "architect-agent":          4,
+  "ux-agent":                 5,
+  "technical-design-agent":   6,
+  "developer-agent":          7,
   "developer-agent-backend":  7,
   "developer-agent-frontend": 7,
   "developer-agent-platform": 7,
-  "code-review-agent":       8,
-  "qa-agent":                9,
-  "devops-agent":           10,
-  "monitoring-agent":       11,
-  "change-impact-agent":    12,
+  "code-review-agent":        8,
+  "qa-agent":                 9,
+  "devops-agent":            10,
+  "monitoring-agent":        11,
+  "change-impact-agent":     12,
 };
 
 const LAYER_MAP: Record<string, { label: string; cls: string }> = {
-  "requirement-agent":       { label: "Business",  cls: "bg-amber-100 text-amber-700" },
-  "gap-analysis-agent":      { label: "Business",  cls: "bg-amber-100 text-amber-700" },
-  "ba-agent":                { label: "Business",  cls: "bg-amber-100 text-amber-700" },
-  "architect-agent":         { label: "Design",    cls: "bg-blue-100 text-blue-700" },
-  "ux-agent":                { label: "Design",    cls: "bg-blue-100 text-blue-700" },
-  "technical-design-agent":  { label: "Design",    cls: "bg-blue-100 text-blue-700" },
-  "developer-agent":         { label: "Delivery",  cls: "bg-green-100 text-green-700" },
+  "requirement-agent":        { label: "Business",  cls: "bg-amber-100 text-amber-700" },
+  "gap-analysis-agent":       { label: "Business",  cls: "bg-amber-100 text-amber-700" },
+  "ba-agent":                 { label: "Business",  cls: "bg-amber-100 text-amber-700" },
+  "architect-agent":          { label: "Design",    cls: "bg-blue-100 text-blue-700" },
+  "ux-agent":                 { label: "Design",    cls: "bg-blue-100 text-blue-700" },
+  "technical-design-agent":   { label: "Design",    cls: "bg-blue-100 text-blue-700" },
+  "developer-agent":          { label: "Delivery",  cls: "bg-green-100 text-green-700" },
   "developer-agent-backend":  { label: "Delivery",  cls: "bg-green-100 text-green-700" },
   "developer-agent-frontend": { label: "Delivery",  cls: "bg-green-100 text-green-700" },
   "developer-agent-platform": { label: "Delivery",  cls: "bg-green-100 text-green-700" },
-  "code-review-agent":       { label: "Delivery",  cls: "bg-green-100 text-green-700" },
-  "qa-agent":                { label: "Delivery",  cls: "bg-green-100 text-green-700" },
-  "devops-agent":            { label: "Delivery",  cls: "bg-green-100 text-green-700" },
-  "monitoring-agent":        { label: "Delivery",  cls: "bg-green-100 text-green-700" },
-  "change-impact-agent":     { label: "On-demand", cls: "bg-purple-100 text-purple-700" },
-  "documentation-agent":     { label: "On-demand", cls: "bg-purple-100 text-purple-700" },
-  "pm-agent":                { label: "On-demand", cls: "bg-purple-100 text-purple-700" },
+  "code-review-agent":        { label: "Delivery",  cls: "bg-green-100 text-green-700" },
+  "qa-agent":                 { label: "Delivery",  cls: "bg-green-100 text-green-700" },
+  "devops-agent":             { label: "Delivery",  cls: "bg-green-100 text-green-700" },
+  "monitoring-agent":         { label: "Delivery",  cls: "bg-green-100 text-green-700" },
+  "change-impact-agent":      { label: "On-demand", cls: "bg-purple-100 text-purple-700" },
+  "documentation-agent":      { label: "On-demand", cls: "bg-purple-100 text-purple-700" },
+  "pm-agent":                 { label: "On-demand", cls: "bg-purple-100 text-purple-700" },
 };
 
-type Tab = "info" | "skill";
+const STATUS_BADGE: Record<string, { label: string; cls: string; spin?: boolean; Icon: React.ElementType }> = {
+  idle:    { label: "Waiting", cls: "text-gray-600 bg-gray-100",   Icon: Clock },
+  working: { label: "Running", cls: "text-blue-700 bg-blue-100",   Icon: Loader2, spin: true },
+  done:    { label: "Done",    cls: "text-green-700 bg-green-100", Icon: CheckCircle2 },
+  error:   { label: "Failed",  cls: "text-red-700 bg-red-100",     Icon: XCircle },
+};
 
-interface AgentDetailPanelProps {
-  agent: Agent;
-  onClose: () => void;
-}
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatBytes(bytes: number | null) {
   if (!bytes) return null;
   return `${(bytes / 1e9).toFixed(1)} GB`;
 }
 
-// Minimal markdown renderer — headers, bold, lists, tables, code blocks
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleString([], {
+    year: "numeric", month: "short", day: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+// ── Minimal Markdown renderer ─────────────────────────────────────────────────
+
 function MarkdownView({ content }: { content: string }) {
   const lines = content.split("\n");
   const elements: React.ReactNode[] = [];
@@ -73,7 +79,6 @@ function MarkdownView({ content }: { content: string }) {
 
   while (i < lines.length) {
     const line = lines[i];
-
     if (line.startsWith("### ")) {
       elements.push(<h3 key={i} className="text-sm font-semibold mt-3 mb-1">{line.slice(4)}</h3>);
     } else if (line.startsWith("## ")) {
@@ -81,12 +86,8 @@ function MarkdownView({ content }: { content: string }) {
     } else if (line.startsWith("# ")) {
       elements.push(<h1 key={i} className="text-base font-bold mt-2 mb-2">{line.slice(2)}</h1>);
     } else if (line.startsWith("| ")) {
-      // collect table rows
       const tableLines: string[] = [];
-      while (i < lines.length && lines[i].startsWith("|")) {
-        tableLines.push(lines[i]);
-        i++;
-      }
+      while (i < lines.length && lines[i].startsWith("|")) { tableLines.push(lines[i]); i++; }
       const rows = tableLines.filter(l => !l.match(/^\|[-| ]+\|$/));
       elements.push(
         <div key={`table-${i}`} className="overflow-x-auto my-2">
@@ -116,10 +117,7 @@ function MarkdownView({ content }: { content: string }) {
     } else if (line.startsWith("```")) {
       const codeLines: string[] = [];
       i++;
-      while (i < lines.length && !lines[i].startsWith("```")) {
-        codeLines.push(lines[i]);
-        i++;
-      }
+      while (i < lines.length && !lines[i].startsWith("```")) { codeLines.push(lines[i]); i++; }
       elements.push(
         <pre key={`code-${i}`} className="bg-muted rounded p-2 text-xs font-mono overflow-x-auto my-1">
           {codeLines.join("\n")}
@@ -134,23 +132,40 @@ function MarkdownView({ content }: { content: string }) {
     }
     i++;
   }
-
   return <div className="space-y-0.5">{elements}</div>;
 }
 
+// ── Tab types ─────────────────────────────────────────────────────────────────
+
+type Tab = "overview" | "model" | "skill" | "logs";
+
+const TABS: { key: Tab; label: string; Icon: React.ElementType }[] = [
+  { key: "overview", label: "Overview",     Icon: LayoutDashboard },
+  { key: "model",    label: "Model Config", Icon: Settings },
+  { key: "skill",    label: "Prompt / Skill", Icon: FileText },
+  { key: "logs",     label: "Logs",         Icon: ScrollText },
+];
+
+// ── Props ─────────────────────────────────────────────────────────────────────
+
+interface AgentDetailPanelProps {
+  agent: Agent;
+  onClose: () => void;
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export function AgentDetailPanel({ agent, onClose }: AgentDetailPanelProps) {
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<Tab>("info");
+  const [tab, setTab] = useState<Tab>("overview");
 
-  // Info tab state
-  const [provider, setProvider] = useState<ModelProvider>(agent.model_provider);
+  const [provider, setProvider]   = useState<ModelProvider>(agent.model_provider);
   const [modelName, setModelName] = useState(agent.model_name);
   const [savedModel, setSavedModel] = useState(false);
 
-  // Skill tab state
   const [editingSkill, setEditingSkill] = useState(false);
-  const [skillDraft, setSkillDraft] = useState(agent.skill_markdown ?? "");
-  const [savedSkill, setSavedSkill] = useState(false);
+  const [skillDraft, setSkillDraft]     = useState(agent.skill_markdown ?? "");
+  const [savedSkill, setSavedSkill]     = useState(false);
 
   useEffect(() => {
     setProvider(agent.model_provider);
@@ -159,7 +174,7 @@ export function AgentDetailPanel({ agent, onClose }: AgentDetailPanelProps) {
     setSavedModel(false);
     setSavedSkill(false);
     setEditingSkill(false);
-    setTab("info");
+    setTab("overview");
   }, [agent.id]);
 
   const { data: ollamaData } = useQuery({
@@ -196,139 +211,245 @@ export function AgentDetailPanel({ agent, onClose }: AgentDetailPanelProps) {
     );
   };
 
-  const resetSkill = () => {
-    setSkillDraft(agent.skill_markdown ?? "");
-    setEditingSkill(false);
-  };
-
   const stepNumber = STEP_MAP[agent.name] ?? null;
-  const layer = LAYER_MAP[agent.name];
-  const badge = STATUS_BADGES[agent.status];
-  const BadgeIcon = badge.icon;
+  const layer      = LAYER_MAP[agent.name];
+  const badge      = STATUS_BADGE[agent.status];
 
   return (
     <div className="rounded-lg border bg-white shadow-sm overflow-hidden flex flex-col">
-      {/* Header */}
-      <div className="flex items-center gap-3 border-b px-4 py-3 flex-shrink-0">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 flex-shrink-0">
-          <Bot className="h-5 w-5 text-primary" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-sm font-semibold">{agent.name}</h3>
-            {stepNumber && (
-              <span className="text-xs text-muted-foreground">Step {stepNumber}</span>
-            )}
-            {layer && (
-              <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", layer.cls)}>
-                {layer.label}
-              </span>
-            )}
+      {/* ── Agent Header ── */}
+      <div className="border-b px-4 py-3 flex-shrink-0">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 flex-shrink-0">
+            <Bot className="h-5 w-5 text-primary" />
           </div>
-          <p className="text-xs text-muted-foreground">{agent.role}</p>
+
+          <div className="flex-1 min-w-0">
+            {/* Name */}
+            <p className="text-sm font-semibold break-all leading-snug">{agent.name}</p>
+
+            {/* Meta badges */}
+            <div className="flex flex-wrap items-center gap-1.5 mt-1">
+              <span className="text-xs text-muted-foreground">{agent.role}</span>
+              {stepNumber && (
+                <span className="text-[10px] text-muted-foreground border rounded px-1.5 py-0.5">Step {stepNumber}</span>
+              )}
+              {layer && (
+                <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", layer.cls)}>
+                  {layer.label}
+                </span>
+              )}
+              <span className={cn("flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold", badge.cls)}>
+                <badge.Icon className={cn("h-3 w-3", badge.spin && "animate-spin")} />
+                {badge.label}
+              </span>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={tab === "model" ? saveModel : tab === "skill" && editingSkill ? saveSkill : undefined}
+              disabled={
+                updateMutation.isPending ||
+                (tab === "model" && provider === agent.model_provider && modelName === agent.model_name) ||
+                (tab === "skill" && !editingSkill)
+              }
+              className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {savedModel || savedSkill ? (
+                <><CheckCircle2 className="h-3.5 w-3.5" /> Saved</>
+              ) : updateMutation.isPending ? (
+                <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…</>
+              ) : (
+                <><Save className="h-3.5 w-3.5" /> Save Changes</>
+              )}
+            </button>
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
-        <div className={cn("flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium flex-shrink-0", badge.cls)}>
-          <BadgeIcon className={cn("h-3 w-3", "spin" in badge && badge.spin && "animate-spin")} />
-          <span className="capitalize">{agent.status}</span>
-        </div>
-        <button onClick={onClose} className="text-muted-foreground hover:text-foreground flex-shrink-0">
-          <X className="h-4 w-4" />
-        </button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b flex-shrink-0">
-        {(["info", "skill"] as Tab[]).map((t) => (
+      {/* ── Tabs ── */}
+      <div className="flex border-b flex-shrink-0 overflow-x-auto">
+        {TABS.map(({ key, label, Icon }) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
+            key={key}
+            onClick={() => setTab(key)}
             className={cn(
-              "flex items-center gap-1.5 px-4 py-2 text-xs font-medium border-b-2 transition-colors",
-              tab === t
+              "flex items-center gap-1.5 whitespace-nowrap px-4 py-2.5 text-xs font-medium border-b-2 transition-colors",
+              tab === key
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground"
             )}
           >
-            {t === "info" ? <Settings className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
-            {t === "info" ? "Configuration" : "Skill Document"}
+            <Icon className="h-3.5 w-3.5" />
+            {label}
           </button>
         ))}
       </div>
 
-      {/* Tab: Configuration */}
-      {tab === "info" && (
+      {/* ── Tab: Overview ── */}
+      {tab === "overview" && (
         <div className="p-4 space-y-4 overflow-y-auto">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Agent Name</p>
+              <p className="font-medium break-all">{agent.name}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Role</p>
+              <p className="font-medium">{agent.role}</p>
+            </div>
+            {stepNumber && (
+              <div>
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Pipeline Step</p>
+                <p className="font-medium">Step {stepNumber}</p>
+              </div>
+            )}
+            {layer && (
+              <div>
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Category</p>
+                <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", layer.cls)}>
+                  {layer.label}
+                </span>
+              </div>
+            )}
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Status</p>
+              <span className={cn("flex items-center gap-1 w-fit rounded-full px-2 py-0.5 text-[10px] font-semibold", badge.cls)}>
+                <badge.Icon className={cn("h-3 w-3", badge.spin && "animate-spin")} />
+                {badge.label}
+              </span>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Model</p>
+              <p className="font-mono text-[11px]">{agent.model_name}</p>
+            </div>
+            {agent.home_zone && (
+              <div>
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Home Zone</p>
+                <p className="font-medium">{agent.home_zone}</p>
+              </div>
+            )}
+            {agent.current_zone && agent.current_zone !== agent.home_zone && (
+              <div>
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Current Zone</p>
+                <p className="font-medium text-blue-600">{agent.current_zone}</p>
+              </div>
+            )}
+            <div className="col-span-2">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Last Updated</p>
+              <p className="font-medium">{formatDate(agent.updated_at)}</p>
+            </div>
+          </div>
+
           {agent.description && (
             <div>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Description</p>
-              <p className="text-sm">{agent.description}</p>
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Description</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">{agent.description}</p>
             </div>
           )}
-          {agent.home_zone && (
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <span>Home: <span className="text-foreground">{agent.home_zone}</span></span>
-              {agent.current_zone && agent.current_zone !== agent.home_zone && (
-                <span>Now: <span className="text-blue-600">{agent.current_zone}</span></span>
-              )}
+
+          {/* Status-specific notice */}
+          {agent.status === "error" && (
+            <div className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 p-3">
+              <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-medium text-red-700">Agent Failed</p>
+                <p className="text-xs text-red-600 mt-0.5">
+                  Check the Logs tab for execution history, or open the Pipeline Console for details.
+                </p>
+              </div>
             </div>
           )}
-          <hr />
-          <div className="space-y-3">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">LLM Configuration</p>
-            <div>
-              <label className="block text-xs font-medium mb-1">Provider</label>
+        </div>
+      )}
+
+      {/* ── Tab: Model Config ── */}
+      {tab === "model" && (
+        <div className="p-4 space-y-4 overflow-y-auto">
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">LLM Configuration</p>
+
+          <div>
+            <label className="block text-xs font-medium mb-1">Provider</label>
+            <select
+              value={provider}
+              onChange={(e) => setProvider(e.target.value as ModelProvider)}
+              className="w-full rounded-md border bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="ollama">Ollama (local)</option>
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic / Claude</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium mb-1">Model</label>
+            {provider === "ollama" && ollamaData ? (
               <select
-                value={provider}
-                onChange={(e) => setProvider(e.target.value as ModelProvider)}
+                value={modelName}
+                onChange={(e) => setModelName(e.target.value)}
                 className="w-full rounded-md border bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
-                <option value="ollama">Ollama (local)</option>
-                <option value="openai">OpenAI</option>
+                {ollamaData.models.map((m) => (
+                  <option key={m.name} value={m.name}>
+                    {m.name}{m.size ? ` (${formatBytes(m.size)})` : ""}
+                  </option>
+                ))}
               </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1">Model</label>
-              {provider === "ollama" && ollamaData ? (
-                <select
-                  value={modelName}
-                  onChange={(e) => setModelName(e.target.value)}
-                  className="w-full rounded-md border bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  {ollamaData.models.map((m) => (
-                    <option key={m.name} value={m.name}>
-                      {m.name}{m.size ? ` (${formatBytes(m.size)})` : ""}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  value={modelName}
-                  onChange={(e) => setModelName(e.target.value)}
-                  placeholder="e.g. gpt-4o"
-                  className="w-full rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              )}
-            </div>
+            ) : (
+              <input
+                type="text"
+                value={modelName}
+                onChange={(e) => setModelName(e.target.value)}
+                placeholder={
+                  provider === "openai" ? "e.g. gpt-4o"
+                  : provider === "anthropic" ? "e.g. claude-sonnet-4-6"
+                  : "model name"
+                }
+                className="w-full rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            )}
+            {provider !== "ollama" && (
+              <p className="text-[11px] text-muted-foreground mt-1">
+                {provider === "openai"
+                  ? "Requires OPENAI_API_KEY in environment"
+                  : "Requires ANTHROPIC_API_KEY in environment"}
+              </p>
+            )}
+          </div>
+
+          <div className="flex gap-2 pt-1">
             <button
               onClick={saveModel}
-              disabled={updateMutation.isPending || (provider === agent.model_provider && modelName === agent.model_name)}
+              disabled={
+                updateMutation.isPending ||
+                (provider === agent.model_provider && modelName === agent.model_name)
+              }
               className="flex items-center gap-2 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {savedModel ? (
                 <><CheckCircle2 className="h-3.5 w-3.5" /> Saved!</>
               ) : (
-                <><Save className="h-3.5 w-3.5" /> {updateMutation.isPending ? "Saving…" : "Save Model"}</>
+                <><Save className="h-3.5 w-3.5" /> {updateMutation.isPending ? "Saving…" : "Save Model Config"}</>
               )}
+            </button>
+            <button
+              onClick={() => { setProvider(agent.model_provider); setModelName(agent.model_name); }}
+              className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent"
+            >
+              <RotateCcw className="h-3.5 w-3.5" /> Reset
             </button>
           </div>
         </div>
       )}
 
-      {/* Tab: Skill Document */}
+      {/* ── Tab: Prompt / Skill ── */}
       {tab === "skill" && (
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-          {/* Skill toolbar */}
           <div className="flex items-center justify-between px-4 py-2 border-b bg-gray-50 flex-shrink-0">
             <span className="text-xs text-muted-foreground">
               {editingSkill ? "Editing skill.md" : "skill.md"}
@@ -337,7 +458,7 @@ export function AgentDetailPanel({ agent, onClose }: AgentDetailPanelProps) {
               {editingSkill ? (
                 <>
                   <button
-                    onClick={resetSkill}
+                    onClick={() => { setSkillDraft(agent.skill_markdown ?? ""); setEditingSkill(false); }}
                     className="flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground hover:bg-accent"
                   >
                     <RotateCcw className="h-3 w-3" /> Cancel
@@ -351,7 +472,7 @@ export function AgentDetailPanel({ agent, onClose }: AgentDetailPanelProps) {
                       ? <><Loader2 className="h-3 w-3 animate-spin" /> Saving…</>
                       : savedSkill
                         ? <><CheckCircle2 className="h-3 w-3" /> Saved!</>
-                        : <><Save className="h-3 w-3" /> Save</>
+                        : <><Save className="h-3 w-3" /> Save Skill</>
                     }
                   </button>
                 </>
@@ -366,7 +487,6 @@ export function AgentDetailPanel({ agent, onClose }: AgentDetailPanelProps) {
             </div>
           </div>
 
-          {/* Content area */}
           <div className="flex-1 overflow-y-auto">
             {editingSkill ? (
               <textarea
@@ -391,6 +511,42 @@ export function AgentDetailPanel({ agent, onClose }: AgentDetailPanelProps) {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Tab: Logs ── */}
+      {tab === "logs" && (
+        <div className="p-4 space-y-3 overflow-y-auto">
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Execution History</p>
+
+          <div className="rounded-lg border bg-muted/30 p-4 text-center space-y-2">
+            <ScrollText className="mx-auto h-8 w-8 text-muted-foreground/30" />
+            <p className="text-sm text-muted-foreground">
+              Per-agent execution logs are available in the Pipeline Console.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Open a project → Pipeline tab to see detailed step logs and duration for this agent.
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Status</span>
+              <span className={cn(
+                "font-medium",
+                agent.status === "done"    ? "text-green-600"
+                : agent.status === "error" ? "text-red-600"
+                : agent.status === "working"? "text-blue-600"
+                : "text-muted-foreground"
+              )}>
+                {({ idle: "Waiting", working: "Running", done: "Done", error: "Failed" } as Record<string, string>)[agent.status] ?? agent.status}
+              </span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Last Updated</span>
+              <span>{formatDate(agent.updated_at)}</span>
+            </div>
           </div>
         </div>
       )}

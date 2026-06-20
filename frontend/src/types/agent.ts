@@ -1,5 +1,5 @@
 export type AgentStatus = "idle" | "working" | "done" | "error";
-export type ModelProvider = "ollama" | "openai";
+export type ModelProvider = "ollama" | "openai" | "anthropic";
 
 export interface Agent {
   id: string;
