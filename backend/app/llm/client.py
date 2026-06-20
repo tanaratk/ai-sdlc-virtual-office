@@ -49,6 +49,8 @@ def call_ollama(
 def extract_json(text: str) -> dict:
     """Parse JSON from LLM output, handling markdown code-block wrapping."""
     text = text.strip()
+    # Strip <think>...</think> blocks emitted by reasoning models (e.g. qwen3)
+    text = re.sub(r"<think>[\s\S]*?</think>", "", text).strip()
     try:
         return json.loads(text)
     except json.JSONDecodeError:
@@ -67,6 +69,8 @@ def extract_json(text: str) -> dict:
 def strip_code_fences(text: str) -> str:
     """Remove markdown code fences from LLM code output."""
     text = text.strip()
+    # Strip <think>...</think> blocks emitted by reasoning models (e.g. qwen3)
+    text = re.sub(r"<think>[\s\S]*?</think>", "", text).strip()
     match = re.match(r"^```[\w]*\n([\s\S]+?)\n```$", text)
     if match:
         return match.group(1)
