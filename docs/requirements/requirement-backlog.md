@@ -40,6 +40,8 @@
 | FR-027 | System must alert users when a sprint deadline is approaching (≤3 days remaining) or overdue; alerts must appear in the dashboard header and in the PM Agent's summary output | High | MVP 1 | Open |
 | FR-028 | PM Agent must include in its output: current sprint name, sprint progress (tasks done / total), days remaining to sprint deadline, next MVP milestone date, and list of overdue items | High | MVP 2 | Open |
 | FR-029 | Project Admin must be able to update sprint start/end dates and move tasks between sprints via the Sprint Management screen | Medium | MVP 2 | Open |
+| FR-030 | Before starting a pipeline run, the user must be able to select the project tech stack: Database (PostgreSQL, MS SQL, MySQL, MongoDB), Language/Framework (.NET, Node.js, Python/FastAPI, Java/Spring), and Platform (Web, Mobile, Both). The selection is stored per-project and injected into SA Agent, Developer Agent, and DevOps Agent prompts. | High | MVP 3 | Open |
+| FR-031 | System must offer an Auto-Recommend mode for tech stack selection: when the user clicks "Recommend", the system analyzes the uploaded requirement inputs using LLM and suggests the most appropriate Database, Language/Framework, and Platform, with a short justification for each choice. The user may accept or override any recommendation before starting the pipeline. | Medium | MVP 3 | Open |
 
 ---
 
@@ -69,3 +71,4 @@
 | BR-005 | Every agent run must be logged in pipeline_steps | Critical | MVP 1 | Open |
 | BR-006 | Documents must be versioned; old versions retained | High | MVP 1 | Open |
 | BR-007 | Human approval required at: post-Gap Analysis, post-BA, post-Architect, pre-Developer, post-QA | Critical | MVP 1 | Open |
+| BR-008 | Pipeline run cannot be started until the project tech stack (DB, Language, Platform) has been either explicitly selected by the user or confirmed via Auto-Recommend. A pre-flight check must block the Run button if tech stack is unset. | High | MVP 3 | Open |
