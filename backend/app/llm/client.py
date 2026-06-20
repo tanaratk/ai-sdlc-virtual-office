@@ -60,8 +60,11 @@ def extract_json(text: str) -> dict:
     # Direct parse
     try:
         return json.loads(text)
-    except json.JSONDecodeError:
-        pass
+    except json.JSONDecodeError as e:
+        logger.warning("json.loads failed (pos=%d col=%d): %s | text[%d:%d]=%r",
+                       e.pos, e.colno, e.msg,
+                       max(0, e.pos - 30), e.pos + 30,
+                       text[max(0, e.pos - 30): e.pos + 30])
 
     # Markdown code fence ```json ... ```
     match = re.search(r"```(?:json)?\s*([\s\S]+?)\s*```", text)
@@ -77,9 +80,10 @@ def extract_json(text: str) -> dict:
     if start != -1 and end > start:
         try:
             return json.loads(text[start : end + 1])
-        except json.JSONDecodeError:
-            pass
+        except json.JSONDecodeError as e:
+            logger.warning("brace-extract also failed (pos=%d): %s", e.pos, e.msg)
 
+    logger.error("extract_json giving up. Full text (%d chars): %s", len(original), original)
     raise ValueError(f"Cannot parse JSON from LLM output. First 300 chars: {original[:300]}")
 
 
