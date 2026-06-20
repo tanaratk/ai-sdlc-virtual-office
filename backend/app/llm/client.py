@@ -48,14 +48,22 @@ def call_ollama(
 
 def extract_json(text: str) -> dict:
     """Parse JSON from LLM output, handling markdown code-block wrapping."""
+    original = text
     text = text.strip()
-    # Strip <think>...</think> blocks emitted by reasoning models (e.g. qwen3)
+    # Strip closed <think>...</think> blocks (qwen3 reasoning mode)
     text = re.sub(r"<think>[\s\S]*?</think>", "", text).strip()
+    # Strip unclosed <think> block (truncated LLM response)
+    text = re.sub(r"<think>[\s\S]*", "", text).strip()
+
+    logger.debug("extract_json raw (first 500): %s", original[:500])
+
+    # Direct parse
     try:
         return json.loads(text)
     except json.JSONDecodeError:
         pass
 
+    # Markdown code fence ```json ... ```
     match = re.search(r"```(?:json)?\s*([\s\S]+?)\s*```", text)
     if match:
         try:
@@ -63,14 +71,23 @@ def extract_json(text: str) -> dict:
         except json.JSONDecodeError:
             pass
 
-    raise ValueError(f"Cannot parse JSON from LLM output. First 300 chars: {text[:300]}")
+    # Last resort: find outermost { ... } in the text
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end > start:
+        try:
+            return json.loads(text[start : end + 1])
+        except json.JSONDecodeError:
+            pass
+
+    raise ValueError(f"Cannot parse JSON from LLM output. First 300 chars: {original[:300]}")
 
 
 def strip_code_fences(text: str) -> str:
     """Remove markdown code fences from LLM code output."""
     text = text.strip()
-    # Strip <think>...</think> blocks emitted by reasoning models (e.g. qwen3)
     text = re.sub(r"<think>[\s\S]*?</think>", "", text).strip()
+    text = re.sub(r"<think>[\s\S]*", "", text).strip()
     match = re.match(r"^```[\w]*\n([\s\S]+?)\n```$", text)
     if match:
         return match.group(1)
