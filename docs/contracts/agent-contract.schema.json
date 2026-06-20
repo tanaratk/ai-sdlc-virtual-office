@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-sdlc.local/schemas/agent-contract.schema.json",
+  "title": "AI-SDLC Agent Contract",
+  "type": "object",
+  "required": ["version", "agents"],
+  "properties": {
+    "version": { "type": "string" },
+    "description": { "type": "string" },
+    "agents": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/agentContract" }
+    }
+  },
+  "$defs": {
+    "agentContract": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "role",
+        "layer",
+        "step",
+        "model",
+        "inputs",
+        "outputs",
+        "responsibilities",
+        "handoff",
+        "workspace"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "layer": { "type": "string", "enum": ["business", "design", "delivery", "on_demand"] },
+        "step": {
+          "type": "object",
+          "required": ["name", "order", "total", "auto_chain"],
+          "properties": {
+            "name": { "type": "string" },
+            "order": { "type": "integer", "minimum": 0 },
+            "total": { "type": "integer", "minimum": 1 },
+            "auto_chain": { "type": "boolean" }
+          }
+        },
+        "model": {
+          "type": "object",
+          "required": ["provider", "default"],
+          "properties": {
+            "provider": { "type": "string" },
+            "default": { "type": "string" }
+          }
+        },
+        "inputs": {
+          "type": "object",
+          "required": ["required_documents", "optional_documents", "runtime_inputs"],
+          "properties": {
+            "required_documents": { "type": "array", "items": { "type": "string" } },
+            "optional_documents": { "type": "array", "items": { "type": "string" } },
+            "runtime_inputs": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "required": ["documents", "workspace_files"],
+          "properties": {
+            "documents": { "type": "array", "items": { "type": "string" } },
+            "workspace_files": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "responsibilities": { "type": "array", "items": { "type": "string" } },
+        "handoff": {
+          "type": "object",
+          "required": ["next_agent", "review_gate"],
+          "properties": {
+            "next_agent": { "type": ["string", "null"] },
+            "review_gate": { "type": "boolean" },
+            "failure_action": { "type": "string" }
+          }
+        },
+        "workspace": {
+          "type": "object",
+          "required": ["home_zone", "writes_to"],
+          "properties": {
+            "home_zone": { "type": "string" },
+            "writes_to": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    }
+  }
+}
