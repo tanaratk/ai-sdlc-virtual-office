@@ -31,6 +31,9 @@ def call_ollama(
             {"role": "user", "content": user_prompt},
         ],
         "stream": False,
+        # Disable thinking mode for qwen3 family — thinking tokens consume context
+        # and cause empty responses when combined with format=json constraint
+        "options": {"think": False},
     }
     if response_format:
         payload["format"] = response_format
