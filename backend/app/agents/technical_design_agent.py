@@ -377,6 +377,6 @@ class TechnicalDesignAgentRunner:
         self.session.add(ActivityLog(
             project_id=project_id,
             agent_id=agent_row.id if agent_row else None,
-            event_type=EventType.agent_completed,
+            event_type=EventType.task_completed,
             message=message,
         ))
