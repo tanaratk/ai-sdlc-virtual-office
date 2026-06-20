@@ -75,6 +75,7 @@
 | 39 | Change Impact On-demand Trigger | ✅ Done |
 | 39-fix | UI Redesign (sidebar groups, pipeline control center, agent console) | ✅ Done |
 | 39-bugfix | Backend: 6 bugs fixed (SA validation, change_impact doctype, BOM removal) | ✅ Done |
+| 40 | Wire Documentation + PM Agent into pipeline (auto-chain after monitoring) | ✅ Done |
 
 ## Project Status
 
