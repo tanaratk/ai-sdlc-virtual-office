@@ -483,12 +483,13 @@ class SAAgentRunner:
 
             brd_doc, fsd_doc, us_doc = self._load_ba_documents(run.project_id)
 
+            _DOC_LIMIT = 2000  # chars per doc — keeps total prompt < 8000 chars
             raw_json = _llm.call_ollama(
                 system_prompt=_SYSTEM_PROMPT,
                 user_prompt=_TASK_TEMPLATE.format(
-                    brd=brd_doc.content_markdown,
-                    fsd=fsd_doc.content_markdown,
-                    user_stories=us_doc.content_markdown,
+                    brd=brd_doc.content_markdown[:_DOC_LIMIT],
+                    fsd=fsd_doc.content_markdown[:_DOC_LIMIT],
+                    user_stories=us_doc.content_markdown[:_DOC_LIMIT],
                 ),
                 model=agent_row.model_name if agent_row else None,
                 timeout=TIMEOUT_SECONDS,

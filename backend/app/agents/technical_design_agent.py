@@ -253,14 +253,15 @@ class TechnicalDesignAgentRunner:
 
             fsd_doc, arch_doc, db_doc, api_doc, screen_doc = self._load_design_documents(run.project_id)
 
+            _DOC_LIMIT = 1500  # chars per doc — 5 docs x 1500 = 7500 chars input
             raw_json = _llm.call_ollama(
                 system_prompt=_SYSTEM_PROMPT,
                 user_prompt=_TASK_TEMPLATE.format(
-                    fsd=fsd_doc.content_markdown,
-                    architecture=arch_doc.content_markdown,
-                    db_schema=db_doc.content_markdown,
-                    api_spec=api_doc.content_markdown,
-                    screen_spec=screen_doc.content_markdown,
+                    fsd=fsd_doc.content_markdown[:_DOC_LIMIT],
+                    architecture=arch_doc.content_markdown[:_DOC_LIMIT],
+                    db_schema=db_doc.content_markdown[:_DOC_LIMIT],
+                    api_spec=api_doc.content_markdown[:_DOC_LIMIT],
+                    screen_spec=screen_doc.content_markdown[:_DOC_LIMIT],
                 ),
                 model=agent_row.model_name if agent_row else None,
                 timeout=TIMEOUT_SECONDS,
