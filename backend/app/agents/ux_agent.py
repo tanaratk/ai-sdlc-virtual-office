@@ -119,6 +119,7 @@ Rules:
 - Every field must have a type: text, number, date, dropdown, checkbox, textarea, file, password.
 - Every user flow must have a unique ID (FLOW-001, FLOW-002, โ€ฆ).
 - Write flow steps as clear imperative sentences (e.g., "User clicks Submit button").
+- Produce at most 8 screens and 6 user flows. Keep descriptions concise (under 20 words each).
 - You MUST return ONLY a valid JSON object โ€” no prose, no markdown wrapping.
 """
 
@@ -298,12 +299,13 @@ class UXAgentRunner:
 
             brd_doc, fsd_doc, us_doc = self._load_ba_documents(run.project_id)
 
+            _DOC_LIMIT = 1800  # chars per input doc — keeps total prompt < 7000 chars
             raw_json = _llm.call_ollama(
                 system_prompt=_SYSTEM_PROMPT,
                 user_prompt=_TASK_TEMPLATE.format(
-                    brd=brd_doc.content_markdown,
-                    fsd=fsd_doc.content_markdown,
-                    user_stories=us_doc.content_markdown,
+                    brd=brd_doc.content_markdown[:_DOC_LIMIT],
+                    fsd=fsd_doc.content_markdown[:_DOC_LIMIT],
+                    user_stories=us_doc.content_markdown[:_DOC_LIMIT],
                 ),
                 model=agent_row.model_name if agent_row else None,
                 timeout=TIMEOUT_SECONDS,
