@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useMutation } from "@tanstack/react-query";
-import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2 } from "lucide-react";
-import { runChangeImpact } from "@/services/changeImpactApi";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle, ArrowLeft, CheckCircle2, FileText, Loader2 } from "lucide-react";
+import { listChangeImpactReports, runChangeImpact } from "@/services/changeImpactApi";
 
 export default function ChangeImpactPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const [changeDescription, setChangeDescription] = useState("");
   const [reqIdsRaw, setReqIdsRaw] = useState("");
@@ -22,6 +23,16 @@ export default function ChangeImpactPage() {
           .filter(Boolean),
         context_notes: contextNotes,
       }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["change-impact-reports", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["documents", projectId] });
+    },
+  });
+
+  const reportsQuery = useQuery({
+    queryKey: ["change-impact-reports", projectId],
+    queryFn: () => listChangeImpactReports(projectId!),
+    enabled: !!projectId,
   });
 
   const canSubmit =
@@ -162,6 +173,36 @@ export default function ChangeImpactPage() {
           </p>
         </form>
       )}
+
+      <section className="rounded-lg border bg-white">
+        <div className="border-b px-4 py-3">
+          <h3 className="text-sm font-semibold">Recent Impact Reports</h3>
+        </div>
+        <div className="divide-y">
+          {reportsQuery.isLoading ? (
+            <p className="px-4 py-3 text-sm text-muted-foreground">Loading reports...</p>
+          ) : !reportsQuery.data?.length ? (
+            <p className="px-4 py-3 text-sm text-muted-foreground">No impact reports yet.</p>
+          ) : (
+            reportsQuery.data.slice(0, 5).map((report) => (
+              <button
+                key={report.id}
+                type="button"
+                onClick={() => navigate(`/projects/${projectId}/documents`)}
+                className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-accent"
+              >
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{report.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(report.created_at).toLocaleString()} - {report.status}
+                  </p>
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      </section>
     </div>
   );
 }

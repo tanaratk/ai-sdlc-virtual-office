@@ -500,6 +500,10 @@ class ChangeImpactAgentRunner:
             self.session.commit()
             self.session.refresh(report_doc)
 
+            from app.agents._workspace import write_workspace_docs
+
+            write_workspace_docs(self.session, project_id, {"change_impact_report.md": report_doc.content_markdown})
+
             logger.info(
                 "ChangeImpactAgent completed project=%s doc=%s severity=%s artifacts=%d",
                 project_id, doc_id, output.severity, len(output.affected_artifacts),

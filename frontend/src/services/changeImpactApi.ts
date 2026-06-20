@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "./api";
+import type { DocumentSummary } from "@/types/document";
 
 export interface ChangeImpactRequest {
   change_description: string;
@@ -13,6 +14,29 @@ export interface ChangeImpactResponse {
   message: string;
 }
 
+export interface ChangeImpactReportListResponse {
+  items: DocumentSummary[];
+}
+
+async function parseError(res: Response): Promise<string> {
+  const err = await res.json().catch(() => ({}));
+  const detail = (err as { detail?: unknown }).detail;
+  if (typeof detail === "string") return detail;
+  if (detail && typeof detail === "object" && "message" in detail) {
+    return String((detail as { message: unknown }).message);
+  }
+  return `HTTP ${res.status}`;
+}
+
+export async function listChangeImpactReports(
+  projectId: string,
+): Promise<DocumentSummary[]> {
+  const res = await fetch(`${API_BASE_URL}/projects/${projectId}/change-impact/reports`);
+  if (!res.ok) throw new Error(await parseError(res));
+  const data = (await res.json()) as ChangeImpactReportListResponse;
+  return data.items;
+}
+
 export async function runChangeImpact(
   projectId: string,
   body: ChangeImpactRequest,
@@ -23,8 +47,7 @@ export async function runChangeImpact(
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { detail?: string }).detail ?? `HTTP ${res.status}`);
+    throw new Error(await parseError(res));
   }
   return res.json() as Promise<ChangeImpactResponse>;
 }
