@@ -46,10 +46,17 @@ def _build_ollama_payload(
     system_prompt: str,
     user_prompt: str,
     response_format: str | None,
-    force_no_think: bool = False,
+    no_think: bool = False,
+    no_grammar: bool = False,
 ) -> dict:
-    suppress = (_is_thinking_model(model) or force_no_think) and response_format
-    effective_user = (user_prompt + "\n/no_think") if suppress else user_prompt
+    """Build Ollama request payload.
+
+    no_think=True  → append /no_think + options.think=false (qwen3/qwq/deepseek)
+    no_grammar=True → skip format=json (used on retry when grammar+thinking conflicts)
+    """
+    apply_no_think = (no_think or _is_thinking_model(model)) and bool(response_format)
+    effective_user = (user_prompt + "\n/no_think") if apply_no_think else user_prompt
+    effective_format = None if no_grammar else response_format
 
     payload: dict = {
         "model": model,
@@ -59,11 +66,18 @@ def _build_ollama_payload(
         ],
         "stream": False,
     }
-    if suppress:
+    if apply_no_think:
         payload["options"] = {"think": False}
-    if response_format:
-        payload["format"] = response_format
+    if effective_format:
+        payload["format"] = effective_format
     return payload
+
+
+def _ollama_post(url: str, payload: dict, timeout: float) -> str:
+    with httpx.Client(timeout=timeout) as http:
+        resp = http.post(url, json=payload)
+        resp.raise_for_status()
+    return resp.json()["message"]["content"]
 
 
 def _call_ollama(
@@ -74,25 +88,39 @@ def _call_ollama(
     response_format: str | None,
 ) -> str:
     url = f"{settings.ollama_base_url}/api/chat"
+
+    # Attempt 1 — standard (with format=json, thinking suppressed for known models)
     payload = _build_ollama_payload(model, system_prompt, user_prompt, response_format)
+    content = _ollama_post(url, payload, timeout)
+    logger.info("Ollama attempt 1 model=%s response=%d chars", model, len(content))
 
-    with httpx.Client(timeout=timeout) as http:
-        resp = http.post(url, json=payload)
-        resp.raise_for_status()
+    if content.strip():
+        return content
 
-    content: str = resp.json()["message"]["content"]
+    if not response_format:
+        return content  # free-form call, empty is the final answer
 
-    if not content.strip() and response_format:
-        logger.warning("Empty response from Ollama model=%s; retrying with forced no_think", model)
-        retry = _build_ollama_payload(
-            model, system_prompt, user_prompt, response_format, force_no_think=True
-        )
-        with httpx.Client(timeout=timeout) as http:
-            resp = http.post(url, json=retry)
-            resp.raise_for_status()
-        content = resp.json()["message"]["content"]
-        logger.info("Ollama retry complete, response length=%d chars", len(content))
+    # Attempt 2 — force no_think + keep format=json
+    logger.warning("Ollama model=%s: empty on attempt 1, retry with forced no_think", model)
+    payload2 = _build_ollama_payload(
+        model, system_prompt, user_prompt, response_format, no_think=True
+    )
+    content = _ollama_post(url, payload2, timeout)
+    logger.info("Ollama attempt 2 model=%s response=%d chars", model, len(content))
 
+    if content.strip():
+        return content
+
+    # Attempt 3 — drop format=json entirely; rely on prompt instructions + extract_json
+    # Fixes: thinking models where grammar-constrained JSON + thinking tokens exhaust context
+    logger.warning(
+        "Ollama model=%s: still empty, retrying WITHOUT format=json (grammar conflict)", model
+    )
+    payload3 = _build_ollama_payload(
+        model, system_prompt, user_prompt, response_format, no_think=True, no_grammar=True
+    )
+    content = _ollama_post(url, payload3, timeout)
+    logger.info("Ollama attempt 3 model=%s response=%d chars", model, len(content))
     return content
 
 
