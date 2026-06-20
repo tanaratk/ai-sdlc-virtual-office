@@ -1,5 +1,6 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
+import ProjectLayout from "@/components/layout/ProjectLayout";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AdminRoute } from "@/components/auth/AdminRoute";
 import Dashboard from "@/pages/Dashboard";
@@ -29,7 +30,7 @@ import MonitoringPage from "@/pages/MonitoringPage";
 import GeneratedCodePage from "@/pages/GeneratedCodePage";
 
 export const router = createBrowserRouter([
-  { path: "/login", element: <LoginPage /> },
+  { path: "/login",    element: <LoginPage /> },
   { path: "/register", element: <RegisterPage /> },
 
   {
@@ -38,41 +39,52 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Dashboard /> },
       { path: "profile", element: <ProfilePage /> },
-      {
-        path: "users",
-        element: <AdminRoute><UserManagementPage /></AdminRoute>,
-      },
-      {
-        path: "admin/projects",
-        element: <AdminRoute><AdminProjectsPage /></AdminRoute>,
-      },
-      {
-        path: "admin/pipeline",
-        element: <AdminRoute><PipelineMonitorPage /></AdminRoute>,
-      },
-      { path: "projects", element: <ProjectsList /> },
+
+      // ── Administration (admin-only) ──────────────────────────────────────────
+      { path: "users",          element: <AdminRoute><UserManagementPage /></AdminRoute> },
+      { path: "admin/projects", element: <AdminRoute><AdminProjectsPage /></AdminRoute> },
+
+      // ── Projects list + new ──────────────────────────────────────────────────
+      { path: "projects",     element: <ProjectsList /> },
       { path: "projects/new", element: <NewProject /> },
-      { path: "projects/:projectId", element: <ProjectWorkspace /> },
-      { path: "projects/:projectId/intake", element: <RequirementIntake /> },
-      { path: "projects/:projectId/agents", element: <AgentConsolePage /> },
-      { path: "projects/:projectId/documents", element: <DocumentReview /> },
-      { path: "projects/:projectId/traceability", element: <TraceabilityPage /> },
-      { path: "projects/:projectId/office", element: <VirtualOfficePage /> },
-      { path: "projects/:projectId/change-impact", element: <ChangeImpactPage /> },
-      { path: "projects/:projectId/documentation", element: <DocumentationPage /> },
-      { path: "projects/:projectId/pm", element: <PMPage /> },
-      { path: "projects/:projectId/github", element: <GitHubPage /> },
-      { path: "projects/:projectId/mcp", element: <McpPage /> },
-      { path: "projects/:projectId/rag", element: <RAGPage /> },
-      { path: "projects/:projectId/generated-code", element: <GeneratedCodePage /> },
-      { path: "mcp", element: <McpPage /> },
-      { path: "intake", element: <RequirementIntake /> },
-      { path: "agents", element: <AgentManagerPage /> },
-      { path: "documents", element: <DocumentReview /> },
-      { path: "traceability", element: <TraceabilityPage /> },
-      { path: "office", element: <VirtualOfficePage /> },
-      { path: "monitoring", element: <MonitoringPage /> },
+
+      // ── Project workspace (tabs via ProjectLayout) ───────────────────────────
+      {
+        path: "projects/:projectId",
+        element: <ProjectLayout />,
+        children: [
+          { index: true,              element: <ProjectWorkspace /> },
+          { path: "intake",           element: <RequirementIntake /> },
+          { path: "agents",           element: <AgentConsolePage /> },
+          { path: "documents",        element: <DocumentReview /> },
+          { path: "generated-code",   element: <GeneratedCodePage /> },
+          { path: "traceability",     element: <TraceabilityPage /> },
+          { path: "office",           element: <VirtualOfficePage /> },
+          { path: "change-impact",    element: <ChangeImpactPage /> },
+          { path: "documentation",    element: <DocumentationPage /> },
+          { path: "pm",               element: <PMPage /> },
+          { path: "github",           element: <GitHubPage /> },
+          { path: "mcp",              element: <McpPage /> },
+          { path: "rag",              element: <RAGPage /> },
+        ],
+      },
+
+      // ── Delivery (global / cross-project) ───────────────────────────────────
+      { path: "pipeline-runs", element: <PipelineMonitorPage /> },
+      { path: "documents",     element: <DocumentReview /> },
+      { path: "code-workspace",element: <Navigate to="/projects" replace /> },
+      { path: "traceability",  element: <TraceabilityPage /> },
+      { path: "office",        element: <VirtualOfficePage /> },
+      { path: "monitoring",    element: <MonitoringPage /> },
+
+      // ── AI Platform ──────────────────────────────────────────────────────────
+      { path: "agents",   element: <AgentManagerPage /> },
+      { path: "rag",      element: <RAGPage /> },
+      { path: "mcp",      element: <McpPage /> },
       { path: "settings", element: <Settings /> },
+
+      // ── Legacy / convenience aliases ─────────────────────────────────────────
+      { path: "intake", element: <RequirementIntake /> },
     ],
   },
 ]);
