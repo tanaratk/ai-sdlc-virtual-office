@@ -27,7 +27,7 @@ class _RejectBody(BaseModel):
 # DESIGN LAYER:    sa_documents → ux_documents → technical_design
 #   [HARD GATE] technical_design approved → unlock Delivery Layer
 #
-# DELIVERY LAYER:  dev_tasks → devops_tasks → test_cases → DONE
+# DELIVERY LAYER:  dev_tasks → code_review → test_cases → devops_tasks → monitoring → DONE
 #
 # ON-DEMAND (removed from auto-chain): change_impact, documentation, pm_summary
 
@@ -42,9 +42,10 @@ _NEXT_STEP: dict[str, str | None] = {
     "technical_design":  "dev_tasks",          # Design Layer gate
     # Delivery Layer
     "dev_tasks":         "code_review",       # Code Review after Developer Agent
-    "code_review":       "devops_tasks",
-    "devops_tasks":      "test_cases",
-    "test_cases":        None,                 # Pipeline complete
+    "code_review":       "test_cases",
+    "test_cases":        "devops_tasks",
+    "devops_tasks":      "monitoring",
+    "monitoring":        None,                 # Pipeline complete
 }
 
 # step_name → task key to dispatch on approval
@@ -55,8 +56,9 @@ _NEXT_TASK: dict[str, str] = {
     "ux_documents":      "technical_design",
     "technical_design":  "dev_tasks",
     "dev_tasks":         "code_review",
-    "code_review":       "devops_tasks",
-    "devops_tasks":      "test_cases",
+    "code_review":       "test_cases",
+    "test_cases":        "devops_tasks",
+    "devops_tasks":      "monitoring",
 }
 
 # step_name → which task key retries that step
@@ -71,6 +73,7 @@ _RETRY_TASK: dict[str, str] = {
     "code_review":         "code_review",
     "devops_tasks":        "devops_tasks",
     "test_cases":          "test_cases",
+    "monitoring":          "monitoring",
 }
 
 # Hard gates — approve at these steps triggers a layer transition message
@@ -91,6 +94,7 @@ _STEP_LAYER: dict[str, str] = {
     "code_review":         "delivery",
     "devops_tasks":        "delivery",
     "test_cases":          "delivery",
+    "monitoring":          "delivery",
 }
 
 
@@ -324,5 +328,3 @@ def cancel_run(
     run.completed_at = datetime.now(UTC)
     session.commit()
     return {"status": "cancelled", "run_id": str(run_id)}
-
-

@@ -30,11 +30,10 @@ export default function PMPage() {
         <div>
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <ClipboardList className="h-5 w-5" />
-            PM Summary — Pipeline Final Step
+            PM Summary
           </h2>
           <p className="text-sm text-muted-foreground">
-            Generate the Project Summary and Delivery Report — the final step (10 of 10)
-            in the AI-SDLC pipeline.
+            Generate the Project Summary and Delivery Report from the current SDLC artifacts. This is an on-demand management report, not part of the auto-chain gate flow.
           </p>
         </div>
       </div>
@@ -43,7 +42,7 @@ export default function PMPage() {
         <div className="rounded-lg border border-green-300 bg-green-50 p-5 space-y-4">
           <div className="flex items-center gap-2 text-green-700 font-medium">
             <CheckCircle2 className="h-5 w-5" />
-            Pipeline Step 10 complete — two documents created
+            PM reports created
           </div>
 
           <div className="space-y-2">
@@ -89,9 +88,9 @@ export default function PMPage() {
           {/* Pipeline badge */}
           <div className="flex items-center gap-2 rounded-lg border bg-primary/5 px-4 py-3">
             <span className="rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-primary-foreground">
-              Step 10 / 10
+              On-demand
             </span>
-            <span className="text-sm text-foreground font-medium">Final Pipeline Step</span>
+            <span className="text-sm text-foreground font-medium">Management reporting agent</span>
           </div>
 
           {/* What the agent produces */}
@@ -102,8 +101,8 @@ export default function PMPage() {
               <div className="rounded-md border-l-4 border-l-primary bg-accent/20 p-3 space-y-1">
                 <p className="text-sm font-medium">Project Summary</p>
                 <ul className="text-xs text-muted-foreground space-y-0.5 list-disc pl-4">
-                  <li>LLM-generated executive summary (2–3 paragraphs)</li>
-                  <li>Scope delivered — major deliverables with status</li>
+                  <li>LLM-generated executive summary (2เนโฌโ€3 paragraphs)</li>
+                  <li>Scope delivered เนโฌโ€ major deliverables with status</li>
                   <li>Risk register derived from project context</li>
                   <li>Recommended next steps for the team</li>
                   <li>Full artifact inventory table</li>
@@ -137,12 +136,12 @@ export default function PMPage() {
             className="flex items-center gap-2 rounded-md bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            {mutation.isPending ? "Generating reports…" : "Generate PM Summary"}
+            {mutation.isPending ? "Generating reportsเนโฌเธ" : "Generate PM Summary"}
           </button>
 
           <p className="text-xs text-muted-foreground">
             Requires at least one project document to exist. The LLM generates the
-            executive summary from the Requirement Summary. This may take 30–90 seconds.
+            executive summary from the Requirement Summary. This may take 30เนโฌโ€90 seconds.
           </p>
         </div>
       )}

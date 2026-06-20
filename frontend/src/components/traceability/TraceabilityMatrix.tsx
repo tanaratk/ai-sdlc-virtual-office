@@ -18,6 +18,12 @@ const DOC_TYPE_SHORT: Partial<Record<DocumentType, string>> = {
   api_spec: "API",
   screen_spec: "Screen",
   code_task_list: "Tasks",
+  technical_design: "Tech",
+  code_review: "Review",
+  devops_config: "DevOps",
+  build_report: "Build",
+  monitoring_report: "Monitor",
+  test_report: "Report",
   test_cases: "Tests",
   uat_script: "UAT",
 };
@@ -32,8 +38,14 @@ const PIPELINE_DOC_TYPES: DocumentType[] = [
   "database_design",
   "api_spec",
   "screen_spec",
+  "technical_design",
   "code_task_list",
+  "code_review",
   "test_cases",
+  "test_report",
+  "devops_config",
+  "build_report",
+  "monitoring_report",
   "uat_script",
 ];
 

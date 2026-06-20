@@ -32,8 +32,14 @@ _PIPELINE_DOC_TYPES: list[DocumentType] = [
     DocumentType.database_design,
     DocumentType.api_spec,
     DocumentType.screen_spec,
+    DocumentType.technical_design,
     DocumentType.code_task_list,
+    DocumentType.code_review,
     DocumentType.test_cases,
+    DocumentType.test_report,
+    DocumentType.devops_config,
+    DocumentType.build_report,
+    DocumentType.monitoring_report,
     DocumentType.uat_script,
 ]
 
@@ -192,4 +198,3 @@ class TraceabilityService:
             .order_by(TraceabilityLink.created_at)
         ).all()
         return [TraceabilityLinkResponse.model_validate(lnk) for lnk in links]
-

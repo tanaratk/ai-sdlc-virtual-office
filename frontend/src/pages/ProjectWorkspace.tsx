@@ -10,7 +10,7 @@ import { sourceApi } from "@/services/sourceApi";
 import { agentApi } from "@/services/agentApi";
 import { cn } from "@/lib/utils";
 
-// ── Tool links grid ───────────────────────────────────────────────────────────
+// เนโ€โฌเนโ€โฌ Tool links grid เนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌ
 
 const TOOLS = [
   { label: "Generated Code", icon: Code2,        sub: "View & download code files", href: (id: string) => `/projects/${id}/generated-code` },
@@ -20,11 +20,30 @@ const TOOLS = [
   { label: "GitHub",         icon: Github,       sub: "Push tasks as issues",     href: (id: string) => `/projects/${id}/github` },
   { label: "MCP Tools",      icon: Wrench,       sub: "Tool registry & approvals", href: (id: string) => `/projects/${id}/mcp` },
   { label: "Compile Docs",   icon: BookOpen,     sub: "Bundle all pipeline docs", href: (id: string) => `/projects/${id}/documentation` },
-  { label: "PM Summary",     icon: ClipboardList, sub: "Final delivery report",   href: (id: string) => `/projects/${id}/pm` },
+  { label: "PM Summary",     icon: ClipboardList, sub: "On-demand delivery report", href: (id: string) => `/projects/${id}/pm` },
   { label: "Knowledge Base", icon: Database,     sub: "Semantic search (RAG)",    href: (id: string) => `/projects/${id}/rag` },
 ];
 
-// ── Main page ─────────────────────────────────────────────────────────────────
+const STEP_LABELS: Record<string, string> = {
+  requirement_summary: "Requirement Summary",
+  gap_analysis: "Gap Analysis",
+  ba_documents: "BRD + FSD + User Stories",
+  sa_documents: "Architecture + DB + API",
+  ux_documents: "Screen Spec + UX Flows",
+  technical_design: "Technical Design",
+  dev_tasks: "Generated Code",
+  code_review: "Code Review",
+  test_cases: "Generated Tests + Report",
+  devops_tasks: "Build + Deploy Package",
+  monitoring: "Monitoring Report",
+};
+
+function stepLabel(step: string | null | undefined) {
+  if (!step) return "starting";
+  return STEP_LABELS[step] ?? step;
+}
+
+// เนโ€โฌเนโ€โฌ Main page เนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌเนโ€โฌ
 
 export default function ProjectWorkspace() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -49,7 +68,7 @@ export default function ProjectWorkspace() {
     refetchInterval: 5000,
   });
 
-  if (isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  if (isLoading) return <p className="text-sm text-muted-foreground">Loadingเนโฌเธ</p>;
   if (!project) return <p className="text-sm text-destructive">Project not found.</p>;
 
   const inputCount  = inputs?.total ?? 0;
@@ -66,7 +85,7 @@ export default function ProjectWorkspace() {
       num: 1,
       label: "Upload Requirements",
       desc: hasInputs
-        ? `${inputCount} input${inputCount !== 1 ? "s" : ""} uploaded — add more or proceed`
+        ? `${inputCount} input${inputCount !== 1 ? "s" : ""} uploaded เนโฌโ€ add more or proceed`
         : "Upload meeting transcripts, documents, or text as requirements",
       href: `/projects/${projectId}/intake`,
       icon: Upload,
@@ -78,16 +97,16 @@ export default function ProjectWorkspace() {
       num: 2,
       label: "Run AI Pipeline",
       desc: !hasInputs
-        ? "Complete Step 1 first — upload at least one requirement"
+        ? "Complete Step 1 first เนโฌโ€ upload at least one requirement"
         : activeRun?.status === "waiting_for_user"
-        ? `Waiting for your approval — step: ${activeRun.current_step}`
+        ? `Waiting for your approval - ${stepLabel(activeRun.current_step)}`
         : activeRun?.status === "running"
-        ? `Running… current step: ${activeRun.current_step ?? "starting"}`
+        ? `Running... current step: ${stepLabel(activeRun.current_step)}`
         : pipelineDone
-        ? "Pipeline completed — all 10 agents finished"
+        ? "Pipeline completed - 11-step auto-chain finished"
         : latestRun?.status === "failed"
-        ? "Last run failed — check the console or retry"
-        : "Start the 10-agent SDLC pipeline",
+        ? "Last run failed - check the console or retry"
+        : "Start the 11-step SDLC pipeline",
       href: `/projects/${projectId}/agents`,
       icon: Bot,
       done: pipelineDone,
@@ -121,7 +140,7 @@ export default function ProjectWorkspace() {
         )}
       </div>
 
-      {/* ── Guided steps ── */}
+      {/* เนโ€โฌเนโ€โฌ Guided steps เนโ€โฌเนโ€โฌ */}
       <section>
         <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Pipeline Workflow
@@ -190,14 +209,14 @@ export default function ProjectWorkspace() {
         </div>
       </section>
 
-      {/* ── Divider ── */}
+      {/* เนโ€โฌเนโ€โฌ Divider เนโ€โฌเนโ€โฌ */}
       <div className="flex items-center gap-3 text-xs text-muted-foreground">
         <div className="flex-1 border-t" />
         <span>Additional tools</span>
         <div className="flex-1 border-t" />
       </div>
 
-      {/* ── Tools grid ── */}
+      {/* เนโ€โฌเนโ€โฌ Tools grid เนโ€โฌเนโ€โฌ */}
       <div className="grid gap-3 sm:grid-cols-4">
         {TOOLS.map(({ label, icon: Icon, sub, href }) => (
           <Link

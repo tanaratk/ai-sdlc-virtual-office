@@ -16,11 +16,12 @@ const PIPELINE = [
   { key: "ba_documents",        label: "BRD + FSD + User Stories",  agent: "BA Agent",                   num: 3 },
   { key: "sa_documents",        label: "Architecture + DB + API",   agent: "Solution Architect Agent",   num: 4 },
   { key: "ux_documents",        label: "Screen Spec + UX Flows",    agent: "UX Agent",                   num: 5 },
-  { key: "dev_tasks",           label: "Code Task List",            agent: "Developer Agent",            num: 6 },
-  { key: "test_cases",          label: "Test Cases + UAT",          agent: "QA Agent",                   num: 7 },
-  { key: "change_impact",       label: "Change Impact Report",      agent: "Change Impact Agent",        num: 8 },
-  { key: "documentation",       label: "Compiled Docs",             agent: "Documentation Agent",        num: 9 },
-  { key: "pm_summary",          label: "PM Delivery Report",        agent: "PM Agent",                   num: 10 },
+  { key: "technical_design",    label: "Technical Design",          agent: "Technical Design Agent",     num: 6 },
+  { key: "dev_tasks",           label: "Generated Code + Fan-out",  agent: "Developer Agents",           num: 7 },
+  { key: "code_review",         label: "Code Review",               agent: "Code Review Agent",          num: 8 },
+  { key: "test_cases",          label: "Generated Tests + Report",  agent: "QA Agent",                   num: 9 },
+  { key: "devops_tasks",        label: "Build + Deploy Package",    agent: "DevOps Agent",               num: 10 },
+  { key: "monitoring",          label: "Monitoring Report",         agent: "Monitoring Agent",           num: 11 },
 ] as const;
 
 type StepKey = (typeof PIPELINE)[number]["key"];

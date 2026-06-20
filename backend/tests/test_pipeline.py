@@ -448,13 +448,29 @@ _MOCK_QA_OUTPUT = json.dumps({
     "minimum_pass_rate": 95,
 })
 
+_MOCK_DEVOPS_FILE = """\
+# Generated test deployment artifact
+services:
+  app:
+    image: alpine:3.20
+    command: ["sh", "-c", "echo ok"]
+"""
+
 # LLM call sequences
 _BOTH_LLM_OUTPUTS  = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT]                                                                # Gate 1
 _ALL_LLM_OUTPUTS   = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT, _MOCK_BA_OUTPUT]                                               # Gate 2
 _FULL_LLM_OUTPUTS  = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT, _MOCK_BA_OUTPUT, _MOCK_SA_OUTPUT]                              # Gate 3
 _MAX_LLM_OUTPUTS   = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT, _MOCK_BA_OUTPUT, _MOCK_SA_OUTPUT, _MOCK_UX_OUTPUT]             # Gate 4
 _ULTRA_LLM_OUTPUTS = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT, _MOCK_BA_OUTPUT, _MOCK_SA_OUTPUT, _MOCK_UX_OUTPUT, _MOCK_DEV_OUTPUT]  # Gate 5
-_APEX_LLM_OUTPUTS  = [_MOCK_REQ_OUTPUT, _MOCK_GAP_OUTPUT, _MOCK_BA_OUTPUT, _MOCK_SA_OUTPUT, _MOCK_UX_OUTPUT, _MOCK_DEV_OUTPUT, _MOCK_QA_OUTPUT]  # Gate 6
+_APEX_LLM_OUTPUTS  = [
+    _MOCK_REQ_OUTPUT,
+    _MOCK_GAP_OUTPUT,
+    _MOCK_BA_OUTPUT,
+    _MOCK_SA_OUTPUT,
+    _MOCK_UX_OUTPUT,
+    _MOCK_DEV_OUTPUT,
+    *([_MOCK_DEVOPS_FILE] * 8),
+]  # Full delivery chain through DevOps
 
 
 # ── guard tests (no LLM) ───────────────────────────────────────────────────────
@@ -836,25 +852,32 @@ def test_approve_gate5_completes_run(mock_llm, client: TestClient):
     result = _approve(client, project["id"], run_id, dev_step["id"])
     assert result["status"] == "approved"
 
-    # QA agent runs after gate 5 approval; approve gate 6 (test_cases) to complete
+    # Delivery chain after dev: code review -> QA -> DevOps -> monitoring -> complete.
+    code_review_step = _get_step(client, project["id"], run_id, "code_review")
+    _approve(client, project["id"], run_id, code_review_step["id"])
     qa_step = _get_step(client, project["id"], run_id, "test_cases")
     _approve(client, project["id"], run_id, qa_step["id"])
+    devops_step = _get_step(client, project["id"], run_id, "devops_tasks")
+    _approve(client, project["id"], run_id, devops_step["id"])
+    monitoring_step = _get_step(client, project["id"], run_id, "monitoring")
+    _approve(client, project["id"], run_id, monitoring_step["id"])
 
     final_run = client.get(f"/api/v1/projects/{project['id']}/pipeline/runs/{run_id}").json()
     assert final_run["status"] == "completed"
 
 
-@patch("app.llm.client.call_ollama", side_effect=_ULTRA_LLM_OUTPUTS)
+@patch("app.llm.client.call_ollama", side_effect=_APEX_LLM_OUTPUTS)
 def test_approve_wrong_state_returns_400(mock_llm, client: TestClient):
     project = _create_project(client)
     _create_input(client, project["id"])
     run = _run_pipeline(client, project["id"])
     run_id = run["id"]
 
-    # All five gates → run = completed
+    # Complete every auto-chain gate before checking invalid-state approval.
     _approve_through_gate(client, project["id"], run_id,
                           "gap_analysis", "ba_documents", "sa_documents",
-                          "ux_documents", "dev_tasks")
+                          "ux_documents", "dev_tasks", "code_review",
+                          "test_cases", "devops_tasks", "monitoring")
 
     dev_step = _get_step(client, project["id"], run_id, "dev_tasks")
     r = client.post(f"/api/v1/projects/{project['id']}/pipeline/runs/{run_id}/steps/{dev_step['id']}/approve")

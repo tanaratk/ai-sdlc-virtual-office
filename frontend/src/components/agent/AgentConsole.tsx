@@ -31,7 +31,7 @@ export function AgentConsole({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold">Agent Pipeline</h3>
+        <h3 className="text-sm font-semibold">Agent Pipeline (11-step auto-chain)</h3>
         <button
           onClick={onStart}
           disabled={!canStart || isStarting}

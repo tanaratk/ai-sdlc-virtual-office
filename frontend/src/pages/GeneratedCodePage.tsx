@@ -245,7 +245,7 @@ export default function GeneratedCodePage() {
           <AlertCircle className="h-8 w-8 text-muted-foreground/50" />
           <p className="text-sm font-medium">No generated code yet</p>
           <p className="text-xs text-muted-foreground max-w-sm">
-            Run the AI pipeline and approve Step 6 (Developer Agent) to generate
+            Run the AI pipeline and approve Step 7 (Developer Agents) to generate
             source code files for your project.
           </p>
         </div>
