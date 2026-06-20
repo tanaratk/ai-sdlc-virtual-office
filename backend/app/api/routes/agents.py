@@ -5,6 +5,7 @@ from sqlmodel import Session
 
 from app.db.session import get_session
 from app.schemas.agent import AgentResponse, AgentUpdate
+from app.services.agent_contract_service import get_agent_contract, list_agent_contracts
 from app.services.agent_service import AgentService
 
 router = APIRouter()
@@ -14,6 +15,16 @@ router = APIRouter()
 def list_agents(session: Session = Depends(get_session)):
     svc = AgentService(session)
     return svc.list_active()
+
+
+@router.get("/contracts")
+def list_contracts():
+    return {"items": list_agent_contracts()}
+
+
+@router.get("/contracts/{agent_name}")
+def get_contract(agent_name: str):
+    return get_agent_contract(agent_name)
 
 
 @router.get("/{agent_id}", response_model=AgentResponse)

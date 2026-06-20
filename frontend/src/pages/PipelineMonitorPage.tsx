@@ -34,6 +34,25 @@ const STATUS_COLOR: Record<ActiveRun["status"], string> = {
   waiting_for_user: "bg-yellow-100 text-yellow-700",
 };
 
+const STEP_LABELS: Record<string, string> = {
+  requirement_summary: "Requirement Summary",
+  gap_analysis: "Gap Analysis",
+  ba_documents: "BRD + FSD + User Stories",
+  sa_documents: "Architecture + DB + API",
+  ux_documents: "Screen Spec + UX Flows",
+  technical_design: "Technical Design",
+  dev_tasks: "Generated Code",
+  code_review: "Code Review",
+  test_cases: "Generated Tests + Report",
+  devops_tasks: "Build + Deploy Package",
+  monitoring: "Monitoring Report",
+};
+
+function stepLabel(step: string | null) {
+  if (!step) return null;
+  return STEP_LABELS[step] ?? step;
+}
+
 function elapsed(iso: string | null): string {
   if (!iso) return "—";
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -129,7 +148,7 @@ export default function PipelineMonitorPage() {
                   <td className="px-4 py-3 text-xs">
                     {run.active_step ? (
                       <span className="font-mono bg-muted px-1.5 py-0.5 rounded">
-                        {run.active_step}
+                        {stepLabel(run.active_step)}
                       </span>
                     ) : (
                       <span className="text-muted-foreground">—</span>
