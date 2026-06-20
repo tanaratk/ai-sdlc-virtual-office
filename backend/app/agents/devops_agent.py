@@ -1,26 +1,20 @@
-"""DevOps Agent -- Pipeline Step 7.
+"""DevOps Agent -- Sprint 35.
 
-Reads the Architecture Design, Database Design, and API Spec to generate
-real deployment and infrastructure files for the project.
-
-Output files (predefined for FastAPI + React + PostgreSQL stack):
-  Dockerfile.backend
-  Dockerfile.frontend
-  docker-compose.yml
-  docker-compose.prod.yml
-  nginx.conf
-  .env.example
-  .github/workflows/ci.yml
-  README.md
-
-Files are written to: {workspace}/generated_app/  (same folder as dev_agent)
-A summary document (devops_config type) is saved to the DB.
+Generates deployment files, runs Docker build/deploy checks when Docker is
+available, performs a health check, and stores both configuration and
+build_report documents.
 """
 import logging
 import os
 import re
+import shutil
+import subprocess
+import urllib.error
+import urllib.request
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Optional
 
 from sqlmodel import Session, select
@@ -44,51 +38,79 @@ from app.llm import client as _llm
 logger = logging.getLogger(__name__)
 
 AGENT_NAME = "devops-agent"
-STEP_NAME  = "devops_tasks"
+STEP_NAME = "devops_tasks"
 
-FILE_TIMEOUT   = 120.0
+FILE_TIMEOUT = 120.0
 MIN_FILE_CHARS = 30
+COMMAND_TIMEOUT = 300
+HEALTH_TIMEOUT = 10
+
+
+@dataclass
+class CommandResult:
+    name: str
+    command: str
+    status: str
+    exit_code: int | None
+    stdout: str
+    stderr: str
+
+
+@dataclass
+class HealthResult:
+    url: str
+    status: str
+    http_status: int | None
+    detail: str
 
 
 def _trunc(s: str, n: int) -> str:
     return s[:n] + "\n...(truncated)" if len(s) > n else s
 
 
-# -- Predefined file specs ----------------------------------------------------
-# (filename, lang hint, context_type)
+def _short(s: str, n: int = 5000) -> str:
+    return s if len(s) <= n else s[:n] + "\n... output truncated ..."
+
+
+def _container_workspace_path(raw: str | None) -> str:
+    workspace = raw or "/workspace"
+    workspace = re.sub(r"^[A-Za-z]:[/\\]workspace", "/workspace", workspace, flags=re.IGNORECASE)
+    if not workspace.startswith("/workspace"):
+        workspace = "/workspace"
+    return workspace
+
+
+def _safe_name(name: str) -> str:
+    return re.sub(r"[^\w\-]", "_", name)
+
 
 _DEVOPS_FILES: list[tuple[str, str, str]] = [
-    ("Dockerfile.backend",       "dockerfile", "backend_docker"),
-    ("Dockerfile.frontend",      "dockerfile", "frontend_docker"),
-    ("docker-compose.yml",       "yaml",       "compose_dev"),
-    ("docker-compose.prod.yml",  "yaml",       "compose_prod"),
-    ("nginx.conf",               "text",       "nginx"),
-    (".env.example",             "bash",       "env_example"),
-    (".github/workflows/ci.yml", "yaml",       "github_ci"),
-    ("README.md",                "markdown",   "readme"),
+    ("Dockerfile.backend", "dockerfile", "backend_docker"),
+    ("Dockerfile.frontend", "dockerfile", "frontend_docker"),
+    ("docker-compose.yml", "yaml", "compose_dev"),
+    ("docker-compose.prod.yml", "yaml", "compose_prod"),
+    ("nginx.conf", "text", "nginx"),
+    (".env.example", "bash", "env_example"),
+    (".github/workflows/ci.yml", "yaml", "github_ci"),
+    ("README.md", "markdown", "readme"),
 ]
 
-# -- Prompts ------------------------------------------------------------------
 
 _SYSTEM_PROMPT = """\
 You are an expert DevOps engineer and infrastructure specialist.
-You write clean, production-ready deployment configuration files for
-full-stack web applications.
+You write clean deployment configuration files for full-stack web applications.
 
-RULES:
+Rules:
 - Output ONLY the file content. No markdown fences. No explanation.
 - Tech stack: FastAPI (Python 3.11) + PostgreSQL 15 for backend;
   React + Vite + Node 20 for frontend.
-- Use multi-stage Docker builds to keep image sizes small.
-- docker-compose.yml should include: postgres, redis, backend, frontend, nginx.
-- docker-compose.prod.yml should add: resource limits, restart policies,
-  volume mounts for persistent data.
+- Use multi-stage Docker builds.
+- docker-compose.yml should include postgres, redis, backend, frontend, and nginx
+  when the generated app needs them.
 - nginx.conf should proxy /api/ to backend:8000 and serve frontend on /.
-- .env.example must list ALL environment variables with placeholder values.
-- GitHub Actions CI should: checkout, run backend tests (pytest), run frontend
-  type-check (tsc --noEmit), build Docker images.
-- README.md should explain: prerequisites, quick start, env setup, Docker commands.
-- Never hardcode real passwords or secrets -- use placeholder values.
+- .env.example must list required environment variables with placeholder values.
+- GitHub Actions CI should run backend tests, frontend type-check, and Docker build.
+- Never hardcode real passwords or secrets.
 """
 
 _FILE_TEMPLATE = """\
@@ -105,47 +127,33 @@ Output the file content directly. No fences, no explanation.
 """
 
 _PURPOSES: dict[str, str] = {
-    "backend_docker":  "Multi-stage Dockerfile for FastAPI backend (Python 3.11, uvicorn)",
-    "frontend_docker": "Multi-stage Dockerfile for React/Vite frontend (Node 20 build, nginx serve)",
-    "compose_dev":     "docker-compose.yml for local development with hot-reload",
-    "compose_prod":    "docker-compose.prod.yml for production with resource limits and restart policies",
-    "nginx":           "nginx.conf reverse proxy: /api/ → backend:8000, / → frontend static files",
-    "env_example":     ".env.example template listing all required environment variables",
-    "github_ci":       "GitHub Actions CI workflow: lint, test, type-check, build on push/PR",
-    "readme":          "README.md with prerequisites, quick start, environment setup, Docker commands",
+    "backend_docker": "Multi-stage Dockerfile for FastAPI backend",
+    "frontend_docker": "Multi-stage Dockerfile for React/Vite frontend",
+    "compose_dev": "docker-compose.yml for local build and deployment",
+    "compose_prod": "docker-compose.prod.yml for production-like deployment",
+    "nginx": "nginx reverse proxy for frontend and backend API",
+    "env_example": "Environment variable template",
+    "github_ci": "GitHub Actions CI workflow",
+    "readme": "Runbook with Docker build/deploy commands",
 }
 
 
-# -- Markdown summary ---------------------------------------------------------
-
-def _render_summary(
-    results: list[tuple[str, bool]],
-    project_id: str,
-    doc_id: str,
-) -> str:
-    ok   = sum(1 for _, s in results if s)
+def _render_config_summary(results: list[tuple[str, bool]], project_id: str, doc_id: str) -> str:
+    ok = sum(1 for _, success in results if success)
     fail = len(results) - ok
+    rows = "\n".join(f"| `{path}` | {'OK' if success else 'FAILED'} |" for path, success in results)
+    return f"""# DevOps Configuration Summary
 
-    rows = ""
-    for path, success in results:
-        status = "OK" if success else "FAILED"
-        rows += f"| `{path}` | {status} |\n"
-
-    return f"""\
-# DevOps Configuration Summary
-
-**Project ID:** `{project_id}`
-**Document ID:** `{doc_id}`
-**Generated By:** DevOps Agent v1.0.0
-**Pipeline Step:** 7 of 10
+**Project ID:** `{project_id}`  
+**Document ID:** `{doc_id}`  
+**Generated By:** DevOps Agent  
+**Pipeline Step:** 10 of 12  
 **Status:** Draft -- Awaiting Review
-
----
 
 ## Generation Results
 
 | Files OK | Files Failed |
-|---|---|
+|---:|---:|
 | {ok} | {fail} |
 
 ## Files Generated
@@ -154,18 +162,103 @@ def _render_summary(
 |---|---|
 {rows}
 
----
-
 ## Output Location
 
-Files are written to: `generated_app/` inside the project workspace.
-View and download via the **Generated Code** tab.
-
-{"**Warning:** Some files failed to generate. Review and regenerate manually." if fail else "All deployment files generated successfully."}
+Files are written to `generated_app/` inside the project workspace.
 """
 
 
-# -- Agent runner -------------------------------------------------------------
+def _render_build_report(
+    project_id: uuid.UUID,
+    doc_id: uuid.UUID,
+    app_dir: Path,
+    command_results: list[CommandResult],
+    health: HealthResult,
+    rollback: CommandResult | None,
+) -> str:
+    failed = sum(1 for r in command_results if r.status == "failed")
+    skipped = sum(1 for r in command_results if r.status == "skipped")
+    passed = sum(1 for r in command_results if r.status == "passed")
+    overall = "PASS" if failed == 0 and health.status == "passed" else "FAIL"
+    if skipped and failed == 0 and health.status != "failed":
+        overall = "PARTIAL"
+
+    result_rows = "\n".join(
+        f"| {r.name} | `{r.command}` | {r.status.upper()} | {r.exit_code if r.exit_code is not None else '-'} |"
+        for r in command_results
+    )
+    output_blocks = "\n".join(
+        f"""### {r.name}
+
+**Command:** `{r.command}`  
+**Status:** {r.status.upper()}  
+**Exit code:** {r.exit_code if r.exit_code is not None else "-"}
+
+```text
+STDOUT:
+{_short(r.stdout)}
+
+STDERR:
+{_short(r.stderr)}
+```
+"""
+        for r in command_results
+    )
+    rollback_block = ""
+    if rollback:
+        rollback_block = f"""## Rollback
+
+**Command:** `{rollback.command}`  
+**Status:** {rollback.status.upper()}  
+**Exit code:** {rollback.exit_code if rollback.exit_code is not None else "-"}
+
+```text
+STDOUT:
+{_short(rollback.stdout)}
+
+STDERR:
+{_short(rollback.stderr)}
+```
+"""
+
+    return f"""# Build Report
+
+**Project ID:** `{project_id}`  
+**Document ID:** `{doc_id}`  
+**Generated By:** DevOps Agent  
+**Pipeline Step:** 10 of 12  
+**Generated At:** {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}  
+**Overall Status:** {overall}
+
+## Summary
+
+| Metric | Count |
+|---|---:|
+| Commands passed | {passed} |
+| Commands failed | {failed} |
+| Commands skipped | {skipped} |
+
+**Workspace:** `{app_dir}`
+
+## Command Results
+
+| Stage | Command | Status | Exit Code |
+|---|---|---|---:|
+{result_rows}
+
+## Health Check
+
+| URL | Status | HTTP Status | Detail |
+|---|---|---:|---|
+| `{health.url}` | {health.status.upper()} | {health.http_status if health.http_status is not None else '-'} | {health.detail} |
+
+## Runner Output
+
+{output_blocks}
+
+{rollback_block}
+"""
+
 
 class DevOpsAgentRunner:
     def __init__(self, session: Session) -> None:
@@ -197,50 +290,59 @@ class DevOpsAgentRunner:
             arch_doc, db_doc, api_doc, fsd_doc = self._load_source_documents(run.project_id)
             project = self.session.get(Project, run.project_id)
             project_name = project.name if project else "project"
+            app_dir = self._get_output_dir(run.project_id)
 
             docs = {
                 "architecture": arch_doc.content_markdown,
-                "database":     db_doc.content_markdown,
-                "api_spec":     api_doc.content_markdown,
-                "fsd":          fsd_doc.content_markdown,
+                "database": db_doc.content_markdown,
+                "api_spec": api_doc.content_markdown,
+                "fsd": fsd_doc.content_markdown,
                 "project_name": project_name,
             }
 
-            out_dir = self._get_output_dir(run.project_id)
-            results: list[tuple[str, bool]] = []
+            generation_results = self._generate_devops_files(app_dir, docs, model)
+            command_results, health, rollback = self._build_deploy_healthcheck(app_dir)
 
-            for path, lang, ctx_type in _DEVOPS_FILES:
-                content = self._generate_file(path, lang, ctx_type, docs, model)
-                if content:
-                    self._write_file(out_dir, path, content)
-                    results.append((path, True))
-                    logger.info("DevOpsAgent generated %s", path)
-                else:
-                    results.append((path, False))
-                    logger.warning("DevOpsAgent failed to generate %s", path)
-
-            doc_id = uuid.uuid4()
-            pid = str(run.project_id)
-            summary_md = _render_summary(results, pid, str(doc_id))
-
-            summary_doc = Document(
-                id=doc_id,
+            config_doc_id = uuid.uuid4()
+            config_md = _render_config_summary(generation_results, str(run.project_id), str(config_doc_id))
+            config_doc = Document(
+                id=config_doc_id,
                 project_id=run.project_id,
                 document_type=DocumentType.devops_config,
                 title="DevOps Configuration Summary",
-                content_markdown=summary_md,
+                content_markdown=config_md,
                 version=1,
                 status=DocumentStatus.review,
                 created_by_agent_id=agent_row.id if agent_row else None,
             )
-            self.session.add(summary_doc)
+            self.session.add(config_doc)
+
+            report_doc_id = uuid.uuid4()
+            report_md = _render_build_report(
+                project_id=run.project_id,
+                doc_id=report_doc_id,
+                app_dir=app_dir,
+                command_results=command_results,
+                health=health,
+                rollback=rollback,
+            )
+            report_doc = Document(
+                id=report_doc_id,
+                project_id=run.project_id,
+                document_type=DocumentType.build_report,
+                title=f"Build Report -- {health.status.upper()}",
+                content_markdown=report_md,
+                version=1,
+                status=DocumentStatus.review,
+                created_by_agent_id=agent_row.id if agent_row else None,
+            )
+            self.session.add(report_doc)
             self.session.flush()
 
             step.status = PipelineStepStatus.completed
             step.agent_id = agent_row.id if agent_row else None
-            step.output_document_id = summary_doc.id
+            step.output_document_id = report_doc.id
             step.completed_at = datetime.now(UTC)
-
             run.status = PipelineRunStatus.waiting_for_user
             run.current_step = STEP_NAME
 
@@ -248,14 +350,26 @@ class DevOpsAgentRunner:
                 agent_row.status = AgentStatus.done
                 agent_row.updated_at = datetime.now(UTC)
 
-            ok_count = sum(1 for _, s in results if s)
+            ok_files = sum(1 for _, success in generation_results if success)
+            failed_commands = sum(1 for r in command_results if r.status == "failed")
             self._log_activity(
-                run.project_id, agent_row,
-                f"DevOps configuration generated: {ok_count}/{len(results)} files "
-                f"written to generated_app/. Awaiting Gate 6 review.",
+                run.project_id,
+                agent_row,
+                (
+                    f"DevOps generated {ok_files}/{len(generation_results)} files. "
+                    f"Build/deploy commands failed: {failed_commands}. "
+                    f"Health check: {health.status}."
+                ),
             )
             self.session.commit()
-            logger.info("DevOpsAgent completed run=%s files=%d/%d", run_id, ok_count, len(results))
+
+            from app.agents._workspace import write_workspace_docs
+
+            write_workspace_docs(self.session, run.project_id, {"build_report.md": report_md})
+            logger.info(
+                "DevOpsAgent completed run=%s config=%s report=%s health=%s",
+                run_id, config_doc_id, report_doc_id, health.status,
+            )
 
         except Exception as exc:
             logger.exception("DevOpsAgent failed run=%s: %s", run_id, exc)
@@ -267,14 +381,141 @@ class DevOpsAgentRunner:
                 if step:
                     step.status = PipelineStepStatus.failed
                     step.error_message = str(exc)[:2000]
+                    step.completed_at = datetime.now(UTC)
                 if agent_row:
                     agent_row.status = AgentStatus.error
                     agent_row.updated_at = datetime.now(UTC)
                 self.session.commit()
             except Exception:
-                logger.exception("Failed to persist failure state for run=%s", run_id)
+                logger.exception("Failed to persist DevOps failure state for run=%s", run_id)
 
-    # -- Generation helpers ---------------------------------------------------
+    def _generate_devops_files(
+        self,
+        app_dir: Path,
+        docs: dict[str, str],
+        model: str | None,
+    ) -> list[tuple[str, bool]]:
+        results: list[tuple[str, bool]] = []
+        for rel_path, lang, ctx_type in _DEVOPS_FILES:
+            content = self._generate_file(rel_path, lang, ctx_type, docs, model)
+            if content:
+                self._write_file(app_dir, rel_path, content)
+                results.append((rel_path, True))
+            else:
+                results.append((rel_path, False))
+        return results
+
+    def _build_deploy_healthcheck(
+        self,
+        app_dir: Path,
+    ) -> tuple[list[CommandResult], HealthResult, CommandResult | None]:
+        docker = shutil.which("docker")
+        if not docker:
+            return (
+                [CommandResult(
+                    name="docker",
+                    command="docker --version",
+                    status="skipped",
+                    exit_code=None,
+                    stdout="Docker CLI is not available in this runtime.",
+                    stderr="",
+                )],
+                HealthResult(url="-", status="skipped", http_status=None, detail="Health check skipped because Docker is unavailable."),
+                None,
+            )
+
+        compose_file = app_dir / "docker-compose.yml"
+        if not compose_file.exists():
+            return (
+                [CommandResult(
+                    name="compose-config",
+                    command="docker compose -f docker-compose.yml config",
+                    status="failed",
+                    exit_code=None,
+                    stdout="",
+                    stderr=f"Missing compose file: {compose_file}",
+                )],
+                HealthResult(url="-", status="failed", http_status=None, detail="Missing docker-compose.yml."),
+                None,
+            )
+
+        results = [
+            self._run_command("compose-config", [docker, "compose", "-f", str(compose_file), "config"], app_dir),
+            self._run_command("compose-build", [docker, "compose", "-f", str(compose_file), "build"], app_dir),
+        ]
+
+        if any(r.status == "failed" for r in results):
+            return results, HealthResult(url="-", status="failed", http_status=None, detail="Build failed before deploy."), None
+
+        up_result = self._run_command("compose-up", [docker, "compose", "-f", str(compose_file), "up", "-d"], app_dir)
+        results.append(up_result)
+        if up_result.status == "failed":
+            rollback = self._run_command("rollback-down", [docker, "compose", "-f", str(compose_file), "down"], app_dir)
+            return results, HealthResult(url="-", status="failed", http_status=None, detail="Deploy failed."), rollback
+
+        health = self._health_check()
+        rollback = None
+        if health.status == "failed":
+            rollback = self._run_command("rollback-down", [docker, "compose", "-f", str(compose_file), "down"], app_dir)
+        return results, health, rollback
+
+    def _run_command(self, name: str, command: list[str], cwd: Path) -> CommandResult:
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=str(cwd),
+                capture_output=True,
+                text=True,
+                timeout=COMMAND_TIMEOUT,
+                check=False,
+            )
+            return CommandResult(
+                name=name,
+                command=" ".join(command),
+                status="passed" if completed.returncode == 0 else "failed",
+                exit_code=completed.returncode,
+                stdout=completed.stdout,
+                stderr=completed.stderr,
+            )
+        except subprocess.TimeoutExpired as exc:
+            return CommandResult(
+                name=name,
+                command=" ".join(command),
+                status="failed",
+                exit_code=None,
+                stdout=exc.stdout or "",
+                stderr=f"Timed out after {COMMAND_TIMEOUT} seconds. {exc.stderr or ''}",
+            )
+        except OSError as exc:
+            return CommandResult(
+                name=name,
+                command=" ".join(command),
+                status="failed",
+                exit_code=None,
+                stdout="",
+                stderr=str(exc),
+            )
+
+    def _health_check(self) -> HealthResult:
+        urls = [
+            "http://localhost:8000/health",
+            "http://localhost:8000/api/v1/health",
+            "http://localhost:3000/health",
+            "http://localhost/health",
+        ]
+        last_detail = ""
+        for url in urls:
+            try:
+                with urllib.request.urlopen(url, timeout=HEALTH_TIMEOUT) as response:
+                    status = getattr(response, "status", None)
+                    if status and 200 <= status < 400:
+                        return HealthResult(url=url, status="passed", http_status=status, detail="Health endpoint responded successfully.")
+                    last_detail = f"HTTP {status}"
+            except urllib.error.HTTPError as exc:
+                last_detail = f"HTTP {exc.code}: {exc.reason}"
+            except Exception as exc:
+                last_detail = str(exc)
+        return HealthResult(url=urls[-1], status="failed", http_status=None, detail=last_detail or "No health endpoint responded.")
 
     def _generate_file(
         self,
@@ -286,9 +527,7 @@ class DevOpsAgentRunner:
     ) -> str | None:
         context = self._build_context(ctx_type, docs)
         purpose = _PURPOSES.get(ctx_type, f"Generate {path}")
-        prompt = _FILE_TEMPLATE.format(
-            path=path, lang=lang, purpose=purpose, context=context,
-        )
+        prompt = _FILE_TEMPLATE.format(path=path, lang=lang, purpose=purpose, context=context)
         for attempt in range(2):
             try:
                 raw = _llm.call_ollama(
@@ -307,45 +546,33 @@ class DevOpsAgentRunner:
         return None
 
     def _build_context(self, ctx_type: str, docs: dict[str, str]) -> str:
-        arch  = _trunc(docs["architecture"], 3000)
-        db    = _trunc(docs["database"], 2000)
-        api   = _trunc(docs["api_spec"], 2000)
-        fsd   = _trunc(docs["fsd"], 1500)
+        arch = _trunc(docs["architecture"], 3000)
+        db = _trunc(docs["database"], 2000)
+        api = _trunc(docs["api_spec"], 2000)
+        fsd = _trunc(docs["fsd"], 1500)
         pname = docs["project_name"]
 
-        if ctx_type in ("backend_docker", "frontend_docker"):
+        if ctx_type in ("backend_docker", "frontend_docker", "github_ci"):
             return f"PROJECT: {pname}\n\nARCHITECTURE:\n{arch}"
-        if ctx_type in ("compose_dev", "compose_prod"):
+        if ctx_type in ("compose_dev", "compose_prod", "env_example"):
             return f"PROJECT: {pname}\n\nARCHITECTURE:\n{arch}\n\nDATABASE DESIGN:\n{db}"
         if ctx_type == "nginx":
-            return f"PROJECT: {pname}\n\nAPI SPEC (for proxy routing):\n{api}"
-        if ctx_type == "env_example":
-            return f"PROJECT: {pname}\n\nARCHITECTURE:\n{arch}\n\nDATABASE DESIGN:\n{db}"
-        if ctx_type == "github_ci":
-            return f"PROJECT: {pname}\n\nARCHITECTURE:\n{arch}"
+            return f"PROJECT: {pname}\n\nAPI SPEC:\n{api}"
         if ctx_type == "readme":
-            return f"PROJECT: {pname}\n\nFSD EXCERPT:\n{fsd}\n\nARCHITECTURE:\n{arch}"
+            return f"PROJECT: {pname}\n\nFSD:\n{fsd}\n\nARCHITECTURE:\n{arch}"
         return arch
 
-    def _write_file(self, out_dir: str, rel_path: str, content: str) -> None:
+    def _write_file(self, app_dir: Path, rel_path: str, content: str) -> None:
         safe_rel = re.sub(r"\.\.+[/\\]", "", rel_path).lstrip("/\\")
-        full_path = os.path.join(out_dir, safe_rel)
-        os.makedirs(os.path.dirname(full_path), exist_ok=True)
-        with open(full_path, "w", encoding="utf-8") as f:
-            f.write(content)
+        full_path = app_dir / safe_rel
+        full_path.parent.mkdir(parents=True, exist_ok=True)
+        full_path.write_text(content, encoding="utf-8")
 
-    def _get_output_dir(self, project_id: uuid.UUID) -> str:
+    def _get_output_dir(self, project_id: uuid.UUID) -> Path:
         project = self.session.get(Project, project_id)
-        raw = (project.workspace_path if project else None) or "/workspace"
-        container_path = re.sub(
-            r"^[A-Za-z]:[/\\]workspace", "/workspace", raw, flags=re.IGNORECASE
-        )
-        if not container_path.startswith("/workspace"):
-            container_path = "/workspace"
-        safe_name = re.sub(r"[^\w\-]", "_", project.name if project else "project")
-        return os.path.join(container_path, safe_name, "generated_app")
-
-    # -- DB helpers -----------------------------------------------------------
+        workspace = _container_workspace_path(project.workspace_path if project else None)
+        safe_name = _safe_name(project.name if project else "project")
+        return Path(workspace) / safe_name / "generated_app"
 
     def _get_run(self, run_id: uuid.UUID) -> PipelineRun:
         run = self.session.get(PipelineRun, run_id)
@@ -365,35 +592,26 @@ class DevOpsAgentRunner:
         return step
 
     def _get_agent_row(self) -> Optional[Agent]:
-        return self.session.exec(
-            select(Agent).where(Agent.name == AGENT_NAME)
-        ).first()
+        return self.session.exec(select(Agent).where(Agent.name == AGENT_NAME)).first()
 
-    def _load_source_documents(
-        self, project_id: uuid.UUID
-    ) -> tuple[Document, Document, Document, Document]:
+    def _load_source_documents(self, project_id: uuid.UUID) -> tuple[Document, Document, Document, Document]:
         def _latest(doc_type: DocumentType) -> Optional[Document]:
             return self.session.exec(
-                select(Document).where(
-                    Document.project_id == project_id,
-                    Document.document_type == doc_type,
-                ).order_by(Document.created_at.desc())
+                select(Document)
+                .where(Document.project_id == project_id, Document.document_type == doc_type)
+                .order_by(Document.created_at.desc())  # type: ignore[union-attr]
             ).first()
 
         arch = _latest(DocumentType.architecture_design)
-        db   = _latest(DocumentType.database_design)
-        api  = _latest(DocumentType.api_spec)
-        fsd  = _latest(DocumentType.fsd)
-
-        missing = [n for n, d in [("Architecture", arch), ("Database", db), ("API Spec", api), ("FSD", fsd)] if not d]
+        db = _latest(DocumentType.database_design)
+        api = _latest(DocumentType.api_spec)
+        fsd = _latest(DocumentType.fsd)
+        missing = [name for name, doc in [("Architecture", arch), ("Database", db), ("API Spec", api), ("FSD", fsd)] if not doc]
         if missing:
             raise ValueError(f"Missing source documents: {', '.join(missing)}")
-
         return arch, db, api, fsd  # type: ignore[return-value]
 
-    def _log_activity(
-        self, project_id: uuid.UUID, agent_row: Optional[Agent], message: str
-    ) -> None:
+    def _log_activity(self, project_id: uuid.UUID, agent_row: Optional[Agent], message: str) -> None:
         self.session.add(ActivityLog(
             project_id=project_id,
             agent_id=agent_row.id if agent_row else None,

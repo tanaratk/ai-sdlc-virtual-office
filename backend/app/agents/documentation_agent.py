@@ -43,6 +43,10 @@ _DOC_ORDER: list[tuple[DocumentType, str]] = [
     (DocumentType.screen_spec,          "Screen Specification"),
     (DocumentType.code_task_list,       "Code Task List"),
     (DocumentType.test_cases,           "Test Cases"),
+    (DocumentType.test_report,          "Test Report"),
+    (DocumentType.devops_config,        "DevOps Configuration"),
+    (DocumentType.build_report,         "Build Report"),
+    (DocumentType.monitoring_report,    "Monitoring Report"),
     (DocumentType.uat_script,           "UAT Script"),
     (DocumentType.change_impact_report, "Change Impact Report"),
 ]
