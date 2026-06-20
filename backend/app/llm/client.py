@@ -24,16 +24,21 @@ def call_ollama(
     model = model or settings.ollama_model
     url = f"{settings.ollama_base_url}/api/chat"
 
+    # For qwen3 family: /no_think in the user turn disables extended thinking.
+    # Thinking tokens exhaust the context window and produce empty content when
+    # format=json is also set. Non-qwen3 models treat this as harmless trailing text.
+    effective_user = user_prompt
+    if response_format:
+        effective_user = user_prompt + "\n/no_think"
+
     payload: dict = {
         "model": model,
         "messages": [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
+            {"role": "user", "content": effective_user},
         ],
         "stream": False,
-        # Disable thinking mode for qwen3 family — thinking tokens consume context
-        # and cause empty responses when combined with format=json constraint
-        "options": {"think": False},
+        "options": {"think": False},  # belt-and-suspenders for newer Ollama versions
     }
     if response_format:
         payload["format"] = response_format
