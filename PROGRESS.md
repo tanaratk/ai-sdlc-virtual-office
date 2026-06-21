@@ -1,6 +1,6 @@
 # AI-SDLC Virtual Office — Progress Tracker
 
-**Last Updated:** 2026-06-21 (Sprint 41 done — Tech Stack Config: backend + frontend UI complete)  
+**Last Updated:** 2026-06-21 (Sprint 42 done — Left Menu restructured per CR spec FR-008)  
 **Project:** ai-sdlc-virtual-office  
 **Repo:** https://github.com/tanaratk/ai-sdlc-virtual-office  
 **Working Directory:** D:\AI_Office
@@ -77,6 +77,7 @@
 | 39-bugfix | Backend: 6 bugs fixed (SA validation, change_impact doctype, BOM removal) | ✅ Done |
 | 40 | Wire Documentation + PM Agent into pipeline (auto-chain after monitoring) | ✅ Done |
 | 41 | Tech Stack Config — backend model + schema + migration + frontend UI (FR-005) | ✅ Done |
+| 42 | Left Menu Restructure — remove project-level items, reorder per CR spec (FR-008) | ✅ Done |
 
 ## Project Status
 

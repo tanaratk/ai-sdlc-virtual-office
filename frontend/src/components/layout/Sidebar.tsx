@@ -2,18 +2,13 @@ import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   FolderOpen,
-  Upload,
   Bot,
-  FileText,
-  GitBranch,
   Building2,
-  Activity,
-  Users,
-  Cpu,
   Radio,
-  Code2,
+  Cpu,
   Database,
-  Wrench,
+  Plug,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -21,30 +16,25 @@ import { useAuth } from "@/context/AuthContext";
 type NavItem = { to: string; icon: React.ElementType; label: string };
 
 const mainItems: NavItem[] = [
-  { to: "/",        icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/projects",icon: FolderOpen,      label: "Projects" },
-  { to: "/intake",  icon: Upload,          label: "Requirements" },
-];
-
-const deliveryItems: NavItem[] = [
-  { to: "/pipeline-runs",   icon: Radio,     label: "Pipeline Runs" },
-  { to: "/documents",       icon: FileText,  label: "Documents" },
-  { to: "/code-workspace",  icon: Code2,     label: "Code Workspace" },
-  { to: "/traceability",    icon: GitBranch, label: "Traceability" },
-  { to: "/office",          icon: Building2, label: "Virtual Office" },
-  { to: "/monitoring",      icon: Activity,  label: "Monitoring" },
+  { to: "/",       icon: LayoutDashboard, label: "Dashboard"       },
+  { to: "/office", icon: Building2,       label: "Virtual Office"  },
+  { to: "/projects",icon: FolderOpen,     label: "Projects"        },
 ];
 
 const platformItems: NavItem[] = [
-  { to: "/agents",   icon: Bot,      label: "Agents" },
-  { to: "/rag",      icon: Database, label: "RAG Knowledge Base" },
-  { to: "/mcp",      icon: Wrench,   label: "Tool Registry" },
-  { to: "/settings", icon: Cpu,      label: "AI Model Settings" },
+  { to: "/agents",        icon: Bot,      label: "Agent Management"    },
+  { to: "/pipeline-runs", icon: Radio,    label: "Pipeline"            },
+  { to: "/settings",      icon: Cpu,      label: "AI Model Settings"   },
+];
+
+const systemItems: NavItem[] = [
+  { to: "/rag", icon: Database, label: "Knowledge Base / RAG" },
+  { to: "/mcp", icon: Plug,     label: "Integrations"         },
 ];
 
 const adminItems: NavItem[] = [
-  { to: "/users",         icon: Users,      label: "User Management" },
-  { to: "/admin/projects",icon: FolderOpen, label: "Project Management" },
+  { to: "/users",          icon: Users,      label: "User Management"    },
+  { to: "/admin/projects", icon: FolderOpen, label: "Project Management" },
 ];
 
 export function Sidebar() {
@@ -86,11 +76,11 @@ export function Sidebar() {
         <SectionLabel label="Main" />
         {mainItems.map((item) => <NavLink key={item.to} {...item} />)}
 
-        <SectionLabel label="Delivery" />
-        {deliveryItems.map((item) => <NavLink key={item.to} {...item} />)}
-
         <SectionLabel label="AI Platform" />
         {platformItems.map((item) => <NavLink key={item.to} {...item} />)}
+
+        <SectionLabel label="System" />
+        {systemItems.map((item) => <NavLink key={item.to} {...item} />)}
 
         {user?.role === "admin" && (
           <>
