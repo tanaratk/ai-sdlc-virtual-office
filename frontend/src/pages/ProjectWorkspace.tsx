@@ -1,15 +1,114 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import {
   Upload, Bot, FileText, GitBranch, Building2, Zap,
   Github, Wrench, BookOpen, ClipboardList, Database, Code2,
   CheckCircle2, Circle, ArrowRight, AlertCircle, RotateCcw,
-  ScrollText, FolderGit2,
+  ScrollText, FolderGit2, Pencil, Check, X,
 } from "lucide-react";
 import { projectApi } from "@/services/projectApi";
 import { sourceApi } from "@/services/sourceApi";
 import { agentApi } from "@/services/agentApi";
 import { cn } from "@/lib/utils";
+import type { TechStackConfig } from "@/types/project";
+
+const FRONTEND_OPTIONS = ["React", "ASPX", "ASP.NET Web Forms", "ASP.NET MVC / Razor", "Other / Custom"];
+const BACKEND_OPTIONS  = ["Node.js", ".NET / ASP.NET Core", "ASP.NET Framework", "Other / Custom"];
+const DATABASE_OPTIONS = ["PostgreSQL", "Microsoft SQL Server", "MySQL"];
+const APP_TYPE_OPTIONS = ["Web App", "Mobile App", "Web + Mobile App"];
+
+// ── Tech Stack inline editor ──────────────────────────────────────────────────
+
+function TechStackPanel({ projectId, initial }: { projectId: string; initial: TechStackConfig | null | undefined }) {
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<TechStackConfig>(initial ?? {});
+
+  const saveMutation = useMutation({
+    mutationFn: (ts: TechStackConfig) => projectApi.update(projectId, { tech_stack: ts }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["project", projectId] });
+      setEditing(false);
+    },
+  });
+
+  const startEdit = () => { setDraft(initial ?? {}); setEditing(true); };
+  const cancel    = () => setEditing(false);
+  const save      = () => {
+    const clean: TechStackConfig = Object.fromEntries(
+      Object.entries(draft).filter(([, v]) => v && (v as string).length > 0)
+    );
+    saveMutation.mutate(clean);
+  };
+
+  const rows: Array<{ label: string; key: keyof TechStackConfig; opts: string[] }> = [
+    { label: "Frontend",  key: "frontend",          opts: FRONTEND_OPTIONS },
+    { label: "Backend",   key: "backend",            opts: BACKEND_OPTIONS  },
+    { label: "Database",  key: "database",           opts: DATABASE_OPTIONS },
+    { label: "App Type",  key: "app_type",           opts: APP_TYPE_OPTIONS },
+  ];
+
+  const hasValue = rows.some((r) => initial?.[r.key]);
+
+  return (
+    <div className="rounded-xl border bg-white p-4">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tech Stack</p>
+        {!editing && (
+          <button onClick={startEdit} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+            <Pencil className="h-3 w-3" /> Edit
+          </button>
+        )}
+      </div>
+
+      {editing ? (
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            {rows.map(({ label, key, opts }) => (
+              <div key={key}>
+                <label className="block text-[10px] font-medium text-muted-foreground mb-0.5">{label}</label>
+                <select
+                  value={draft[key] ?? ""}
+                  onChange={(e) => setDraft((p) => ({ ...p, [key]: e.target.value }))}
+                  className="w-full rounded border px-2 py-1.5 text-xs bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="">— None —</option>
+                  {opts.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={save}
+              disabled={saveMutation.isPending}
+              className="flex items-center gap-1 rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              <Check className="h-3 w-3" /> Save
+            </button>
+            <button onClick={cancel} className="flex items-center gap-1 rounded-md border px-3 py-1 text-xs font-medium hover:bg-accent">
+              <X className="h-3 w-3" /> Cancel
+            </button>
+          </div>
+        </div>
+      ) : hasValue ? (
+        <div className="flex flex-wrap gap-2">
+          {rows.map(({ label, key }) =>
+            initial?.[key] ? (
+              <span key={key} className="rounded-full border bg-muted/40 px-2.5 py-0.5 text-xs">
+                <span className="text-muted-foreground">{label}: </span>
+                <span className="font-medium">{initial[key]}</span>
+              </span>
+            ) : null
+          )}
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">No tech stack configured — click Edit to set.</p>
+      )}
+    </div>
+  );
+}
 
 // ── Project Output groups ─────────────────────────────────────────────────────
 
@@ -227,6 +326,9 @@ export default function ProjectWorkspace() {
           </div>
         )}
       </div>
+
+      {/* ── Tech Stack ── */}
+      <TechStackPanel projectId={projectId!} initial={project.tech_stack} />
 
       {/* ── Guided steps ── */}
       <section>
