@@ -89,6 +89,7 @@ export interface LlmSetting {
   temperature: number;
   max_tokens: number;
   is_active: boolean;
+  has_api_key: boolean;
   created_at: string;
   updated_at: string;
 }
