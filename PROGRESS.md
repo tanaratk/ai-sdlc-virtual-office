@@ -1,6 +1,6 @@
 # AI-SDLC Virtual Office — Progress Tracker
 
-**Last Updated:** 2026-06-21 (Sprint 42 done — Left Menu restructured per CR spec FR-008)  
+**Last Updated:** 2026-06-21 (Sprint 43 done — AI Model Settings redesigned: 2-tab layout + Claude/OpenAI providers)  
 **Project:** ai-sdlc-virtual-office  
 **Repo:** https://github.com/tanaratk/ai-sdlc-virtual-office  
 **Working Directory:** D:\AI_Office
@@ -78,6 +78,7 @@
 | 40 | Wire Documentation + PM Agent into pipeline (auto-chain after monitoring) | ✅ Done |
 | 41 | Tech Stack Config — backend model + schema + migration + frontend UI (FR-005) | ✅ Done |
 | 42 | Left Menu Restructure — remove project-level items, reorder per CR spec (FR-008) | ✅ Done |
+| 43 | AI Model Settings Redesign — 2-tab layout (Ollama Models + Per-Agent) + Claude/OpenAI providers (FR-006, FR-007) | ✅ Done |
 
 ## Project Status
 
