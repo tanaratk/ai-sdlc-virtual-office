@@ -1,6 +1,6 @@
 # AI-SDLC Virtual Office — Progress Tracker
 
-**Last Updated:** 2026-06-21 (Sprint 43 done — AI Model Settings redesigned: 2-tab layout + Claude/OpenAI providers)  
+**Last Updated:** 2026-06-21 (Virtual Office 44-fix2 — Graphics furniture, 48×48 sprites, dynamic viewport layout)  
 **Project:** ai-sdlc-virtual-office  
 **Repo:** https://github.com/tanaratk/ai-sdlc-virtual-office  
 **Working Directory:** D:\AI_Office
@@ -79,6 +79,9 @@
 | 41 | Tech Stack Config — backend model + schema + migration + frontend UI (FR-005) | ✅ Done |
 | 42 | Left Menu Restructure — remove project-level items, reorder per CR spec (FR-008) | ✅ Done |
 | 43 | AI Model Settings Redesign — 2-tab layout (Ollama Models + Per-Agent) + Claude/OpenAI providers (FR-006, FR-007) | ✅ Done |
+| 44 | Virtual Office — Phaser.js 2D Pixel Office: 5 rooms, 17 agent sprites, idle walk, status dots, glass drawer, camera (FR-001–004, ADD-001) | ✅ Done |
+| 44-fix | Virtual Office Iteration 1 — solid color floors per room, Room_Builder tileset diagnostic (tile-debug.html), 2-row layout (MAP 64×40 tiles), agent badges with pulse dot | ✅ Done |
+| 44-fix2 | Virtual Office Iteration 2 — Graphics furniture (desk/computer/chair/plant/server), 48×48 sprite frames, dynamic pixel layout fits viewport (no scroll), corridor between rows | ✅ Done |
 
 ## Project Status
 

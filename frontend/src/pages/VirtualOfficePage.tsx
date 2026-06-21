@@ -1,117 +1,96 @@
-import { useNavigate, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { agentApi } from "@/services/agentApi";
-import { VirtualOfficeMap } from "@/components/virtual-office/VirtualOfficeMap";
-import type { Agent } from "@/types/agent";
-import type { PipelineRun } from "@/types/workflow";
+import { useEffect, useRef, useState } from 'react';
+import { X } from 'lucide-react';
+import type { SelectedAgentInfo } from '@/game/scenes/OfficeScene';
+
+const STATUS_COLORS: Record<string, string> = {
+  working: 'bg-indigo-100 text-indigo-700',
+  done:    'bg-emerald-100 text-emerald-700',
+  error:   'bg-red-100 text-red-700',
+  waiting: 'bg-amber-100 text-amber-700',
+  idle:    'bg-gray-100 text-gray-500',
+};
 
 export default function VirtualOfficePage() {
-  const { projectId } = useParams<{ projectId?: string }>();
-  const navigate = useNavigate();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [selectedAgent, setSelectedAgent] = useState<SelectedAgentInfo | null>(null);
 
-  const { data: agents = [], isLoading: agentsLoading } = useQuery({
-    queryKey: ["agents"],
-    queryFn: agentApi.list,
-    refetchInterval: 5000,
-  });
+  useEffect(() => {
+    if (!containerRef.current) return;
+    let game: { destroy: (b: boolean) => void } | null = null;
+    let active = true;
 
-  const { data: runs = [] } = useQuery({
-    queryKey: ["pipeline-runs", projectId],
-    queryFn: () => agentApi.listRuns(projectId!),
-    enabled: !!projectId,
-    refetchInterval: 4000,
-  });
+    import('@/game/config').then(({ createOfficeGame }) => {
+      if (!active || !containerRef.current) return;
+      game = createOfficeGame(containerRef.current, (info) => {
+        setSelectedAgent(info);
+      });
+    });
 
-  const activeRun: PipelineRun | null =
-    runs.find((r) => r.status === "running" || r.status === "waiting_for_user") ??
-    runs[0] ??
-    null;
+    return () => {
+      active = false;
+      game?.destroy(true);
+    };
+  }, []);
 
-  const { data: steps = [] } = useQuery({
-    queryKey: ["pipeline-steps", projectId, activeRun?.id],
-    queryFn: () => agentApi.getSteps(projectId!, activeRun!.id),
-    enabled: !!projectId && !!activeRun,
-    refetchInterval: activeRun?.status === "running" ? 3000 : false,
-  });
-
-  const handleAgentClick = (agent: Agent) => {
-    if (projectId) {
-      navigate(`/projects/${projectId}/agents`);
-    } else {
-      navigate("/agents");
-    }
-    // Pass agent name as hint via query param for future use
-    void agent;
-  };
-
-  const runStatusLabel: Record<string, string> = {
-    running:          "Pipeline running",
-    waiting_for_user: "Awaiting your review",
-    completed:        "Pipeline complete",
-    failed:           "Pipeline failed",
-    pending:          "Pipeline pending",
-    cancelled:        "Pipeline cancelled",
-  };
+  // Close drawer on Escape
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedAgent(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold">Virtual Office</h2>
-          <p className="text-sm text-muted-foreground">
-            {projectId
-              ? "Live agent status for this project. Click a room to navigate, click an agent to open the console."
-              : "Global agent status. Open a project to see pipeline state."}
-          </p>
-        </div>
+    <div className="relative w-full" style={{ height: 'calc(100vh - 56px)' }}>
+      {/* Phaser canvas container */}
+      <div ref={containerRef} className="w-full h-full" />
 
-        {activeRun && (
-          <div
-            className={`rounded-full px-3 py-1 text-xs font-medium ${
-              activeRun.status === "waiting_for_user"
-                ? "bg-yellow-100 text-yellow-700"
-                : activeRun.status === "running"
-                ? "bg-blue-100 text-blue-700"
-                : activeRun.status === "completed"
-                ? "bg-green-100 text-green-700"
-                : "bg-muted text-muted-foreground"
-            }`}
-          >
-            {runStatusLabel[activeRun.status] ?? activeRun.status}
+      {/* Glass drawer */}
+      {selectedAgent && (
+        <div className="absolute right-0 top-0 h-full w-80 border-l bg-white/80 backdrop-blur-md shadow-xl flex flex-col z-10">
+          <div className="flex items-center justify-between px-4 py-3 border-b">
+            <h3 className="text-sm font-semibold">Agent Detail</h3>
+            <button
+              onClick={() => setSelectedAgent(null)}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
-        )}
-      </div>
 
-      {agentsLoading ? (
-        <p className="text-sm text-muted-foreground">Loading agents…</p>
-      ) : (
-        <VirtualOfficeMap
-          agents={agents}
-          projectId={projectId}
-          activeRun={activeRun}
-          steps={steps}
-          onAgentClick={handleAgentClick}
-        />
+          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+            <div>
+              <p className="text-lg font-semibold leading-tight">{selectedAgent.name}</p>
+              <p className="text-xs text-muted-foreground font-mono mt-0.5">{selectedAgent.role}</p>
+            </div>
+
+            <div className="space-y-2">
+              <Row label="Status">
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[selectedAgent.status] ?? STATUS_COLORS.idle}`}>
+                  {selectedAgent.status}
+                </span>
+              </Row>
+              <Row label="Model">
+                <span className="font-mono text-xs">{selectedAgent.model}</span>
+              </Row>
+            </div>
+          </div>
+
+          <div className="px-4 py-3 border-t text-xs text-muted-foreground">
+            Click another agent to switch · Esc to close
+          </div>
+        </div>
       )}
+    </div>
+  );
+}
 
-      {/* Legend */}
-      <div className="flex flex-wrap items-center gap-4 pt-2 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-muted-foreground" /> Idle
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-blue-500" /> Running
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-yellow-400" /> Awaiting Review
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-green-500" /> Done
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-destructive" /> Failed / Error
-        </span>
-      </div>
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      {children}
     </div>
   );
 }

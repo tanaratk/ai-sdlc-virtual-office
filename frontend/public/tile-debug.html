@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tile Frame Inspector</title>
+  <style>
+    body { margin: 0; background: #0f172a; color: #f1f5f9; font-family: monospace; }
+    h2   { margin: 8px 10px 4px; font-size: 13px; color: #94a3b8; }
+    .strip { display: flex; flex-wrap: wrap; padding: 4px 8px; gap: 2px; }
+    .tile  { position: relative; display: inline-block; }
+    .tile canvas { display: block; image-rendering: pixelated; }
+    .tile span {
+      display: block; text-align: center;
+      font-size: 9px; color: #fbbf24; line-height: 1;
+      background: #00000088; padding: 1px 0;
+    }
+    #info { padding: 6px 10px; font-size: 11px; color: #64748b; border-top: 1px solid #1e293b; }
+  </style>
+</head>
+<body>
+<div id="info">Loading tilesets…</div>
+
+<script>
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload  = () => resolve(img);
+    img.onerror = () => reject(new Error('Failed: ' + src));
+    img.src = src;
+  });
+}
+
+function renderStrip(container, img, cols, frameW, frameH, start, count, scale) {
+  const strip = document.createElement('div');
+  strip.className = 'strip';
+  container.appendChild(strip);
+
+  for (let i = start; i < start + count; i++) {
+    const frameX = (i % cols) * frameW;
+    const frameY = Math.floor(i / cols) * frameH;
+
+    const canvas = document.createElement('canvas');
+    canvas.width  = frameW * scale;
+    canvas.height = frameH * scale;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(img, frameX, frameY, frameW, frameH,
+                       0,      0,       frameW * scale, frameH * scale);
+
+    const wrap = document.createElement('div');
+    wrap.className = 'tile';
+    const label = document.createElement('span');
+    label.textContent = String(i);
+    wrap.appendChild(canvas);
+    wrap.appendChild(label);
+    strip.appendChild(wrap);
+  }
+}
+
+// ── Main ─────────────────────────────────────────────────────────────────────
+
+async function main() {
+  const info = document.getElementById('info');
+
+  const RB_COLS = 76, RB_W = 16, RB_H = 16;
+  const IN_COLS = 16, IN_W = 16, IN_H = 16;
+  const SCALE = 2; // display 16px × 2 = 32px per tile
+
+  let rbImg, intImg;
+  try {
+    [rbImg, intImg] = await Promise.all([
+      loadImage('/tilesets/Room_Builder_16x16.png'),
+      loadImage('/tilesets/Interiors_16x16.png'),
+    ]);
+  } catch (e) {
+    info.style.color = '#f87171';
+    info.textContent = 'ERROR: ' + e.message;
+    return;
+  }
+
+  const rbTotal = RB_COLS * Math.floor(rbImg.height / RB_H);
+  const intTotal = IN_COLS * Math.floor(intImg.height / IN_H);
+  info.textContent =
+    `Room_Builder: ${rbImg.width}×${rbImg.height} = ${rbTotal} frames  |  ` +
+    `Interiors: ${intImg.width}×${intImg.height} = ${intTotal} frames`;
+
+  // ── Room_Builder — first 3 rows (0..227) ──────────────────────────────────
+  const h1 = document.createElement('h2');
+  h1.textContent = 'Room_Builder_16x16 — frames 0…' + (RB_COLS * 3 - 1);
+  document.body.appendChild(h1);
+  renderStrip(document.body, rbImg, RB_COLS, RB_W, RB_H, 0, RB_COLS * 3, SCALE);
+
+  // ── Room_Builder — rows 3-6 (228..455) ───────────────────────────────────
+  const h2 = document.createElement('h2');
+  h2.textContent = 'Room_Builder_16x16 — frames ' + RB_COLS * 3 + '…' + (RB_COLS * 6 - 1);
+  document.body.appendChild(h2);
+  renderStrip(document.body, rbImg, RB_COLS, RB_W, RB_H, RB_COLS * 3, RB_COLS * 3, SCALE);
+
+  // ── Interiors — first 6 rows (0..95) ──────────────────────────────────────
+  const h3 = document.createElement('h2');
+  h3.textContent = 'Interiors_16x16 — frames 0…95 (first 6 rows)';
+  document.body.appendChild(h3);
+  renderStrip(document.body, intImg, IN_COLS, IN_W, IN_H, 0, IN_COLS * 6, SCALE);
+
+  // ── Interiors — rows 6-12 (96..191) ───────────────────────────────────────
+  const h4 = document.createElement('h2');
+  h4.textContent = 'Interiors_16x16 — frames 96…191';
+  document.body.appendChild(h4);
+  renderStrip(document.body, intImg, IN_COLS, IN_W, IN_H, 96, 96, SCALE);
+}
+
+main();
+</script>
+</body>
+</html>
