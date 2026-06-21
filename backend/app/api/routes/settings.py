@@ -9,6 +9,8 @@ from app.core.config import settings as app_settings
 from app.db.models import LlmSetting
 from app.db.session import get_session
 from app.schemas.llm import (
+    LlmKeyTestRequest,
+    LlmKeyTestResponse,
     LlmSettingCreate,
     LlmSettingResponse,
     LlmSettingUpdate,
@@ -83,6 +85,45 @@ def activate_llm_setting(setting_id: uuid.UUID, session: Session = Depends(get_s
     session.commit()
     session.refresh(target)
     return _to_response(target)
+
+
+@router.post("/llm/test-key", response_model=LlmKeyTestResponse)
+def test_llm_api_key(body: LlmKeyTestRequest) -> LlmKeyTestResponse:
+    """Test whether the given API key can reach the provider."""
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            if body.provider == "anthropic":
+                resp = client.get(
+                    "https://api.anthropic.com/v1/models",
+                    headers={
+                        "x-api-key": body.api_key,
+                        "anthropic-version": "2023-06-01",
+                    },
+                )
+                if resp.status_code == 200:
+                    return LlmKeyTestResponse(valid=True, message="API key is valid")
+                if resp.status_code == 401:
+                    return LlmKeyTestResponse(valid=False, message="Invalid API key — authentication failed")
+                return LlmKeyTestResponse(valid=False, message=f"Anthropic returned {resp.status_code}")
+
+            elif body.provider == "openai":
+                resp = client.get(
+                    "https://api.openai.com/v1/models",
+                    headers={"Authorization": f"Bearer {body.api_key}"},
+                )
+                if resp.status_code == 200:
+                    return LlmKeyTestResponse(valid=True, message="API key is valid")
+                if resp.status_code == 401:
+                    return LlmKeyTestResponse(valid=False, message="Invalid API key — authentication failed")
+                return LlmKeyTestResponse(valid=False, message=f"OpenAI returned {resp.status_code}")
+
+            else:
+                return LlmKeyTestResponse(valid=False, message=f"Provider '{body.provider}' does not require an API key test")
+
+    except httpx.TimeoutException:
+        return LlmKeyTestResponse(valid=False, message="Request timed out — check your network connection")
+    except httpx.HTTPError as exc:
+        return LlmKeyTestResponse(valid=False, message=f"Network error: {exc}")
 
 
 @router.get("/llm/models", response_model=OllamaModelsResponse)

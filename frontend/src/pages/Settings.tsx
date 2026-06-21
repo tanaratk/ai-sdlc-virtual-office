@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle2, RefreshCw, Zap, AlertCircle,
-  Eye, EyeOff, Key, ChevronDown, ChevronRight,
+  Eye, EyeOff, Key, ChevronDown, ChevronRight, XCircle, Loader2,
 } from "lucide-react";
 import { agentApi } from "@/services/agentApi";
 import { settingsApi } from "@/services/settingsApi";
@@ -44,26 +44,53 @@ function formatDate(iso: string | null) {
 
 // ── API Key input ─────────────────────────────────────────────────────────────
 
+type TestState = "idle" | "testing" | "ok" | "fail";
+
 function ApiKeyField({
+  provider,
   hasKey,
   onSave,
-  isPending,
+  isSaving,
 }: {
+  provider: "anthropic" | "openai";
   hasKey: boolean;
   onSave: (key: string) => void;
-  isPending: boolean;
+  isSaving: boolean;
 }) {
   const [editing, setEditing] = useState(!hasKey);
   const [value, setValue] = useState("");
   const [show, setShow] = useState(false);
+  const [testState, setTestState] = useState<TestState>("idle");
+  const [testMsg, setTestMsg] = useState("");
+
+  const handleTestAndSave = async () => {
+    if (!value.trim()) return;
+    setTestState("testing");
+    setTestMsg("");
+    try {
+      const result = await settingsApi.testKey(provider, value.trim());
+      if (result.valid) {
+        setTestState("ok");
+        setTestMsg(result.message);
+        onSave(value.trim());
+        setEditing(false);
+      } else {
+        setTestState("fail");
+        setTestMsg(result.message);
+      }
+    } catch {
+      setTestState("fail");
+      setTestMsg("Could not reach the server — check backend connection.");
+    }
+  };
 
   if (!editing && hasKey) {
     return (
       <div className="flex items-center gap-2">
         <Key className="h-3.5 w-3.5 text-green-600" />
-        <span className="text-xs text-green-700 font-medium">API key configured</span>
+        <span className="text-xs text-green-700 font-medium">API key configured and verified</span>
         <button
-          onClick={() => { setEditing(true); setValue(""); }}
+          onClick={() => { setEditing(true); setValue(""); setTestState("idle"); setTestMsg(""); }}
           className="text-xs text-muted-foreground hover:text-foreground underline"
         >
           Change
@@ -72,36 +99,56 @@ function ApiKeyField({
     );
   }
 
+  const isBusy = testState === "testing" || isSaving;
+
   return (
-    <div className="flex items-center gap-2">
-      <Key className="h-3.5 w-3.5 text-muted-foreground" />
-      <div className="relative flex-1 max-w-xs">
-        <input
-          type={show ? "text" : "password"}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder="sk-..."
-          className="w-full rounded border px-3 py-1.5 text-xs font-mono pr-8 focus:outline-none focus:ring-1 focus:ring-ring"
-        />
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <Key className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+        <div className="relative flex-1 max-w-xs">
+          <input
+            type={show ? "text" : "password"}
+            value={value}
+            onChange={(e) => { setValue(e.target.value); setTestState("idle"); setTestMsg(""); }}
+            placeholder={provider === "anthropic" ? "sk-ant-..." : "sk-..."}
+            className="w-full rounded border px-3 py-1.5 text-xs font-mono pr-8 focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+          <button
+            type="button"
+            onClick={() => setShow((v) => !v)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            {show ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+          </button>
+        </div>
         <button
-          type="button"
-          onClick={() => setShow((v) => !v)}
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          onClick={handleTestAndSave}
+          disabled={!value.trim() || isBusy}
+          className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {show ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+          {testState === "testing" || isSaving
+            ? <><Loader2 className="h-3 w-3 animate-spin" /> Testing…</>
+            : "Test & Save"}
         </button>
+        {hasKey && (
+          <button
+            onClick={() => { setEditing(false); setTestState("idle"); setTestMsg(""); }}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            Cancel
+          </button>
+        )}
       </div>
-      <button
-        onClick={() => { if (value.trim()) { onSave(value.trim()); setEditing(false); } }}
-        disabled={!value.trim() || isPending}
-        className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
-      >
-        {isPending ? "Saving…" : "Save Key"}
-      </button>
-      {hasKey && (
-        <button onClick={() => setEditing(false)} className="text-xs text-muted-foreground hover:text-foreground">
-          Cancel
-        </button>
+
+      {testState === "ok" && (
+        <div className="flex items-center gap-1.5 text-xs text-green-700">
+          <CheckCircle2 className="h-3.5 w-3.5" /> {testMsg} — saving key…
+        </div>
+      )}
+      {testState === "fail" && (
+        <div className="flex items-center gap-1.5 text-xs text-destructive">
+          <XCircle className="h-3.5 w-3.5" /> {testMsg}
+        </div>
       )}
     </div>
   );
@@ -310,9 +357,10 @@ function CloudProviderSection({
           <div className="px-4 py-3">
             <p className="text-xs font-medium text-muted-foreground mb-2">API Key</p>
             <ApiKeyField
+              provider={provider}
               hasKey={hasApiKey}
               onSave={(key) => saveKeyMutation.mutate(key)}
-              isPending={saveKeyMutation.isPending}
+              isSaving={saveKeyMutation.isPending}
             />
             {saveKeyMutation.isError && (
               <p className="mt-1 text-xs text-destructive">Failed to save API key.</p>

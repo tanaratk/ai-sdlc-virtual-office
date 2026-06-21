@@ -20,4 +20,9 @@ export const settingsApi = {
 
   activateLlm: (settingId: string) =>
     apiClient.post<LlmSetting>(`/settings/llm/${settingId}/activate`).then((r) => r.data),
+
+  testKey: (provider: string, apiKey: string) =>
+    apiClient
+      .post<{ valid: boolean; message: string }>("/settings/llm/test-key", { provider, api_key: apiKey })
+      .then((r) => r.data),
 };

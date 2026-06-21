@@ -47,6 +47,16 @@ class LlmSettingUpdate(BaseModel):
     max_tokens: Optional[int] = None
 
 
+class LlmKeyTestRequest(BaseModel):
+    provider: ModelProvider
+    api_key: str
+
+
+class LlmKeyTestResponse(BaseModel):
+    valid: bool
+    message: str
+
+
 class OllamaModel(BaseModel):
     name: str
     size: Optional[int] = None
