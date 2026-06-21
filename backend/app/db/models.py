@@ -196,6 +196,7 @@ class Project(SQLModel, table=True):
     status: ProjectStatus = Field(default=ProjectStatus.active)
     created_by: str = Field(max_length=255)
     workspace_path: Optional[str] = Field(default="D:\\workspace", max_length=500)
+    tech_stack: Optional[dict[str, Any]] = Field(default=None, sa_column=Column(sa.JSON))
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
@@ -273,6 +274,7 @@ class PipelineRun(SQLModel, table=True):
     project_id: uuid.UUID = Field(foreign_key="projects.id")
     status: PipelineRunStatus = Field(default=PipelineRunStatus.pending)
     current_step: Optional[str] = Field(default=None, max_length=100)
+    project_context_snapshot: Optional[dict[str, Any]] = Field(default=None, sa_column=Column(sa.JSON))
     started_at: Optional[datetime] = Field(default=None)
     completed_at: Optional[datetime] = Field(default=None)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

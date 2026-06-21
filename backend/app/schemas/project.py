@@ -7,11 +7,20 @@ from pydantic import BaseModel
 from app.db.models import ProjectStatus
 
 
+class TechStackConfig(BaseModel):
+    frontend: Optional[str] = None
+    backend: Optional[str] = None
+    database: Optional[str] = None
+    app_type: Optional[str] = None
+    deployment_target: Optional[str] = None
+
+
 class ProjectCreate(BaseModel):
     name: str
     description: Optional[str] = None
     created_by: str
     workspace_path: Optional[str] = r"D:\workspace"
+    tech_stack: Optional[TechStackConfig] = None
 
 
 class ProjectUpdate(BaseModel):
@@ -19,6 +28,7 @@ class ProjectUpdate(BaseModel):
     description: Optional[str] = None
     status: Optional[ProjectStatus] = None
     workspace_path: Optional[str] = None
+    tech_stack: Optional[TechStackConfig] = None
 
 
 class ProjectResponse(BaseModel):
@@ -28,6 +38,7 @@ class ProjectResponse(BaseModel):
     status: ProjectStatus
     created_by: str
     workspace_path: Optional[str]
+    tech_stack: Optional[TechStackConfig] = None
     created_at: datetime
     updated_at: datetime
 
