@@ -6,8 +6,10 @@ from app.api.routes import (
     agents,
     auth,
     change_impact,
+    deploy,
     documents,
     documentation,
+    figma,
     generated_code,
     github,
     health,
@@ -46,7 +48,9 @@ api_router.include_router(change_impact.router, prefix="/projects", tags=["Chang
 api_router.include_router(documentation.router, prefix="/projects", tags=["Documentation"])
 api_router.include_router(pm.router, prefix="/projects", tags=["PM Agent"])
 api_router.include_router(github.router, prefix="/projects", tags=["GitHub"])
+api_router.include_router(figma.router, prefix="/projects", tags=["Figma"])
 api_router.include_router(mcp.tool_router, tags=["MCP"])
 api_router.include_router(mcp.call_router, prefix="/projects", tags=["MCP"])
 api_router.include_router(rag.router, prefix="/projects", tags=["RAG"])
 api_router.include_router(generated_code.router, prefix="/projects", tags=["Generated Code"])
+api_router.include_router(deploy.router, prefix="/projects", tags=["Deploy"])

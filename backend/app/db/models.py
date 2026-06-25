@@ -401,6 +401,19 @@ class LlmSetting(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class FigmaSetting(SQLModel, table=True):
+    __tablename__ = "figma_settings"
+    __table_args__ = (UniqueConstraint("project_id"),)
+
+    id:         uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    project_id: uuid.UUID = Field(foreign_key="projects.id")
+    file_key:   str       = Field(max_length=100)
+    file_url:   str       = Field(max_length=500)
+    file_name:  Optional[str] = Field(default=None, max_length=255)
+    created_at: datetime  = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime  = Field(default_factory=lambda: datetime.now(UTC))
+
+
 class AgentMemory(SQLModel, table=True):
     __tablename__ = "agent_memories"
 
