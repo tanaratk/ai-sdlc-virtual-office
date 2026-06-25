@@ -21,6 +21,7 @@ import TraceabilityPage from "@/pages/TraceabilityPage";
 import VirtualOfficePage from "@/pages/VirtualOfficePage";
 import ChangeImpactPage from "@/pages/ChangeImpactPage";
 import DocumentationPage from "@/pages/DocumentationPage";
+import DiagramPage from "@/pages/DiagramPage";
 import FigmaPage from "@/pages/FigmaPage";
 import GitHubPage from "@/pages/GitHubPage";
 import PMPage from "@/pages/PMPage";
@@ -70,6 +71,7 @@ export const router = createBrowserRouter([
           { path: "pm",               element: <PMPage /> },
           { path: "github",           element: <GitHubPage /> },
           { path: "figma",            element: <FigmaPage /> },
+          { path: "diagrams",         element: <DiagramPage /> },
           { path: "mcp",              element: <McpPage /> },
           { path: "rag",              element: <RAGPage /> },
         ],

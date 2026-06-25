@@ -100,6 +100,7 @@ class DocumentType(str, Enum):
     compiled_documents = "compiled_documents"
     project_summary = "project_summary"
     delivery_report = "delivery_report"
+    diagram_spec = "diagram_spec"
 
 
 class DocumentStatus(str, Enum):

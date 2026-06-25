@@ -88,6 +88,7 @@
 | 47 | MCP Connector Manager — ConnectorSetting model + migration, connector CRUD + test endpoints in settings.py, Connectors tab (3rd tab) in Settings with per-connector token form, Test Connection, Disconnect | ✅ Done |
 | 48 | GitHub Integration — create_pull_request() in github_service, POST /github/pull-request + /push-docs endpoints, GitHubPage: Push All Docs & Open PR (1-click), manual PR form | ✅ Done |
 | 49 | Figma Integration — FigmaSetting model + migration, figma_service (extract_file_key/get_file_info/push_comment/parse_screens), figma.py routes (GET/PUT/DELETE settings + /screens + /push-screens), figmaApi.ts, FigmaPage.tsx (link file, screen cards, Push to Figma button, iframe embed) | ✅ Done |
+| 50 | Diagram Agent — diagram_spec DocumentType + migration 0022, diagram_service (LLM Mermaid generation with stub fallback, mermaid_to_drawio_url), diagrams.py (GET /diagrams + POST /generate + GET /{id}), mermaid npm install, MermaidChart.tsx (async render), DiagramPage.tsx (generate button, rendered SVG, Copy + Open in Mermaid Live, Draw.io paste hint) | ✅ Done |
 
 ## Project Status
 
