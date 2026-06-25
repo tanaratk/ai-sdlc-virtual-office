@@ -85,6 +85,7 @@
 | 44-fix3 + CR-TECH-001 | Sprite fix (16×16 LimeZu), Tech Stack Presets in NewProject, LLM DB key fallback, DevOps docker socket, QA/Deploy routes | ✅ Done |
 | 45 | WebSocket Real-time Agent Status — /ws/office endpoint, AgentStatusWS replaces poller, richer info (status+model+provider), Vite WS proxy | ✅ Done |
 | 46 | Agent Chat Bubbles + Pipeline Activity Feed — step labels shown above agents, Done ✓/Error! bubbles, bottom-left event feed panel, ws.py extended with pipeline_event + current_task | ✅ Done |
+| 47 | MCP Connector Manager — ConnectorSetting model + migration, connector CRUD + test endpoints in settings.py, Connectors tab (3rd tab) in Settings with per-connector token form, Test Connection, Disconnect | ✅ Done |
 
 ## Project Status
 

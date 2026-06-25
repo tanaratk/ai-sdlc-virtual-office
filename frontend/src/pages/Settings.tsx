@@ -3,11 +3,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle2, RefreshCw, Zap, AlertCircle,
   Eye, EyeOff, Key, ChevronDown, ChevronRight, XCircle, Loader2,
+  Link2, Trash2, TestTube2,
 } from "lucide-react";
 import { agentApi } from "@/services/agentApi";
 import { settingsApi } from "@/services/settingsApi";
 import { cn } from "@/lib/utils";
 import type { LlmSetting, ModelProvider } from "@/types/agent";
+import type { ConnectorSetting } from "@/types/connector";
 
 // ── Model catalogues ──────────────────────────────────────────────────────────
 
@@ -599,16 +601,228 @@ function PerAgentModelTab() {
   );
 }
 
+// ── Tab 3: Connectors ─────────────────────────────────────────────────────────
+
+const CONNECTOR_ICONS: Record<string, string> = {
+  github: "🐙",
+  figma:  "🎨",
+  drawio: "📐",
+  jira:   "📋",
+};
+
+function ConnectorCard({ connector }: { connector: ConnectorSetting }) {
+  const qc = useQueryClient();
+  const [token, setToken] = useState("");
+  const [showToken, setShowToken] = useState(false);
+  const [jiraEmail, setJiraEmail] = useState(connector.extra_config?.email ?? "");
+  const [jiraDomain, setJiraDomain] = useState(connector.extra_config?.domain ?? "");
+
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      const extra = connector.connector_type === "jira"
+        ? { email: jiraEmail, domain: jiraDomain }
+        : undefined;
+      return settingsApi.upsertConnector(connector.connector_type, {
+        access_token: connector.requires_token ? token || undefined : undefined,
+        extra_config: extra,
+      });
+    },
+    onSuccess: () => {
+      setToken("");
+      qc.invalidateQueries({ queryKey: ["connectors"] });
+    },
+  });
+
+  const testMutation = useMutation({
+    mutationFn: () => settingsApi.testConnector(connector.connector_type),
+    onSuccess:  () => qc.invalidateQueries({ queryKey: ["connectors"] }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => settingsApi.deleteConnector(connector.connector_type),
+    onSuccess:  () => qc.invalidateQueries({ queryKey: ["connectors"] }),
+  });
+
+  const statusBadge = () => {
+    if (!connector.requires_token) {
+      return <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700">Always Ready</span>;
+    }
+    if (!connector.has_token) {
+      return <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-500">Not Configured</span>;
+    }
+    if (connector.last_test_ok === true) {
+      return <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700">Connected</span>;
+    }
+    if (connector.last_test_ok === false) {
+      return <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">Error</span>;
+    }
+    return <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">Not Tested</span>;
+  };
+
+  return (
+    <div className="rounded-lg border bg-card p-4 space-y-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xl">{CONNECTOR_ICONS[connector.connector_type] ?? "🔌"}</span>
+          <div>
+            <p className="text-sm font-semibold leading-tight">{connector.display_name}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{connector.description}</p>
+          </div>
+        </div>
+        {statusBadge()}
+      </div>
+
+      {connector.last_error && (
+        <p className="text-xs text-red-600 bg-red-50 rounded px-2 py-1">
+          {connector.last_error}
+        </p>
+      )}
+      {connector.last_tested_at && (
+        <p className="text-[10px] text-muted-foreground">
+          Last tested: {new Date(connector.last_tested_at).toLocaleString()}
+        </p>
+      )}
+
+      {connector.connector_type === "jira" && (
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Atlassian Domain</label>
+            <input
+              value={jiraDomain}
+              onChange={(e) => setJiraDomain(e.target.value)}
+              placeholder="your-org"
+              className="w-full rounded-md border bg-background px-3 py-1.5 text-xs font-mono"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Email</label>
+            <input
+              value={jiraEmail}
+              onChange={(e) => setJiraEmail(e.target.value)}
+              placeholder="you@company.com"
+              className="w-full rounded-md border bg-background px-3 py-1.5 text-xs font-mono"
+            />
+          </div>
+        </div>
+      )}
+
+      {connector.requires_token && (
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">
+            {connector.token_label}
+            {connector.has_token && (
+              <span className="ml-1 text-green-600">(saved — enter new to replace)</span>
+            )}
+          </label>
+          <div className="relative flex items-center gap-2">
+            <input
+              type={showToken ? "text" : "password"}
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              placeholder={connector.has_token ? "••••••••••••••••" : (connector.token_hint ?? "")}
+              className="flex-1 rounded-md border bg-background px-3 py-1.5 text-xs font-mono pr-8"
+            />
+            <button
+              onClick={() => setShowToken((v) => !v)}
+              className="absolute right-2 text-muted-foreground hover:text-foreground"
+            >
+              {showToken ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-2 pt-1">
+        {(connector.requires_token || connector.connector_type === "jira") && (
+          <button
+            onClick={() => saveMutation.mutate()}
+            disabled={saveMutation.isPending || (connector.requires_token && !token && connector.connector_type !== "jira")}
+            className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            {saveMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Key className="h-3 w-3" />}
+            Save
+          </button>
+        )}
+
+        <button
+          onClick={() => testMutation.mutate()}
+          disabled={testMutation.isPending}
+          className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50"
+        >
+          {testMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <TestTube2 className="h-3 w-3" />}
+          Test Connection
+        </button>
+
+        {connector.has_token && (
+          <button
+            onClick={() => deleteMutation.mutate()}
+            disabled={deleteMutation.isPending}
+            className="ml-auto flex items-center gap-1.5 rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+          >
+            {deleteMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+            Disconnect
+          </button>
+        )}
+      </div>
+
+      {(saveMutation.isSuccess || testMutation.isSuccess) && (
+        <p className={cn(
+          "text-xs",
+          testMutation.isSuccess && testMutation.data
+            ? (testMutation.data.ok ? "text-green-600" : "text-red-600")
+            : "text-green-600"
+        )}>
+          {testMutation.isSuccess && testMutation.data
+            ? testMutation.data.message
+            : saveMutation.isSuccess ? "Saved successfully." : ""}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ConnectorsTab() {
+  const { data: connectors, isLoading, isError } = useQuery({
+    queryKey: ["connectors"],
+    queryFn:  () => settingsApi.listConnectors(),
+  });
+
+  if (isLoading) {
+    return <div className="text-sm text-muted-foreground py-8 text-center">Loading connectors…</div>;
+  }
+  if (isError) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-destructive py-8">
+        <AlertCircle className="h-4 w-4" /> Failed to load connectors.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Connect external tools to allow AI agents to automate tasks (GitHub commits, Figma wireframes, Jira issues).
+      </p>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {(connectors ?? []).map((c) => (
+          <ConnectorCard key={c.connector_type} connector={c} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-type Tab = "models" | "per-agent";
+type Tab = "models" | "per-agent" | "connectors";
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState<Tab>("models");
 
   const tabs: Array<{ id: Tab; label: string; icon: React.ElementType }> = [
-    { id: "models",    label: "Available Models", icon: CheckCircle2 },
-    { id: "per-agent", label: "Per-Agent Model",  icon: Zap },
+    { id: "models",     label: "Available Models", icon: CheckCircle2 },
+    { id: "per-agent",  label: "Per-Agent Model",  icon: Zap },
+    { id: "connectors", label: "Connectors",        icon: Link2 },
   ];
 
   return (
@@ -633,8 +847,9 @@ export default function Settings() {
         ))}
       </div>
 
-      {activeTab === "models"    && <AvailableModelsTab />}
-      {activeTab === "per-agent" && <PerAgentModelTab />}
+      {activeTab === "models"     && <AvailableModelsTab />}
+      {activeTab === "per-agent"  && <PerAgentModelTab />}
+      {activeTab === "connectors" && <ConnectorsTab />}
     </div>
   );
 }

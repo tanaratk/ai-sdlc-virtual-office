@@ -364,6 +364,28 @@ class TraceabilityLink(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class ConnectorType(str, Enum):
+    github = "github"
+    figma  = "figma"
+    drawio = "drawio"
+    jira   = "jira"
+
+
+class ConnectorSetting(SQLModel, table=True):
+    __tablename__ = "connector_settings"
+    __table_args__ = (UniqueConstraint("connector_type"),)
+
+    id:             uuid.UUID        = Field(default_factory=uuid.uuid4, primary_key=True)
+    connector_type: ConnectorType
+    access_token:   Optional[str]    = Field(default=None)
+    extra_config:   Optional[dict[str, Any]] = Field(default=None, sa_column=Column(sa.JSON))
+    last_tested_at: Optional[datetime] = Field(default=None)
+    last_test_ok:   Optional[bool]   = Field(default=None)
+    last_error:     Optional[str]    = Field(default=None, max_length=500)
+    created_at:     datetime         = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at:     datetime         = Field(default_factory=lambda: datetime.now(UTC))
+
+
 class LlmSetting(SQLModel, table=True):
     __tablename__ = "llm_settings"
 
