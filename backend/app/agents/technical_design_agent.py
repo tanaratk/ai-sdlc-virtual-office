@@ -66,7 +66,7 @@ class _Task(BaseModel):
         if not v.get("domain"):
             v["domain"] = "backend"
         if not v.get("file_path"):
-            v["file_path"] = "app/main.py"
+            v["file_path"] = "src/main"
         if not v.get("description"):
             v["description"] = "Implementation task"
         # normalise fr_refs / fr_ref
@@ -104,16 +104,67 @@ class TechnicalDesignOutput(BaseModel):
 
 # -- Prompts -------------------------------------------------------------------
 
+def _tech_stack_prompt_vars(tech_stack: dict | None) -> tuple[str, str, str]:
+    """Return (tech_stack_info, file_path_examples, file_ext_example) for prompts."""
+    if not tech_stack:
+        return (
+            "FastAPI + SQLModel + PostgreSQL for backend; React + TypeScript + Vite + Tailwind for frontend.",
+            '"app/backend/api/routes/users.py" or "app/frontend/src/pages/LoginPage.tsx"',
+            "relative/path/to/file.py",
+        )
+    backend = (tech_stack.get("backend") or "").lower()
+    frontend = (tech_stack.get("frontend") or "").lower()
+    parts = []
+    for key, label in [
+        ("backend", "Backend"), ("backend_version", "Backend version"),
+        ("frontend", "Frontend"), ("frontend_version", "Frontend version"),
+        ("database", "Database"), ("language", "Language"),
+        ("orm", "ORM"), ("auth", "Auth"), ("testing", "Testing framework"),
+        ("api_docs", "API docs"), ("cloud", "Cloud"),
+    ]:
+        if tech_stack.get(key):
+            parts.append(f"{label}: {tech_stack[key]}")
+    info = "; ".join(parts) + "."
+
+    is_dotnet = any(k in backend or k in frontend for k in [".net", "asp.net", "aspnet", "blazor", "razor", "c#"])
+    is_node   = any(k in backend for k in ["node", "express", "nest"])
+    is_angular = "angular" in frontend
+    is_vue     = "vue" in frontend
+
+    if is_dotnet:
+        examples = '"Controllers/UsersController.cs" or "Pages/Login.aspx" or "Models/User.cs" or "Views/Users/Index.cshtml"'
+        ext_ex   = "Controllers/ItemsController.cs"
+    elif is_angular:
+        examples = '"frontend/src/app/components/users/users.component.ts" or "backend/src/routes/users.ts" or "backend/src/models/user.ts"'
+        ext_ex   = "frontend/src/app/pages/items/items.component.ts"
+    elif is_vue:
+        examples = '"frontend/src/pages/UsersPage.vue" or "frontend/src/components/UserCard.vue" or "backend/src/routes/users.ts"'
+        ext_ex   = "frontend/src/pages/ItemsPage.vue"
+    elif is_node:
+        examples = '"backend/src/routes/users.ts" or "backend/src/models/user.ts" or "frontend/src/pages/LoginPage.tsx"'
+        ext_ex   = "backend/src/routes/items.ts"
+    else:
+        examples = '"app/backend/api/routes/users.py" or "app/frontend/src/pages/LoginPage.tsx"'
+        ext_ex   = "app/backend/api/routes/items.py"
+
+    return info, examples, ext_ex
+
+
+# -- Prompts -------------------------------------------------------------------
+
 _SYSTEM_PROMPT = """\
 You are the Technical Design Agent in an AI-powered software factory.
 Your job is to read the FSD, Architecture, Database Design, API Spec, and Screen Spec
 and produce a comprehensive implementation task breakdown (dev_tasks.md).
 
+PROJECT TECH STACK: {tech_stack_info}
+
 Rules:
 - Every task must have a unique ID: TASK-001, TASK-002, ...
 - domain must be one of: backend, frontend, database, test, infra
 - file_path is the relative path of the file that will be created or modified
-  (e.g. "app/backend/api/routes/users.py" or "app/frontend/src/pages/LoginPage.tsx")
+  Use file extensions that match the PROJECT TECH STACK above.
+  (e.g. {file_path_examples})
 - fr_refs must list at least one FR-XXX reference
 - depends_on lists TASK-IDs that must complete first (empty list if no dependency)
 - estimated_lines is an integer estimate of lines of code for this task
@@ -132,7 +183,7 @@ Schema:
     {{
       "id": "TASK-001",
       "domain": "backend|frontend|database|test|infra",
-      "file_path": "relative/path/to/file.py",
+      "file_path": "{file_ext_example}",
       "description": "What this task implements",
       "fr_refs": ["FR-001"],
       "depends_on": ["TASK-XXX"],
@@ -253,10 +304,18 @@ class TechnicalDesignAgentRunner:
 
             fsd_doc, arch_doc, db_doc, api_doc, screen_doc = self._load_design_documents(run.project_id)
 
+            project = self.session.get(Project, run.project_id)
+            tech_stack: dict | None = project.tech_stack if project else None
+            tech_stack_info, file_path_examples, file_ext_example = _tech_stack_prompt_vars(tech_stack)
+
             _DOC_LIMIT = 1500  # chars per doc — 5 docs x 1500 = 7500 chars input
             raw_json = _llm.call_ollama(
-                system_prompt=_SYSTEM_PROMPT,
+                system_prompt=_SYSTEM_PROMPT.format(
+                    tech_stack_info=tech_stack_info,
+                    file_path_examples=file_path_examples,
+                ),
                 user_prompt=_TASK_TEMPLATE.format(
+                    file_ext_example=file_ext_example,
                     fsd=fsd_doc.content_markdown[:_DOC_LIMIT],
                     architecture=arch_doc.content_markdown[:_DOC_LIMIT],
                     db_schema=db_doc.content_markdown[:_DOC_LIMIT],

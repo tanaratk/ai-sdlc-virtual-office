@@ -26,6 +26,7 @@ Each task will provide all six required documents (all must be in `approved` sta
 - `api_document_id` + `api_content_markdown`
 - `screen_document_id` + `screen_content_markdown`
 - `user_story_document_id`
+- `tech_stack` — JSON object with frontend, backend, database, language, orm, auth, testing, cloud, api_docs, etc.
 - Optionally: `context_notes`
 
 **If any document is not in `approved` status, you must refuse to proceed and return:**
@@ -74,30 +75,148 @@ One row per infrastructure task (Docker Compose setup, CI/CD, migration scripts,
 
 ### Skeleton Plan
 
-List the proposed folder structure for backend and frontend. Use a code block with comments explaining each folder's purpose. File names only — no code content.
+List the proposed folder structure based on `tech_stack`. Use a code block with comments explaining each folder's purpose. File names only — no code content.
 
-**Backend:**
+**Use the structure that matches the project's tech stack:**
+
+**If backend is ASP.NET Core (MVC / Razor Pages):**
+```
+App/
+├── Program.cs              # ASP.NET Core entry point, DI, middleware pipeline
+├── App.csproj              # Project file with NuGet package references
+├── Controllers/            # MVC Controllers (one per resource)
+├── Models/                 # EF Core entity classes
+├── Services/               # Business logic interfaces and implementations
+├── Data/
+│   └── AppDbContext.cs     # EF Core DbContext
+├── Migrations/             # EF Core database migrations
+├── Views/
+│   ├── Shared/
+│   │   └── _Layout.cshtml  # Master layout with Bootstrap 5 nav
+│   ├── _ViewImports.cshtml
+│   ├── _ViewStart.cshtml
+│   └── <Resource>/         # Index, Create, Edit, Details views per resource
+└── wwwroot/                # Static assets (CSS, JS, images)
+```
+
+**If backend is ASP.NET Web Forms (.NET Framework):**
+```
+App/
+├── Web.config              # IIS / ASP.NET configuration
+├── App.csproj              # Project file (net472 or net48)
+├── Global.asax             # App lifecycle events
+├── Default.aspx            # Home page
+├── <Resource>/
+│   ├── List.aspx           # List page
+│   ├── List.aspx.cs        # Code-behind
+│   ├── Edit.aspx           # Edit/Create page
+│   └── Edit.aspx.cs
+├── App_Code/               # Shared classes, DAL helpers
+└── App_Data/               # Local data (if any)
+```
+
+**If backend is Node.js / Express:**
 ```
 backend/
-├── main.py           # FastAPI app entry point
-├── api/
-│   ├── routes/       # One file per resource group
-│   └── dependencies/ # Auth, DB session, LLM client
-├── models/           # SQLModel table definitions
-├── schemas/          # Pydantic request/response schemas
-├── services/         # Business logic per agent
-└── agents/           # Agent runner implementations
+├── src/
+│   ├── index.ts            # Express app entry point
+│   ├── routes/             # Route handlers (one file per resource)
+│   ├── controllers/        # Controller logic
+│   ├── models/             # ORM models (Prisma schema or TypeORM entities)
+│   ├── middleware/         # Auth, error handling, validation
+│   └── config/             # Database, environment config
+├── package.json
+└── tsconfig.json
+
+frontend/
+├── src/
+│   ├── pages/              # Route-level components
+│   ├── components/         # Reusable UI components
+│   ├── services/           # API client (axios/fetch wrappers)
+│   ├── types/              # TypeScript type definitions
+│   └── main.tsx            # App entry point (React/Vue)
+├── package.json
+└── vite.config.ts
 ```
 
-Extend this structure based on the Architecture Design.
+**If backend is Angular + Node.js:**
+```
+backend/                    # Same as Node.js above
+frontend/
+├── src/
+│   ├── app/
+│   │   ├── components/     # Angular components
+│   │   ├── services/       # Angular services (HttpClient)
+│   │   ├── models/         # TypeScript interfaces
+│   │   ├── pages/          # Route-level page components
+│   │   └── app.routes.ts   # Route definitions
+│   ├── main.ts
+│   └── styles.scss
+├── angular.json
+├── package.json
+└── tsconfig.json
+```
+
+**If backend is Python / FastAPI (default):**
+```
+backend/
+├── main.py                 # FastAPI app entry point
+├── api/
+│   ├── routes/             # One file per resource group
+│   └── dependencies/       # Auth, DB session, LLM client
+├── models/                 # SQLModel table definitions
+├── schemas/                # Pydantic request/response schemas
+├── services/               # Business logic per domain
+└── migrations/             # Alembic migration scripts
+
+frontend/
+├── src/
+│   ├── pages/              # Route-level React components
+│   ├── components/         # Reusable UI components
+│   ├── services/           # API client wrappers
+│   └── types/              # TypeScript interfaces
+├── package.json
+└── vite.config.ts
+```
+
+Extend the chosen structure based on the Architecture Design.
 
 ### Dependencies
 
-List every required package. Split into:
-- **Python (pip):** FastAPI, SQLAlchemy, SQLModel, Alembic, psycopg2-binary, langchain, ollama, etc.
-- **Node.js (npm):** react, vite, typescript, tailwindcss, shadcn/ui, etc.
+List every required package matching the project's `tech_stack`. Split into sections as applicable:
 
-Include pinned or minimum version numbers.
+**If .NET Core (NuGet):**
+- Microsoft.EntityFrameworkCore (ORM: Entity Framework Core)
+- Npgsql.EntityFrameworkCore.PostgreSQL (if database: PostgreSQL)
+- Microsoft.EntityFrameworkCore.SqlServer (if database: SQL Server)
+- Swashbuckle.AspNetCore (if api_docs: Swagger)
+- Microsoft.AspNetCore.Authentication.JwtBearer (if auth: JWT)
+
+**If .NET Framework / Web Forms (NuGet):**
+- EntityFramework 6.x (EF6)
+- Newtonsoft.Json
+- Microsoft.AspNet.WebApi (if REST API needed)
+
+**If Node.js / Express (npm — backend):**
+- express, pg or prisma, dotenv, jsonwebtoken, bcryptjs, cors, helmet
+- typescript, ts-node, nodemon (dev), @types/express, @types/node (dev)
+
+**If React (npm — frontend):**
+- react, react-dom, react-router-dom, tailwindcss, @tanstack/react-query, axios
+- vite, @vitejs/plugin-react, typescript (dev)
+
+**If Angular (npm — frontend):**
+- @angular/core, @angular/common, @angular/forms, @angular/router, @angular/material
+- @angular/cli, typescript (dev)
+
+**If Vue 3 (npm — frontend):**
+- vue, vue-router, pinia, @vueuse/core, tailwindcss, axios
+- vite, @vitejs/plugin-vue, typescript (dev)
+
+**If Python / FastAPI (pip):**
+- fastapi, uvicorn, sqlmodel, psycopg2-binary, alembic, httpx, pydantic, python-jose (auth: JWT)
+
+Include pinned or minimum version numbers where possible.
 
 ---
 

@@ -45,12 +45,39 @@ _MAX_CODE_BYTES = 80_000
 
 # Text file extensions to include in review
 _TEXT_EXTENSIONS = {
-    ".py", ".js", ".ts", ".tsx", ".jsx", ".html", ".css", ".json",
-    ".yaml", ".yml", ".toml", ".md", ".sh", ".sql", ".env.example",
-    ".Dockerfile", "",  # extensionless files like Dockerfile, Makefile
+    # Python / JS / TS
+    ".py", ".js", ".ts", ".tsx", ".jsx",
+    # Web
+    ".html", ".css",
+    # .NET / C# (Presets 1, 3, 5, 6)
+    ".cs", ".cshtml", ".aspx", ".aspx.cs", ".razor", ".csproj", ".vb",
+    # Config / Data
+    ".json", ".yaml", ".yml", ".toml", ".xml", ".config",
+    # DB / Scripts
+    ".sql", ".sh",
+    # Docs / Env
+    ".md", ".env.example",
+    # Extensionless (Dockerfile, Makefile)
+    "",
 }
 
 _BINARY_PREFIXES = (".", "__pycache__", "node_modules", ".git", "dist", "build")
+
+
+def _tech_stack_description(tech_stack: dict | None) -> str:
+    if not tech_stack:
+        return "FastAPI + SQLModel + PostgreSQL for backend; React + TypeScript + Vite + Tailwind for frontend."
+    parts = []
+    for key, label in [
+        ("backend", "Backend"), ("backend_version", "Backend version"),
+        ("frontend", "Frontend"), ("frontend_version", "Frontend version"),
+        ("database", "Database"), ("language", "Language"),
+        ("orm", "ORM"), ("auth", "Auth"), ("testing", "Testing"),
+        ("cloud", "Cloud"), ("api_docs", "API docs"),
+    ]:
+        if tech_stack.get(key):
+            parts.append(f"{label}: {tech_stack[key]}")
+    return "; ".join(parts) + "." if parts else "FastAPI + React + PostgreSQL."
 
 
 # -- Output schema -------------------------------------------------------------
@@ -116,14 +143,27 @@ _SYSTEM_PROMPT = """\
 You are the Code Review Agent in an AI-powered software factory.
 Your job is to review generated source code and produce a structured report.
 
-Rules:
+PROJECT TECH STACK: {tech_stack_info}
+
+Stack-specific review rules:
+- For ASP.NET Core / C#: check for SQL injection via raw ADO.NET, missing [ValidateAntiForgeryToken],
+  unhandled DbUpdateException, missing using statements, wrong namespace, missing async/await on EF Core calls,
+  hardcoded connection strings, [ApiController] vs [Controller] misuse, missing Model validation attributes.
+- For ASP.NET Web Forms: check for missing ScriptManager for UpdatePanel, hardcoded DB credentials,
+  missing Page.IsPostBack guards, unsafe Response.Write usage, missing input sanitization.
+- For Node.js / TypeScript: check for missing async/await, unhandled Promise rejections,
+  missing input validation middleware, hardcoded localhost URLs, untyped any usage, missing error middleware.
+- For React / Angular / Vue: check for missing key props (React), hardcoded API base URLs,
+  unguarded null access, missing loading/error states, console.log left in code.
+- For all stacks: hardcoded secrets, SQL injection, missing environment variable usage,
+  incomplete implementations (TODO/stub), broken imports.
+
+General rules:
 - Every issue must have a unique ID: CR-001, CR-002, ...
 - severity must be one of: critical, major, minor, info
 - category must be one of: security, performance, logic, style, completeness
 - file is the relative path from generated_app root
 - line_approximate is your best guess at the line number (0 if unknown)
-- Focus on: security vulnerabilities, missing error handling, hardcoded secrets,
-  SQL injection, XSS, incomplete implementations, broken imports, missing tests
 - Completeness: check that each TASK mentioned was actually implemented
 - You MUST return ONLY a valid JSON object -- no prose, no markdown wrapping.
 """
@@ -321,8 +361,12 @@ class CodeReviewAgentRunner:
             code_content, file_count = _collect_code(app_dir)
             logger.info("CodeReviewAgent scanning %s files in %s", file_count, app_dir)
 
+            project = self.session.get(Project, run.project_id)
+            tech_stack = (project.tech_stack or {}) if project else {}
+            tech_stack_info = _tech_stack_description(tech_stack)
+
             raw_json = _llm.call_ollama(
-                system_prompt=_SYSTEM_PROMPT,
+                system_prompt=_SYSTEM_PROMPT.format(tech_stack_info=tech_stack_info),
                 user_prompt=_TASK_TEMPLATE.format(
                     dev_tasks=dev_tasks_content[:5000],
                     code_content=code_content,

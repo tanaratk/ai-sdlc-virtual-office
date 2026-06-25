@@ -1716,3 +1716,241 @@ Approved requirement baseline
 ```
 
 Once requirement quality is stable, BA/SA/Dev/QA Agents will produce better and safer results.
+
+---
+
+# Sprint 44: Virtual Office — Phaser.js 2D Pixel Office (FR-001, FR-002, FR-003, FR-004)
+
+## Objective
+
+เปลี่ยน VirtualOfficePage จาก React status board เป็น Phaser 3 game เต็มหน้าจอ โดยใช้ LimeZu Modern Interiors tileset และ character sprites แต่ละตัวแทน Agent ที่เดินเล่นใน office และแสดงสถานะ real-time จาก backend
+
+## References
+
+- FR-001: Virtual Office 2D Pixel UI
+- FR-002: Agent Idle Behavior
+- FR-003: Agent Work Behavior
+- FR-004: Agent Status Light
+- ADD-001: Agent Role & Desk Mapping
+- Spec: `Requirement Spec/AI-SDLC-Virtual-Office-CR-Requirement-Spec.md`
+
+## Assets (already placed in frontend/public/)
+
+### Tileset
+
+| File | Key | Tile Size |
+|---|---|---|
+| `public/tilesets/Interiors_16x16.png` | `interiors` | 16x16 px |
+
+### Character Sprites (spritesheet: 3 cols x N rows, 48x48 px per frame)
+
+| File | Agent role (matches backend) |
+|---|---|
+| `public/sprites/agent_AC.png` | `architect-agent` |
+| `public/sprites/agent_BA.png` | `ba-agent` |
+| `public/sprites/agent_CI.png` | `change-impact-agent` |
+| `public/sprites/agent_RV.png` | `code-review-agent` |
+| `public/sprites/agent_DA1.png` | `developer-agent` |
+| `public/sprites/agent_DAB.png` | `developer-agent-backend` |
+| `public/sprites/agent_DAF.png` | `developer-agent-frontend` |
+| `public/sprites/agent_DAP.png` | `developer-agent-platform` |
+| `public/sprites/agent_DEO.png` | `devops-agent` |
+| `public/sprites/agent_DOC.png` | `documentation-agent` |
+| `public/sprites/agent_GAP.png` | `gap-analysis-agent` |
+| `public/sprites/agent_MON.png` | `monitoring-agent` |
+| `public/sprites/agent_PM.png` | `pm-agent` |
+| `public/sprites/agent_QA.png` | `qa-agent` |
+| `public/sprites/agent_REQ.png` | `requirement-agent` |
+| `public/sprites/agent_TD.png` | `technical-design-agent` |
+| `public/sprites/agent_UX.png` | `ux-agent` |
+
+## Tasks
+
+### Task 1: Install Phaser
+
+```bash
+cd frontend && npm install phaser
+```
+
+### Task 2: Modify `frontend/src/pages/VirtualOfficePage.tsx`
+
+- ลบ React status board เดิมออก
+- โหลด Phaser ผ่าน dynamic import('phaser') ใน useEffect (หลีกเลี่ยง SSR / Vite issue)
+- สร้าง Phaser.Game instance เต็มหน้าจอ (width/height = container clientWidth/clientHeight)
+- cleanup game.destroy(true) on component unmount
+- mount game ลงใน div ref ที่มี style width:100% height:100%
+
+### Task 3: สร้าง `frontend/src/game/scenes/OfficeScene.ts`
+
+#### PRELOAD
+
+โหลด tileset key 'interiors', frameWidth:16, frameHeight:16
+
+โหลด agent sprites ทุกไฟล์, frameWidth:48, frameHeight:48
+
+SPRITE_MAP:
+- agent_AC  -> architect-agent
+- agent_BA  -> ba-agent
+- agent_CI  -> change-impact-agent
+- agent_RV  -> code-review-agent
+- agent_DA1 -> developer-agent
+- agent_DAB -> developer-agent-backend
+- agent_DAF -> developer-agent-frontend
+- agent_DAP -> developer-agent-platform
+- agent_DEO -> devops-agent
+- agent_DOC -> documentation-agent
+- agent_GAP -> gap-analysis-agent
+- agent_MON -> monitoring-agent
+- agent_PM  -> pm-agent
+- agent_QA  -> qa-agent
+- agent_REQ -> requirement-agent
+- agent_TD  -> technical-design-agent
+- agent_UX  -> ux-agent
+
+#### MAP (Graphics-based, ไม่ใช้ Tiled)
+
+- World size: 40x30 tiles = 640x480 px (TILE_SIZE = 16)
+- Floor: Graphics fillRect ทั้ง map สี 0xc8c8c8
+- Wall: สี 0x8b7355 หนา 1 tile รอบแต่ละห้อง ยกเว้น tile ที่เป็น door gap
+
+#### ห้อง 5 ห้อง (tile coordinates)
+
+| Room | tx | ty | tw | th | Door gap (2 tiles) |
+|---|---|---|---|---|---|
+| Requirement Room | 1 | 1 | 10 | 8 | ผนังล่าง tx=5-6 |
+| Meeting Room | 12 | 1 | 10 | 8 | ผนังล่าง tx=16-17 |
+| Developer Room | 1 | 11 | 15 | 10 | ผนังบน tx=7-8 |
+| QA Lab | 23 | 11 | 10 | 10 | ผนังบน tx=27-28 |
+| Control Room | 30 | 1 | 9 | 8 | ผนังล่าง tx=34-35 |
+
+Label ชื่อห้อง: this.add.text(tx*16+4, ty*16+4, 'Room Name', { color:'#ffffff', fontSize:'10px' })
+
+#### ANIMATIONS (สร้างครั้งเดียวใน create())
+
+- walk_down  : frames [0,1,2],   frameRate 8, repeat -1
+- walk_left  : frames [3,4,5],   frameRate 8, repeat -1
+- walk_right : frames [6,7,8],   frameRate 8, repeat -1
+- walk_up    : frames [9,10,11], frameRate 8, repeat -1
+
+Key format: `${spriteKey}_walk_down` เป็นต้น
+
+#### AGENT PLACEMENT
+
+| Agent role | Sprite key | Room | Start tile (tx, ty) |
+|---|---|---|---|
+| requirement-agent | agent_REQ | Requirement Room | 3, 3 |
+| gap-analysis-agent | agent_GAP | Requirement Room | 7, 5 |
+| ba-agent | agent_BA | Meeting Room | 14, 3 |
+| architect-agent | agent_AC | Meeting Room | 18, 3 |
+| ux-agent | agent_UX | Meeting Room | 16, 5 |
+| technical-design-agent | agent_TD | Meeting Room | 14, 6 |
+| developer-agent | agent_DA1 | Developer Room | 4, 14 |
+| developer-agent-backend | agent_DAB | Developer Room | 7, 14 |
+| developer-agent-frontend | agent_DAF | Developer Room | 10, 14 |
+| developer-agent-platform | agent_DAP | Developer Room | 13, 14 |
+| code-review-agent | agent_RV | Developer Room | 4, 17 |
+| qa-agent | agent_QA | QA Lab | 25, 14 |
+| devops-agent | agent_DEO | QA Lab | 28, 14 |
+| monitoring-agent | agent_MON | QA Lab | 25, 18 |
+| documentation-agent | agent_DOC | Control Room | 32, 3 |
+| pm-agent | agent_PM | Control Room | 35, 5 |
+| change-impact-agent | agent_CI | Control Room | 32, 6 |
+
+pixel x = tx * 16 + 8, pixel y = ty * 16 + 8
+
+#### IDLE WALK BEHAVIOR
+
+ทุก 2-4 วินาที (random delay):
+- สุ่ม target pixel (x, y) ภายใน room boundary (inset 1 tile จากขอบ)
+- คำนวณ angle = Phaser.Math.Angle.Between(current, target)
+- setVelocity(cos(angle)*40, sin(angle)*40)
+- เลือก animation ตามทิศ: |dx| > |dy| → left/right, else → up/down
+- เมื่อถึง target (distance < 4px) → หยุด velocity, แสดง idle frame (frame 1)
+- schedule delay ใหม่
+
+หาก status = 'running':
+- หยุด idle walk
+- เล่น animation walk_down (working pose)
+- ไม่สุ่ม target ใหม่จนกว่า status จะกลับเป็น idle
+
+#### STATUS DOT
+
+this.add.arc() radius 5px ที่ offset (+20, -20) จาก sprite center, depth สูงกว่า sprite
+
+| Status | Color | Effect |
+|---|---|---|
+| running | 0x6366f1 (indigo) | tween alpha 1 to 0.3 yoyo repeat -1, duration 800 |
+| completed / done | 0x34d399 (emerald) | static |
+| idle / default | 0xffffff alpha 0.3 | static |
+| error | 0xef4444 (red) | static |
+| waiting | 0xf59e0b (amber) | static |
+
+#### NAME LABEL
+
+this.add.text(x, y-20, role, { color:'#ffffff', fontSize:'9px', stroke:'#000000', strokeThickness:2 })
+
+#### CLICK INTERACTION
+
+sprite.setInteractive({ useHandCursor: true })
+sprite.on('pointerdown', () => this.events.emit('agent:selected', agentData))
+
+### Task 4: สร้าง `frontend/src/game/AgentManager.ts`
+
+AGENT_CONFIG array:
+- agentId, spriteKey, room (17 agents ตาม SPRITE_MAP ด้านบน)
+
+Poll GET /api/agents ทุก 3,000 ms:
+- เปรียบเทียบ status เก่า-ใหม่
+- ถ้าเปลี่ยน -> callback updateStatusDot(agentId, newStatus)
+
+### Task 5: Glass Drawer (React component ใน VirtualOfficePage)
+
+- Absolute positioned, right:0 top:0 height:100%
+- Width: 320px, style: bg-white/70 backdrop-blur-md border-l
+- ปิดด้วย X button หรือ Escape key
+- แสดง: Agent Name, Role badge, Status badge, Current Task, Model, Last Active
+
+### Task 6: Camera
+
+- this.cameras.main.setBounds(0, 0, 640, 480)
+- default zoom = 2 (เพื่อให้ sprite 48px ดูชัด)
+- WASD / Arrow keys scroll (speed 150 / zoom px per second)
+- Scroll wheel zoom: clamp(zoom - deltaY*0.001, 1, 3)
+
+## Files to Create / Modify
+
+```
+frontend/src/pages/VirtualOfficePage.tsx     (modify - replace with Phaser host)
+frontend/src/game/scenes/OfficeScene.ts      (create)
+frontend/src/game/AgentManager.ts            (create)
+frontend/src/game/config.ts                  (create - Phaser.Game config)
+```
+
+## Acceptance Criteria
+
+- [ ] npm install phaser เสร็จ, package.json มี phaser dependency
+- [ ] VirtualOfficePage โหลด Phaser canvas ที่ /office ไม่ crash
+- [ ] Floor + 5 ห้องแสดงถูกต้องตาม tile coordinates
+- [ ] Agent sprites แสดงในห้องของตัวเองถูกต้อง
+- [ ] Animation walk_down/left/right/up เล่นได้
+- [ ] Idle walk: agent เดินวนใน room ไม่หลุดขอบ
+- [ ] Status dot: สีถูกต้อง, running = pulse animation
+- [ ] คลิก agent -> glass drawer เปิดแสดงข้อมูล
+- [ ] WASD/arrow scroll camera
+- [ ] Scroll wheel zoom 1x-3x
+- [ ] game.destroy() on unmount ไม่ memory leak
+- [ ] npm run build ผ่านใน Docker
+
+## Definition of Done
+
+```
+[ ] phaser อยู่ใน package.json
+[ ] VirtualOfficePage host Phaser game
+[ ] OfficeScene preload -> create -> update ทำงาน
+[ ] Rooms + agent sprites แสดงบน canvas
+[ ] AgentManager poll /api/agents และอัปเดต status dots
+[ ] Click agent -> drawer แสดงข้อมูล
+[ ] Camera scroll + zoom ทำงาน
+[ ] Docker rebuild ผ่าน
+[ ] PROGRESS.md อัปเดต Sprint 44 = Done
+```

@@ -28,6 +28,8 @@ import RAGPage from "@/pages/RAGPage";
 import Settings from "@/pages/Settings";
 import MonitoringPage from "@/pages/MonitoringPage";
 import GeneratedCodePage from "@/pages/GeneratedCodePage";
+import QAPage from "@/pages/QAPage";
+import DeployPage from "@/pages/DeployPage";
 
 export const router = createBrowserRouter([
   { path: "/login",    element: <LoginPage /> },
@@ -58,6 +60,8 @@ export const router = createBrowserRouter([
           { path: "agents",           element: <AgentConsolePage /> },
           { path: "documents",        element: <DocumentReview /> },
           { path: "generated-code",   element: <GeneratedCodePage /> },
+          { path: "qa",               element: <QAPage /> },
+          { path: "deploy",           element: <DeployPage /> },
           { path: "traceability",     element: <TraceabilityPage /> },
           { path: "office",           element: <VirtualOfficePage /> },
           { path: "change-impact",    element: <ChangeImpactPage /> },

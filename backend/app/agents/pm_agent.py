@@ -1,4 +1,4 @@
-"""PM Agent โ€” Pipeline Step 10 (final step).
+"""PM Agent — Pipeline Step 10 (final step).
 
 Reads project metadata and all available documents, calls the LLM to
 produce an executive-level Project Summary, then assembles a data-driven
@@ -38,7 +38,7 @@ def _esc(s: str) -> str:
     return s.replace("{", "{{").replace("}", "}}")
 
 
-# โ”€โ”€ LLM output schema โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# ── LLM output schema ──────────────────────────────────────────────────────────
 
 class _ScopeItem(BaseModel):
     item: str
@@ -59,19 +59,19 @@ class PMSummaryOutput(BaseModel):
     risks: list[_Risk] = Field(default_factory=list)
 
 
-# โ”€โ”€ Prompts โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# ── Prompts ────────────────────────────────────────────────────────────────────
 
 _SYSTEM_PROMPT = """\
-You are the PM Agent โ€” the final step in an AI-powered software factory pipeline.
+You are the PM Agent — the final step in an AI-powered software factory pipeline.
 Your job is to write a concise, professional Project Summary for stakeholders.
 
 RULES:
-- Base your output ONLY on the information provided โ€” do not invent requirements.
-- executive_summary: 2โ€“3 paragraphs suitable for executive review.
-- scope_delivered: list each major deliverable (not individual FRs โ€” group by theme).
-- next_steps: 3โ€“5 actionable items for the team after this pipeline run.
-- risks: real risks derived from the requirement context โ€” not fabricated.
-- Return ONLY a valid JSON object โ€” no markdown, no prose outside JSON.
+- Base your output ONLY on the information provided — do not invent requirements.
+- executive_summary: 2–3 paragraphs suitable for executive review.
+- scope_delivered: list each major deliverable (not individual FRs — group by theme).
+- next_steps: 3–5 actionable items for the team after this pipeline run.
+- risks: real risks derived from the requirement context — not fabricated.
+- Return ONLY a valid JSON object — no markdown, no prose outside JSON.
 """
 
 _TASK_TEMPLATE = """\
@@ -102,7 +102,7 @@ Return ONLY this JSON schema:
 """
 
 
-# โ”€โ”€ Helpers โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# ── Helpers ────────────────────────────────────────────────────────────────────
 
 class _DocRow:
     def __init__(self, doc: Document) -> None:
@@ -110,7 +110,7 @@ class _DocRow:
         self.title = doc.title
         self.version = doc.version
         self.status = doc.status
-        self.approved_by = doc.approved_by or "โ€”"
+        self.approved_by = doc.approved_by or "—"
         self.doc_id = str(doc.id)
         self.created_at = doc.created_at.strftime("%Y-%m-%d")
 
@@ -120,18 +120,18 @@ class _StepRow:
         self.order = order
         self.step_name = step.step_name
         self.status = step.status
-        self.started = step.started_at.strftime("%Y-%m-%d %H:%M") if step.started_at else "โ€”"
-        self.completed = step.completed_at.strftime("%Y-%m-%d %H:%M") if step.completed_at else "โ€”"
+        self.started = step.started_at.strftime("%Y-%m-%d %H:%M") if step.started_at else "—"
+        self.completed = step.completed_at.strftime("%Y-%m-%d %H:%M") if step.completed_at else "—"
         self.retry_count = step.retry_count
 
         if step.started_at and step.completed_at:
             secs = int((step.completed_at - step.started_at).total_seconds())
             self.duration = f"{secs // 60}m {secs % 60}s"
         else:
-            self.duration = "โ€”"
+            self.duration = "—"
 
 
-# โ”€โ”€ Renderers โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# ── Renderers ──────────────────────────────────────────────────────────────────
 
 def _render_project_summary(
     output: PMSummaryOutput,
@@ -145,12 +145,12 @@ def _render_project_summary(
     scope_rows = "".join(
         f"| {s.item} | {s.status} |\n"
         for s in output.scope_delivered
-    ) or "| โ€” | โ€” |\n"
+    ) or "| — | — |\n"
 
     artifact_rows = "".join(
         f"| {r.doc_type} | {r.title} | {r.version} | {r.status} | {r.approved_by} |\n"
         for r in doc_rows
-    ) or "| โ€” | โ€” | โ€” | โ€” | โ€” |\n"
+    ) or "| — | — | — | — | — |\n"
 
     next_steps = "\n".join(f"{i + 1}. {s}" for i, s in enumerate(output.next_steps)) \
         or "> No next steps specified."
@@ -158,17 +158,17 @@ def _render_project_summary(
     risk_rows = "".join(
         f"| {r.risk} | {r.likelihood} | {r.impact} | {r.mitigation} |\n"
         for r in output.risks
-    ) or "| โ€” | โ€” | โ€” | โ€” |\n"
+    ) or "| — | — | — | — |\n"
 
     return f"""\
-# Project Summary โ€” {project_name}
+# Project Summary — {project_name}
 
 **Project ID:** `{project_id}`
 **Document ID:** `{doc_id}`
 **Generated By:** PM Agent v1.0.0
 **Pipeline Step:** 10 of 10 (Final)
 **Generated At:** {now}
-**Status:** Draft โ€” Awaiting Review
+**Status:** Draft — Awaiting Review
 
 ---
 
@@ -223,42 +223,42 @@ def _render_delivery_report(
 ) -> str:
     now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
 
-    run_id = str(pipeline_run.id) if pipeline_run else "โ€”"
+    run_id = str(pipeline_run.id) if pipeline_run else "—"
     started = pipeline_run.started_at.strftime("%Y-%m-%d %H:%M") \
-        if pipeline_run and pipeline_run.started_at else "โ€”"
+        if pipeline_run and pipeline_run.started_at else "—"
     completed = pipeline_run.completed_at.strftime("%Y-%m-%d %H:%M") \
-        if pipeline_run and pipeline_run.completed_at else "โ€”"
+        if pipeline_run and pipeline_run.completed_at else "—"
 
     if pipeline_run and pipeline_run.started_at and pipeline_run.completed_at:
         total_secs = int((pipeline_run.completed_at - pipeline_run.started_at).total_seconds())
         duration = f"{total_secs // 3600}h {(total_secs % 3600) // 60}m"
     else:
-        duration = "โ€”"
+        duration = "—"
 
     step_table = "".join(
         f"| {s.order} | {s.step_name} | {s.started} | {s.completed} "
         f"| {s.duration} | {s.retry_count} | {s.status} |\n"
         for s in step_rows
-    ) or "| โ€” | โ€” | โ€” | โ€” | โ€” | โ€” | โ€” |\n"
+    ) or "| — | — | — | — | — | — | — |\n"
 
     doc_table = "".join(
         f"| {r.doc_type} | {r.title} | {r.version} | {r.status} "
         f"| {r.approved_by} | {r.created_at} |\n"
         for r in doc_rows
-    ) or "| โ€” | โ€” | โ€” | โ€” | โ€” | โ€” |\n"
+    ) or "| — | — | — | — | — | — |\n"
 
     total_retries = sum(s.retry_count for s in step_rows)
     approved_count = sum(1 for r in doc_rows if r.status == DocumentStatus.approved)
 
     return f"""\
-# Delivery Report โ€” {project_name}
+# Delivery Report — {project_name}
 
 **Project ID:** `{project_id}`
 **Document ID:** `{doc_id}`
 **Generated By:** PM Agent v1.0.0
 **Pipeline Step:** 10 of 10 (Final)
 **Generated At:** {now}
-**Status:** Draft โ€” Awaiting Sign-Off
+**Status:** Draft — Awaiting Sign-Off
 
 ---
 
@@ -326,7 +326,7 @@ def _render_delivery_report(
 """
 
 
-# โ”€โ”€ Agent runner โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# ── Agent runner ───────────────────────────────────────────────────────────────
 
 class PMAgentRunner:
     def __init__(self, session: Session) -> None:
@@ -363,13 +363,13 @@ class PMAgentRunner:
             pid = str(project_id)
             now = datetime.now(UTC)
 
-            # โ”€โ”€ project_summary โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+            # ── project_summary ───────────────────────────────────────────────
             ps_id = uuid.uuid4()
             ps_doc = Document(
                 id=ps_id,
                 project_id=project_id,
                 document_type=DocumentType.project_summary,
-                title=f"Project Summary โ€” {project_name}",
+                title=f"Project Summary — {project_name}",
                 content_markdown=_render_project_summary(
                     pm_output, project_name, pid, str(ps_id), doc_rows
                 ),
@@ -379,13 +379,13 @@ class PMAgentRunner:
             )
             self.session.add(ps_doc)
 
-            # โ”€โ”€ delivery_report โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+            # ── delivery_report ───────────────────────────────────────────────
             dr_id = uuid.uuid4()
             dr_doc = Document(
                 id=dr_id,
                 project_id=project_id,
                 document_type=DocumentType.delivery_report,
-                title=f"Delivery Report โ€” {project_name}",
+                title=f"Delivery Report — {project_name}",
                 content_markdown=_render_delivery_report(
                     project_name, pid, str(dr_id),
                     pipeline_run, step_rows, doc_rows, trace_count,
@@ -433,7 +433,7 @@ class PMAgentRunner:
                     pass
             raise
 
-    # โ”€โ”€ helpers โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+    # ── helpers ────────────────────────────────────────────────────────────────
 
     def _get_agent_row(self) -> Optional[Agent]:
         return self.session.exec(
@@ -449,10 +449,10 @@ class PMAgentRunner:
         return [_DocRow(d) for d in docs]
 
     def _get_req_summary(self, doc_rows: list[_DocRow]) -> str:
-        """Pull req_summary content from already-loaded doc rows โ€” avoids extra query."""
+        """Pull req_summary content from already-loaded doc rows — avoids extra query."""
         for row in doc_rows:
             if row.doc_type == DocumentType.requirement_summary:
-                # We need the full doc for content โ€” do a targeted query
+                # We need the full doc for content — do a targeted query
                 break
         doc = self.session.exec(
             select(Document).where(

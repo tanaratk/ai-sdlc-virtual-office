@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Paperclip, Upload } from "lucide-react";
+import { Paperclip, Upload, ArrowRight } from "lucide-react";
 import type { InputType, RequirementInputCreate } from "@/types/requirement";
 
 const INPUT_TYPES: { value: InputType; label: string }[] = [
@@ -21,9 +21,10 @@ const EXT_TO_TYPE: Record<string, InputType> = {
 interface RequirementUploadProps {
   onSubmit: (data: RequirementInputCreate) => void;
   isLoading?: boolean;
+  onNext?: () => void;
 }
 
-export function RequirementUpload({ onSubmit, isLoading = false }: RequirementUploadProps) {
+export function RequirementUpload({ onSubmit, isLoading = false, onNext }: RequirementUploadProps) {
   const [inputType, setInputType] = useState<InputType>("manual_text");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -131,14 +132,26 @@ export function RequirementUpload({ onSubmit, isLoading = false }: RequirementUp
         />
       </div>
 
-      <button
-        type="submit"
-        disabled={isLoading || !content.trim()}
-        className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        <Upload className="h-4 w-4" />
-        {isLoading ? "Saving…" : "Save Requirement"}
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          type="submit"
+          disabled={isLoading || !content.trim()}
+          className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Upload className="h-4 w-4" />
+          {isLoading ? "Saving…" : "Save Requirement"}
+        </button>
+        {onNext && (
+          <button
+            type="button"
+            onClick={onNext}
+            className="flex items-center gap-2 rounded-md border border-primary/40 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10"
+          >
+            Next: Run Pipeline
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        )}
+      </div>
     </form>
   );
 }

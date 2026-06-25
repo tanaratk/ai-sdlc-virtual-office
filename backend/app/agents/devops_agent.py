@@ -84,33 +84,189 @@ def _safe_name(name: str) -> str:
     return re.sub(r"[^\w\-]", "_", name)
 
 
-_DEVOPS_FILES: list[tuple[str, str, str]] = [
-    ("Dockerfile.backend", "dockerfile", "backend_docker"),
-    ("Dockerfile.frontend", "dockerfile", "frontend_docker"),
-    ("docker-compose.yml", "yaml", "compose_dev"),
-    ("docker-compose.prod.yml", "yaml", "compose_prod"),
-    ("nginx.conf", "text", "nginx"),
-    (".env.example", "bash", "env_example"),
-    (".github/workflows/ci.yml", "yaml", "github_ci"),
-    ("README.md", "markdown", "readme"),
+_DEVOPS_FILES_DEFAULT: list[tuple[str, str, str]] = [
+    ("Dockerfile.backend",         "dockerfile", "backend_docker"),
+    ("Dockerfile.frontend",        "dockerfile", "frontend_docker"),
+    ("docker-compose.yml",         "yaml",       "compose_dev"),
+    ("docker-compose.prod.yml",    "yaml",       "compose_prod"),
+    ("nginx.conf",                 "text",       "nginx"),
+    (".env.example",               "bash",       "env_example"),
+    (".github/workflows/ci.yml",   "yaml",       "github_ci"),
+    ("README.md",                  "markdown",   "readme"),
 ]
+
+_DEVOPS_FILES_DOTNET: list[tuple[str, str, str]] = [
+    # .NET projects: single app Dockerfile (no separate frontend container)
+    ("Dockerfile",                 "dockerfile", "backend_docker"),
+    ("docker-compose.yml",         "yaml",       "compose_dev"),
+    ("docker-compose.prod.yml",    "yaml",       "compose_prod"),
+    (".env",                       "bash",       "env_defaults"),
+    (".env.example",               "bash",       "env_example"),
+    (".github/workflows/ci.yml",   "yaml",       "github_ci"),
+    ("README.md",                  "markdown",   "readme"),
+]
+
+_DEVOPS_FILES_DOTNET_WEBFORMS: list[tuple[str, str, str]] = [
+    # Web Forms on .NET Framework: requires Windows Server Core container
+    ("Dockerfile",                 "dockerfile", "backend_docker"),
+    ("docker-compose.yml",         "yaml",       "compose_dev"),
+    (".env",                       "bash",       "env_defaults"),
+    (".env.example",               "bash",       "env_example"),
+    (".github/workflows/ci.yml",   "yaml",       "github_ci"),
+    ("README.md",                  "markdown",   "readme"),
+]
+
+_DEVOPS_FILES_NODE: list[tuple[str, str, str]] = [
+    # Node.js projects: separate backend + frontend containers
+    ("Dockerfile.backend",         "dockerfile", "backend_docker"),
+    ("Dockerfile.frontend",        "dockerfile", "frontend_docker"),
+    ("docker-compose.yml",         "yaml",       "compose_dev"),
+    ("docker-compose.prod.yml",    "yaml",       "compose_prod"),
+    ("nginx.conf",                 "text",       "nginx"),
+    (".env.example",               "bash",       "env_example"),
+    (".github/workflows/ci.yml",   "yaml",       "github_ci"),
+    ("README.md",                  "markdown",   "readme"),
+]
+
+_PURPOSES_DEFAULT: dict[str, str] = {
+    "backend_docker": "Multi-stage Dockerfile for FastAPI (Python) backend using python:3.11-slim",
+    "frontend_docker": "Multi-stage Dockerfile for React/Vite frontend using node:20-alpine build stage and nginx:alpine serve stage",
+    "compose_dev": "docker-compose.yml for local build and deployment with backend, frontend, and db services",
+    "compose_prod": "docker-compose.prod.yml for production-like deployment",
+    "nginx": "nginx reverse proxy config: route /api/ to backend, / to frontend static files",
+    "env_example": "Environment variable template with DATABASE_URL, SECRET_KEY, JWT_SECRET, CORS_ORIGINS",
+    "github_ci": "GitHub Actions CI workflow for Python/Node.js: install deps, lint, test, build Docker images",
+    "readme": "Runbook with Docker build/deploy commands",
+}
+
+_PURPOSES_NODE: dict[str, str] = {
+    "backend_docker": "Multi-stage Dockerfile for Node.js/Express backend using node:20-alpine. Build: npm ci. Runtime: node src/index.js or npm start on port 3000.",
+    "frontend_docker": "Multi-stage Dockerfile for React/Vue/Angular frontend using node:20-alpine build stage (npm run build) and nginx:alpine serve stage.",
+    "compose_dev": "docker-compose.yml with THREE services: 'backend' (Node.js), 'frontend' (built static via nginx), 'db' (postgres:16). Include healthcheck on db service. frontend depends_on backend.",
+    "compose_prod": "docker-compose.prod.yml for production Node.js app deployment",
+    "nginx": "nginx reverse proxy config: route /api/ to backend:3000, / to frontend static files",
+    "env_example": "Environment variable template: DATABASE_URL, PORT=3000, JWT_SECRET, NODE_ENV",
+    "github_ci": "GitHub Actions CI workflow for Node.js: actions/setup-node, npm ci, npm test, npm run build, docker build",
+    "readme": "Runbook with Docker build/deploy commands for Node.js app",
+}
+
+_PURPOSES_DOTNET_WEBFORMS: dict[str, str] = {
+    "backend_docker": "Dockerfile for ASP.NET Web Forms on .NET Framework using mcr.microsoft.com/dotnet/framework/sdk:4.8-windowsservercore-ltsc2022 build stage and mcr.microsoft.com/dotnet/framework/aspnet:4.8-windowsservercore-ltsc2022 runtime stage. MSBuild build command. ENTRYPOINT must start IIS.",
+    "compose_dev": "docker-compose.yml with TWO services: 'app' (Windows container, ASP.NET Web Forms) and 'db' (mcr.microsoft.com/mssql/server:2022-latest). Note: Windows containers cannot run Linux db images — use SQL Server.",
+    "env_defaults": "Actual .env file with real default values: DB_SERVER=db, DB_NAME matching project, DB_USER=sa, DB_PASSWORD=YourStrong!Passw0rd",
+    "env_example": ".env.example with placeholder values for ASP.NET Web Forms app connecting to SQL Server",
+    "github_ci": "GitHub Actions CI workflow for .NET Framework using actions/setup-dotnet with framework 4.x, MSBuild restore and build, NuGet restore",
+    "readme": "Runbook for ASP.NET Web Forms Docker deployment. Note: requires Windows Docker daemon.",
+}
+
+_PURPOSES_DOTNET: dict[str, str] = {
+    "backend_docker": "Multi-stage Dockerfile for ASP.NET Core application using mcr.microsoft.com/dotnet/sdk:8.0 build stage and mcr.microsoft.com/dotnet/aspnet:8.0 runtime stage. Run: dotnet publish -c Release -o /app/publish. ENTRYPOINT dotnet App.dll on port 80.",
+    "compose_dev": "docker-compose.yml with TWO services only: 'app' (ASP.NET Core, builds from Dockerfile, port 80) and 'db' (postgres:16). The 'db' service MUST have a healthcheck (pg_isready). The 'app' service MUST have depends_on: db: condition: service_healthy. Pass DB_HOST, DB_NAME, DB_USER, DB_PASSWORD as environment from .env file.",
+    "compose_prod": "docker-compose.prod.yml for production-like deployment of the ASP.NET Core app",
+    "env_defaults": "Actual .env file (not example) with real default values safe for local development: DB_USER=postgres, DB_PASSWORD=devpassword123, DB_NAME matching the project name, DB_HOST=db",
+    "env_example": ".env.example showing required environment variables with placeholder values for ASP.NET Core app",
+    "github_ci": "GitHub Actions CI workflow for .NET using actions/setup-dotnet, dotnet restore, dotnet build, dotnet test, dotnet publish",
+    "readme": "Runbook with Docker build/deploy commands for .NET app including how to run locally with docker compose up",
+}
+
+
+def _detect_stack_type(tech_stack: dict | None) -> str:
+    if not tech_stack:
+        return "python"
+    backend = (tech_stack.get("backend") or "").lower()
+    frontend = (tech_stack.get("frontend") or "").lower()
+    container = (tech_stack.get("container") or "").lower()
+    if any(k in backend or k in frontend for k in [".net", "asp.net", "aspnet", "blazor", "razor"]):
+        # Web Forms on .NET Framework needs Windows containers
+        if "web forms" in backend or "web forms" in frontend or "windows" in container:
+            return "dotnet_webforms"
+        return "dotnet"
+    if any(k in backend for k in ["node", "express", "nest", "javascript", "typescript"]):
+        return "node"
+    return "python"
+
+
+def _devops_files_for_stack(tech_stack: dict | None) -> list[tuple[str, str, str]]:
+    t = _detect_stack_type(tech_stack)
+    if t == "dotnet":
+        return _DEVOPS_FILES_DOTNET
+    if t == "dotnet_webforms":
+        return _DEVOPS_FILES_DOTNET_WEBFORMS
+    if t == "node":
+        return _DEVOPS_FILES_NODE
+    return _DEVOPS_FILES_DEFAULT
+
+
+def _purposes_for_stack(tech_stack: dict | None) -> dict[str, str]:
+    t = _detect_stack_type(tech_stack)
+    if t == "dotnet":
+        return _PURPOSES_DOTNET
+    if t == "dotnet_webforms":
+        return _PURPOSES_DOTNET_WEBFORMS
+    if t == "node":
+        return _PURPOSES_NODE
+    return _PURPOSES_DEFAULT
+
+
+def _tech_stack_description(tech_stack: dict | None) -> str:
+    if not tech_stack:
+        return "FastAPI (Python 3.11) + PostgreSQL 15 for backend; React + Vite + Node 20 for frontend."
+    parts = []
+    for key, label in [
+        ("backend", "Backend"), ("backend_version", "Backend version"),
+        ("frontend", "Frontend"), ("frontend_version", "Frontend version"),
+        ("database", "Database"), ("database_version", "Database version"),
+        ("language", "Language"), ("orm", "ORM"), ("auth", "Auth"),
+        ("cloud", "Cloud"), ("container", "Container"), ("testing", "Testing"),
+    ]:
+        if tech_stack.get(key):
+            parts.append(f"{label}: {tech_stack[key]}")
+    return "; ".join(parts) + "." if parts else "FastAPI + React + PostgreSQL."
 
 
 _SYSTEM_PROMPT = """\
 You are an expert DevOps engineer and infrastructure specialist.
 You write clean deployment configuration files for full-stack web applications.
 
+PROJECT TECH STACK: {tech_stack_info}
+
 Rules:
 - Output ONLY the file content. No markdown fences. No explanation.
-- Tech stack: FastAPI (Python 3.11) + PostgreSQL 15 for backend;
-  React + Vite + Node 20 for frontend.
-- Use multi-stage Docker builds.
-- docker-compose.yml should include postgres, redis, backend, frontend, and nginx
-  when the generated app needs them.
-- nginx.conf should proxy /api/ to backend:8000 and serve frontend on /.
+- Match all Dockerfile, CI, and config to the PROJECT TECH STACK above.
+- For .NET/ASP.NET Core MVC or Razor Pages:
+    * Dockerfile: multi-stage using mcr.microsoft.com/dotnet/sdk:8.0 → mcr.microsoft.com/dotnet/aspnet:8.0
+    * Build: dotnet restore → dotnet publish "App.csproj" -c Release -o /app/publish
+    * Runtime ENTRYPOINT: ["dotnet", "App.dll"]
+    * docker-compose.yml: exactly TWO services (app + db). NO nginx, NO redis unless explicitly required.
+    * The 'db' postgres service MUST include a healthcheck:
+        healthcheck:
+          test: ["CMD-SHELL", "pg_isready -U $${DB_USER} -d $${DB_NAME}"]
+          interval: 5s
+          timeout: 5s
+          retries: 10
+    * The 'app' service MUST use depends_on: db: condition: service_healthy
+    * The 'app' service MUST load env_file: .env
+    * The .env file MUST contain actual working default values (not placeholders):
+        DB_USER=postgres
+        DB_PASSWORD=devpassword123
+        DB_NAME=<project_name_db>
+        DB_HOST=db
+- For Node.js / Express: use node:20-alpine image, npm ci, npm start commands. Separate backend and frontend containers.
+- For Python / FastAPI: use python:3.11-slim image, pip install, uvicorn commands. Include redis if Celery is in the stack.
+- For ASP.NET Web Forms on .NET Framework: use mcr.microsoft.com/dotnet/framework/sdk:4.8-windowsservercore-ltsc2022 build stage and mcr.microsoft.com/dotnet/framework/aspnet:4.8-windowsservercore-ltsc2022 runtime stage. MSBuild for build, not dotnet. Windows containers do not support Linux-based postgres — use mcr.microsoft.com/mssql/server:2022-latest for SQL Server instead.
+- Use multi-stage Docker builds for all stacks.
 - .env.example must list required environment variables with placeholder values.
-- GitHub Actions CI should run backend tests, frontend type-check, and Docker build.
-- Never hardcode real passwords or secrets.
+- GitHub Actions CI must use the correct language toolchain for the stack:
+    * .NET Core: actions/setup-dotnet, dotnet restore, dotnet build, dotnet test, dotnet publish
+    * .NET Framework (Web Forms): MSBuild with NuGet restore
+    * Node.js: actions/setup-node@v4 with node-version: '20', npm ci, npm test, npm run build
+    * Python: actions/setup-python, pip install, pytest
+- Cloud-specific deployment:
+    * If cloud is Azure: include azure/login action, push to Azure Container Registry (ACR), deploy to Azure App Service or AKS
+    * If cloud is AWS: include aws-actions/configure-aws-credentials, push to ECR, deploy to ECS/Fargate
+    * If cloud is not specified: use generic docker build/push to ghcr.io
+- Never hardcode real passwords in .env.example — use placeholders like CHANGE_ME.
+- In .env (non-example), use safe local dev defaults.
 """
 
 _FILE_TEMPLATE = """\
@@ -125,18 +281,6 @@ RELEVANT CONTEXT:
 
 Output the file content directly. No fences, no explanation.
 """
-
-_PURPOSES: dict[str, str] = {
-    "backend_docker": "Multi-stage Dockerfile for FastAPI backend",
-    "frontend_docker": "Multi-stage Dockerfile for React/Vite frontend",
-    "compose_dev": "docker-compose.yml for local build and deployment",
-    "compose_prod": "docker-compose.prod.yml for production-like deployment",
-    "nginx": "nginx reverse proxy for frontend and backend API",
-    "env_example": "Environment variable template",
-    "github_ci": "GitHub Actions CI workflow",
-    "readme": "Runbook with Docker build/deploy commands",
-}
-
 
 def _render_config_summary(results: list[tuple[str, bool]], project_id: str, doc_id: str) -> str:
     ok = sum(1 for _, success in results if success)
@@ -290,6 +434,7 @@ class DevOpsAgentRunner:
             arch_doc, db_doc, api_doc, fsd_doc = self._load_source_documents(run.project_id)
             project = self.session.get(Project, run.project_id)
             project_name = project.name if project else "project"
+            tech_stack: dict | None = project.tech_stack if project else None
             app_dir = self._get_output_dir(run.project_id)
 
             docs = {
@@ -300,7 +445,7 @@ class DevOpsAgentRunner:
                 "project_name": project_name,
             }
 
-            generation_results = self._generate_devops_files(app_dir, docs, model)
+            generation_results = self._generate_devops_files(app_dir, docs, model, tech_stack)
             command_results, health, rollback = self._build_deploy_healthcheck(app_dir)
 
             config_doc_id = uuid.uuid4()
@@ -394,10 +539,11 @@ class DevOpsAgentRunner:
         app_dir: Path,
         docs: dict[str, str],
         model: str | None,
+        tech_stack: dict | None = None,
     ) -> list[tuple[str, bool]]:
         results: list[tuple[str, bool]] = []
-        for rel_path, lang, ctx_type in _DEVOPS_FILES:
-            content = self._generate_file(rel_path, lang, ctx_type, docs, model)
+        for rel_path, lang, ctx_type in _devops_files_for_stack(tech_stack):
+            content = self._generate_file(rel_path, lang, ctx_type, docs, model, tech_stack)
             if content:
                 self._write_file(app_dir, rel_path, content)
                 results.append((rel_path, True))
@@ -524,14 +670,18 @@ class DevOpsAgentRunner:
         ctx_type: str,
         docs: dict[str, str],
         model: str | None,
+        tech_stack: dict | None = None,
     ) -> str | None:
         context = self._build_context(ctx_type, docs)
-        purpose = _PURPOSES.get(ctx_type, f"Generate {path}")
+        purposes = _purposes_for_stack(tech_stack)
+        purpose = purposes.get(ctx_type, f"Generate {path}")
         prompt = _FILE_TEMPLATE.format(path=path, lang=lang, purpose=purpose, context=context)
         for attempt in range(2):
             try:
                 raw = _llm.call_ollama(
-                    system_prompt=_SYSTEM_PROMPT,
+                    system_prompt=_SYSTEM_PROMPT.format(
+                        tech_stack_info=_tech_stack_description(tech_stack),
+                    ),
                     user_prompt=prompt,
                     model=model,
                     timeout=FILE_TIMEOUT,

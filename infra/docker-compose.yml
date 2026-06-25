@@ -11,6 +11,7 @@ x-backend-env: &backend-env
 x-backend-volumes: &backend-volumes
   - ../backend:/app
   - D:/workspace:/workspace
+  - /var/run/docker.sock:/var/run/docker.sock
 
 services:
 

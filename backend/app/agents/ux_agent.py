@@ -1,4 +1,4 @@
-"""UX Agent โ€” Pipeline Step 5.
+"""UX Agent — Pipeline Step 5.
 
 Reads the approved BRD, FSD, and User Story Backlog and produces:
   - Screen Specification (screen list, field spec, user flows, wireframe notes)
@@ -33,7 +33,7 @@ STEP_NAME = "ux_documents"
 TIMEOUT_SECONDS = 180.0
 
 
-# โ”€โ”€ Output schema โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# ── Output schema ──────────────────────────────────────────────────────────────
 
 def _first(data: dict, *keys: str, fallback: str = "") -> str:
     for k in keys:
@@ -78,8 +78,10 @@ class _Screen(BaseModel):
                 v["name"] = _first(v, "screen_name", "title", "label", fallback="Screen")
             if not v.get("description"):
                 v["description"] = _first(v, "detail", "purpose", "summary", "overview", fallback="")
-            if not v.get("user_role"):
-                v["user_role"] = _first(v, "role", "actor", "persona", fallback="")
+            role = v.get("user_role") or _first(v, "role", "actor", "persona", fallback="")
+            if isinstance(role, list):
+                role = ", ".join(str(r) for r in role)
+            v["user_role"] = role
         return v
 
 
@@ -105,7 +107,7 @@ class UXAgentOutput(BaseModel):
     user_flows: list[_UserFlow] = Field(default_factory=list)
 
 
-# โ”€โ”€ Prompts โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# ── Prompts ────────────────────────────────────────────────────────────────────
 
 _SYSTEM_PROMPT = """\
 You are the UX Agent in an AI-powered software factory.
@@ -114,19 +116,19 @@ Your job is to read the BRD, FSD, and User Story Backlog and produce:
   2. User interaction flows (user journeys)
 
 Rules:
-- Every screen must have a unique ID (UI-001, UI-002, โ€ฆ).
+- Every screen must have a unique ID (UI-001, UI-002, …).
 - Every screen must reference a requirement ID (FR-XXX) in requirement_refs.
 - Every field must have a type: text, number, date, dropdown, checkbox, textarea, file, password.
-- Every user flow must have a unique ID (FLOW-001, FLOW-002, โ€ฆ).
+- Every user flow must have a unique ID (FLOW-001, FLOW-002, …).
 - Write flow steps as clear imperative sentences (e.g., "User clicks Submit button").
 - Produce at most 8 screens and 6 user flows. Keep descriptions concise (under 20 words each).
-- You MUST return ONLY a valid JSON object โ€” no prose, no markdown wrapping.
+- You MUST return ONLY a valid JSON object — no prose, no markdown wrapping.
 """
 
 _TASK_TEMPLATE = """\
 Analyze the following BA documents and produce a Screen Specification
 with a complete field list and user interaction flows.
-Return ONLY the JSON โ€” no explanation, no code fences.
+Return ONLY the JSON — no explanation, no code fences.
 
 Schema:
 {{
@@ -176,26 +178,26 @@ USER STORY BACKLOG:
 """
 
 
-# โ”€โ”€ Markdown renderer โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# ── Markdown renderer ──────────────────────────────────────────────────────────
 
 def _render_screen_spec(data: UXAgentOutput, project_id: str, doc_id: str) -> str:
     # Screen list summary table
     screen_rows = ""
     for s in data.screens:
-        refs = ", ".join(s.requirement_refs) if s.requirement_refs else "โ€”"
-        screen_rows += f"| {s.id} | {s.name} | {s.user_role or 'โ€”'} | {refs} |\n"
+        refs = ", ".join(s.requirement_refs) if s.requirement_refs else "—"
+        screen_rows += f"| {s.id} | {s.name} | {s.user_role or '—'} | {refs} |\n"
     if not screen_rows:
-        screen_rows = "| โ€” | No screens defined | โ€” | โ€” |\n"
+        screen_rows = "| — | No screens defined | — | — |\n"
 
     # Detailed screen specs
     screens_detail = ""
     for s in data.screens:
-        refs = ", ".join(s.requirement_refs) if s.requirement_refs else "โ€”"
+        refs = ", ".join(s.requirement_refs) if s.requirement_refs else "—"
 
         field_rows = ""
         for f in s.fields:
             req_str = "Yes" if f.required else "No"
-            val = f.validation if f.validation else "โ€”"
+            val = f.validation if f.validation else "—"
             field_rows += f"| `{f.name}` | {f.type} | {req_str} | {val} | {f.description} |\n"
 
         actions_str = "\n".join(f"- `{a}`" for a in s.actions) if s.actions else "> No actions defined."
@@ -204,9 +206,9 @@ def _render_screen_spec(data: UXAgentOutput, project_id: str, doc_id: str) -> st
         _fld_block = (_fld_hdr + field_rows) if field_rows else "> No input fields on this screen."
 
         screens_detail += f"""
-### {s.id} โ€” {s.name}
+### {s.id} — {s.name}
 
-**User Role:** {s.user_role or "โ€”"}
+**User Role:** {s.user_role or "—"}
 **Requirement Refs:** {refs}
 
 {s.description}
@@ -229,11 +231,11 @@ def _render_screen_spec(data: UXAgentOutput, project_id: str, doc_id: str) -> st
     # User flows
     flows_detail = ""
     for flow in data.user_flows:
-        ref = f" โ {flow.requirement_ref}" if flow.requirement_ref else ""
+        ref = f" → {flow.requirement_ref}" if flow.requirement_ref else ""
         steps_str = "\n".join(f"{step}" for step in flow.steps) if flow.steps \
             else "> No steps defined."
         flows_detail += f"""
-### {flow.id}{ref} โ€” {flow.name}
+### {flow.id}{ref} — {flow.name}
 
 {steps_str}
 
@@ -247,7 +249,7 @@ def _render_screen_spec(data: UXAgentOutput, project_id: str, doc_id: str) -> st
 **Document ID:** `{doc_id}`
 **Generated By:** UX Agent v1.0.0
 **Pipeline Step:** 5 of 10
-**Status:** Draft โ’ Awaiting Review
+**Status:** Draft → Awaiting Review
 **Total Screens:** {len(data.screens)}
 **Total User Flows:** {len(data.user_flows)}
 
@@ -268,7 +270,7 @@ def _render_screen_spec(data: UXAgentOutput, project_id: str, doc_id: str) -> st
 {flows_detail if flows_detail else "> No user flows defined."}"""
 
 
-# โ”€โ”€ Agent runner โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# ── Agent runner ───────────────────────────────────────────────────────────────
 
 class UXAgentRunner:
     def __init__(self, session: Session) -> None:
@@ -282,7 +284,7 @@ class UXAgentRunner:
             run = self._get_run(run_id)
 
             if run.status == PipelineRunStatus.failed:
-                logger.info("UXAgent skipped โ€” run %s already failed", run_id)
+                logger.info("UXAgent skipped — run %s already failed", run_id)
                 return
 
             step = self._get_step(run_id)
@@ -335,7 +337,7 @@ class UXAgentRunner:
             step.output_document_id = screen_doc.id
             step.completed_at = datetime.now(UTC)
 
-            # Gate 4 โ€” wait for human review of Screen Specification
+            # Gate 4 — wait for human review of Screen Specification
             run.status = PipelineRunStatus.waiting_for_user
             run.current_step = STEP_NAME
 
@@ -375,7 +377,7 @@ class UXAgentRunner:
             except Exception:
                 logger.exception("Failed to persist failure state for run=%s", run_id)
 
-    # โ”€โ”€ helpers โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+    # ── helpers ────────────────────────────────────────────────────────────────
 
     def _get_run(self, run_id: uuid.UUID) -> PipelineRun:
         run = self.session.get(PipelineRun, run_id)

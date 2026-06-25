@@ -24,8 +24,31 @@ Each task will provide:
 - `fsd_document_id` + `fsd_content_markdown` — approved FSD
 - `user_story_document_id` + `user_story_content_markdown` — approved User Stories
 - `api_document_id` + `api_content_markdown` — approved API Specification
+- `tech_stack` — project tech stack JSON (use to tailor auth test cases and test environment setup)
 - Optionally: `screen_document_id` + `screen_content_markdown` — for UI test cases
 - Optionally: `context_notes`
+
+---
+
+## Tech Stack Awareness Rules
+
+### Authentication Test Cases
+
+Adapt Negative Tests based on `tech_stack.auth`:
+
+| Auth Mechanism | Negative Tests to Include |
+|---|---|
+| **JWT** | Missing Authorization header (401), expired token (401), tampered token signature (401), wrong token format (400), token for wrong role (403) |
+| **ASP.NET Identity (cookie)** | Unauthenticated access (redirect to /Account/Login), CSRF token missing on POST (400), session cookie expired, wrong credentials on login form (error message), account lockout after N failed attempts |
+| **API Key** | Missing X-API-Key header (401), invalid key value (403), key for wrong scope (403) |
+| **None / Open** | No auth test cases needed for authentication layer — focus on input validation |
+
+### Test Environment Setup (UAT Section)
+
+If `tech_stack.testing` is provided, include a "Test Environment Setup" section in the UAT Script specifying:
+- How to run the test suite locally (e.g., `dotnet test`, `npm test`, `ng test`, `pytest`)
+- Any required environment variables for test configuration
+- How to view test results and coverage reports
 
 ---
 

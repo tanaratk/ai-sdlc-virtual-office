@@ -8,9 +8,10 @@ const GAP        = 12;   // gap between rooms
 const MARGIN     = 12;   // edge margin
 const WALK_SPEED = 55;   // px / sec
 
-// FIX 2: LimeZu Premade Characters vertical strip — try 48×48 per frame
-const FRAME_SIZE     = 48;
-const FRAMES_PER_DIR = 3;   // walk frames per direction
+// LimeZu Premade Characters: 896×656 px → 56 cols × 41 rows @ 16×16 per frame
+const FRAME_SIZE     = 16;
+const SPRITE_COLS    = 56;   // 896 / 16 = 56 columns per row
+const FRAMES_PER_DIR = 3;    // 3 walk frames per direction
 const DIR_DOWN  = 0;
 const DIR_LEFT  = 1;
 const DIR_RIGHT = 2;
@@ -53,7 +54,7 @@ interface AgentObj {
   animFrame:  number;
   animDir:    number;
   status:     string;
-  spriteCols: number;   // 1 = vertical strip, >1 = horizontal layout
+  // spriteCols fixed = SPRITE_COLS (56) for 896×656 LimeZu sheet
 }
 
 const ROLE_ABBR: Record<string, string> = {
@@ -106,14 +107,14 @@ export class OfficeScene extends Phaser.Scene {
     this.W = this.cameras.main.width;
     this.H = this.cameras.main.height;
 
-    // Log sprite dimensions for FIX 2 verification
+    // Verify sprite dimensions (expect 896×656 = 56×41 @ 16×16)
     const firstKey = AGENT_CONFIG[0]?.spriteKey;
     if (firstKey) {
       const src = this.textures.get(firstKey).source[0];
       console.log(
         `[Phaser] ${firstKey}: ${src.width}×${src.height} px → ` +
         `${Math.floor(src.width / FRAME_SIZE)} cols × ${Math.floor(src.height / FRAME_SIZE)} rows ` +
-        `@ ${FRAME_SIZE}×${FRAME_SIZE} = ${this.textures.get(firstKey).frameTotal} frames`
+        `= ${this.textures.get(firstKey).frameTotal} frames @ ${FRAME_SIZE}×${FRAME_SIZE}`
       );
     }
 
@@ -348,12 +349,9 @@ export class OfficeScene extends Phaser.Scene {
   private tickAnimations() {
     for (const a of this.agents) {
       a.animFrame = a.walking ? (a.animFrame + 1) % FRAMES_PER_DIR : 0;
-      // Vertical strip (cols=1): frameIndex = dir * framesPerDir + frame
-      // Horizontal layout (cols>1): frameIndex = dir * cols + frame
-      const frameIdx = a.spriteCols <= 1
-        ? a.animDir * FRAMES_PER_DIR + a.animFrame
-        : a.animDir * a.spriteCols  + a.animFrame;
-      try { a.img.setFrame(frameIdx); } catch { /* frame count mismatch */ }
+      // 896×656 sheet, 56 cols/row: frameIndex = dir * 56 + animFrame
+      const frameIdx = a.animDir * SPRITE_COLS + a.animFrame;
+      try { a.img.setFrame(frameIdx); } catch { /* frame out of range */ }
     }
   }
 
@@ -370,30 +368,30 @@ export class OfficeScene extends Phaser.Scene {
       cfgs.forEach((cfg, idx) => {
         const { x: px, y: py } = this.agentStartPos(room, idx, cfgs.length);
 
-        const tex  = this.textures.get(cfg.spriteKey);
-        const src  = tex.source[0];
-        const cols = Math.max(1, Math.floor(src.width / FRAME_SIZE));
-
         if (idx === 0) {
+          const tex = this.textures.get(cfg.spriteKey);
+          const src = tex.source[0];
           console.log(
             `[${room.name}] ${cfg.spriteKey}: ${src.width}×${src.height}px, ` +
-            `cols=${cols}, frames=${tex.frameTotal}`
+            `frames=${tex.frameTotal}`
           );
         }
 
+        // 16×16 frame, scale 3 → 48×48 on screen; anchor at feet
         const img = this.add.image(px, py, cfg.spriteKey, 0);
-        img.setOrigin(0.5, 0.5).setScale(0.70).setDepth(5);
+        img.setOrigin(0.5, 1).setScale(3).setDepth(5);
         img.setInteractive({ useHandCursor: true });
 
-        const abbr  = ROLE_ABBR[cfg.role] ?? cfg.role.slice(0, 3).toUpperCase();
-        const bw    = abbr.length * 7 + 8;
+        const abbr = ROLE_ABBR[cfg.role] ?? cfg.role.slice(0, 3).toUpperCase();
+        const bw   = abbr.length * 7 + 8;
 
-        const labelBg = this.add.rectangle(px, py - 28, bw, 14, room.headerColor, 0.90)
+        // Badge sits above the 48px sprite (feet at py, head at py-48)
+        const labelBg = this.add.rectangle(px, py - 54, bw, 14, room.headerColor, 0.90)
           .setDepth(8);
-        const labelText = this.add.text(px, py - 28, abbr, {
+        const labelText = this.add.text(px, py - 54, abbr, {
           fontSize: '9px', color: '#ffffff', fontStyle: 'bold',
         }).setOrigin(0.5, 0.5).setDepth(9);
-        const dot = this.add.arc(px + 18, py - 18, 4, 0, 360, false, 0xffffff, 0.40)
+        const dot = this.add.arc(px + 18, py - 36, 4, 0, 360, false, 0xffffff, 0.40)
           .setDepth(9);
 
         const agentObj: AgentObj = {
@@ -401,7 +399,7 @@ export class OfficeScene extends Phaser.Scene {
           img, labelBg, labelText, dot,
           glow: null, pulseTween: null, glowTween: null, walkTween: null,
           walking: false, animFrame: 0, animDir: DIR_DOWN,
-          status: 'idle', spriteCols: cols,
+          status: 'idle',
         };
 
         img.on('pointerdown', () => this.onAgentSelected({
@@ -542,11 +540,11 @@ export class OfficeScene extends Phaser.Scene {
 
   update() {
     for (const a of this.agents) {
-      const { x: ix, y: iy } = a.img;
-      a.labelBg.setPosition(ix, iy - 28);
-      a.labelText.setPosition(ix, iy - 28);
-      a.dot.setPosition(ix + 18, iy - 18);
-      if (a.glow) a.glow.setPosition(ix, iy);
+      const { x: ix, y: iy } = a.img;  // iy = feet position (origin 0.5, 1)
+      a.labelBg.setPosition(ix, iy - 54);
+      a.labelText.setPosition(ix, iy - 54);
+      a.dot.setPosition(ix + 18, iy - 36);
+      if (a.glow) a.glow.setPosition(ix, iy - 24);  // waist level
     }
   }
 

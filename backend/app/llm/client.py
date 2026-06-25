@@ -163,7 +163,7 @@ def _call_openai(
     except ImportError:
         raise RuntimeError("openai package not installed. Run: pip install openai")
 
-    api_key = settings.openai_api_key
+    api_key = settings.openai_api_key or _get_api_key_from_db("openai")
     if not api_key:
         raise RuntimeError(
             "OPENAI_API_KEY is not set. Add it to your .env file or Docker Compose environment."
@@ -185,6 +185,23 @@ def _call_openai(
     return resp.choices[0].message.content or ""
 
 
+# ── API key lookup from DB (fallback when env var is not set) ─────────────────
+
+def _get_api_key_from_db(provider: str) -> str | None:
+    """Look up API key stored via the UI settings page (LlmSetting table)."""
+    try:
+        from sqlmodel import Session, select
+        from app.db.session import engine
+        from app.db.models import LlmSetting
+        with Session(engine) as session:
+            row = session.exec(
+                select(LlmSetting).where(LlmSetting.provider == provider)
+            ).first()
+            return row.api_key_encrypted if row and row.api_key_encrypted else None
+    except Exception:
+        return None
+
+
 # ── Anthropic / Claude ────────────────────────────────────────────────────────
 
 def _call_anthropic(
@@ -199,23 +216,27 @@ def _call_anthropic(
     except ImportError:
         raise RuntimeError("anthropic package not installed. Run: pip install anthropic")
 
-    api_key = settings.anthropic_api_key
+    api_key = settings.anthropic_api_key or _get_api_key_from_db("anthropic")
     if not api_key:
         raise RuntimeError(
             "ANTHROPIC_API_KEY is not set. Add it to your .env file or Docker Compose environment."
         )
 
-    client = anthropic.Anthropic(api_key=api_key, timeout=timeout)
+    # Anthropic can take several minutes to generate large structured outputs.
+    # Use at least 600s regardless of what the caller passes.
+    anthropic_timeout = max(timeout, 600.0)
+    client = anthropic.Anthropic(api_key=api_key, timeout=anthropic_timeout)
 
     # Claude uses prompt-level JSON instructions (no native format=json param).
     # System prompt already says "Return ONLY valid JSON" so no extra change needed.
-    message = client.messages.create(
+    # Use streaming so the connection stays alive while tokens arrive.
+    with client.messages.stream(
         model=model,
-        max_tokens=8192,
+        max_tokens=32768,
         system=system_prompt,
         messages=[{"role": "user", "content": user_prompt}],
-    )
-    return message.content[0].text if message.content else ""
+    ) as stream:
+        return stream.get_final_text()
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -297,9 +318,29 @@ def extract_json(text: str) -> dict:
 
 
 def strip_code_fences(text: str) -> str:
-    """Remove markdown code fences and thinking blocks from LLM code output."""
+    """Remove markdown code fences and thinking blocks from LLM code output.
+
+    Handles three patterns:
+    1. Whole output is one fence block  → extract inner content
+    2. Output starts with a fence       → strip opening + closing fence
+    3. Valid content with trailing fences appended by LLM → cut at first fence line
+    """
     text = text.strip()
     text = re.sub(r"<think>[\s\S]*?</think>", "", text).strip()
     text = re.sub(r"<think>[\s\S]*", "", text).strip()
-    m = re.match(r"^```[\w]*\n([\s\S]+?)\n```$", text)
-    return m.group(1) if m else text
+
+    # Case 1: entire text is wrapped in a single code fence
+    m = re.match(r"^```[\w.-]*\n([\s\S]+?)\n```\s*$", text)
+    if m:
+        return m.group(1).strip()
+
+    # Case 2: text starts with a fence line
+    if text.startswith("```"):
+        text = re.sub(r"^```[\w.-]*\n?", "", text)         # strip opening fence
+        text = re.sub(r"\n```[\w.-]*[\s\S]*$", "", text)   # strip closing fence + anything after
+        return text.strip()
+
+    # Case 3: real content with markdown blocks appended (e.g. LLM adds ```.env section)
+    # Cut everything from the first bare ``` line onward — it's never valid file content
+    text = re.sub(r"\n```[\s\S]*$", "", text)
+    return text.strip()

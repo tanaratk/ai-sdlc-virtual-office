@@ -1,17 +1,20 @@
 import { Link, Outlet, useParams, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { agentApi } from "@/services/agentApi";
 import { projectApi } from "@/services/projectApi";
 import { cn } from "@/lib/utils";
 
-const TABS = [
+type Tab = { label: string; path: string; comingSoon?: boolean };
+
+const TABS: Tab[] = [
   { label: "Overview",     path: "" },
   { label: "Requirements", path: "intake" },
   { label: "Pipeline",     path: "agents" },
   { label: "Documents",    path: "documents" },
   { label: "Code",         path: "generated-code" },
-  { label: "QA",           path: "qa",          disabled: true },
+  { label: "QA",           path: "qa" },
   { label: "Traceability", path: "traceability" },
-  { label: "Deploy",       path: "deploy",       disabled: true },
+  { label: "Deploy",       path: "deploy" },
   { label: "Monitoring",   path: "office" },
 ];
 
@@ -24,6 +27,15 @@ export default function ProjectLayout() {
     queryFn: () => projectApi.get(projectId!),
     enabled: !!projectId,
   });
+
+  const { data: runs = [] } = useQuery({
+    queryKey: ["pipeline-runs", projectId],
+    queryFn: () => agentApi.listRuns(projectId!),
+    enabled: !!projectId,
+    refetchInterval: 8000,
+  });
+
+  const pipelineDone = runs.some((r) => r.status === "completed");
 
   const base = `/projects/${projectId}`;
 
@@ -50,14 +62,17 @@ export default function ProjectLayout() {
           {TABS.map((tab) => {
             const fullPath = tab.path ? `${base}/${tab.path}` : base;
             const isActive = activeLabel === tab.label;
+            const locked = tab.comingSoon && !pipelineDone;
 
-            if (tab.disabled) {
+            if (locked) {
               return (
                 <span
                   key={tab.label}
-                  className="whitespace-nowrap px-4 py-2.5 text-sm text-muted-foreground/40 cursor-not-allowed border-b-2 border-transparent"
+                  title={pipelineDone ? undefined : "Available after pipeline completes"}
+                  className="relative whitespace-nowrap px-4 py-2.5 text-sm text-muted-foreground/40 cursor-not-allowed border-b-2 border-transparent select-none"
                 >
                   {tab.label}
+                  <span className="ml-1 text-[9px] align-super leading-none text-muted-foreground/30">soon</span>
                 </span>
               );
             }

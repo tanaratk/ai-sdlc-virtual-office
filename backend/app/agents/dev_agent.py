@@ -91,65 +91,209 @@ class _DeveloperLane:
 
 # -- Essential config files always added to every project ----------------------
 
-_ESSENTIAL_SPECS: list[_FileSpec] = [
-    _FileSpec(
-        path="requirements.txt",
-        lang="text",
-        purpose="Python dependencies: FastAPI, SQLModel, psycopg2, alembic, httpx, pydantic",
-        context_hint="backend_model",
-    ),
-    _FileSpec(
-        path="frontend/package.json",
-        lang="json",
-        purpose="Node.js package manifest with react, vite, tailwind, react-router, tanstack-query",
-        context_hint="frontend_type",
-    ),
-    _FileSpec(
-        path="frontend/vite.config.ts",
-        lang="typescript",
-        purpose="Vite build configuration for React + TypeScript with path alias @/",
-        context_hint="frontend_type",
-    ),
-    _FileSpec(
-        path="frontend/tsconfig.json",
-        lang="json",
-        purpose="TypeScript compiler configuration for React + Vite project",
-        context_hint="frontend_type",
-    ),
-    _FileSpec(
-        path=".env.example",
-        lang="text",
-        purpose="Environment variables template: DATABASE_URL, SECRET_KEY, CORS_ORIGINS",
-        context_hint="readme",
-    ),
-    _FileSpec(
-        path="README.md",
-        lang="markdown",
-        purpose="Project overview, setup instructions, and how to run locally",
-        context_hint="readme",
-    ),
+_ESSENTIAL_SPECS_DEFAULT: list[_FileSpec] = [
+    _FileSpec(path="requirements.txt", lang="text",
+              purpose="Python dependencies: FastAPI, SQLModel, psycopg2, alembic, httpx, pydantic",
+              context_hint="backend_model"),
+    _FileSpec(path="frontend/package.json", lang="json",
+              purpose="Node.js package manifest with react, vite, tailwind, react-router, tanstack-query",
+              context_hint="frontend_type"),
+    _FileSpec(path="frontend/vite.config.ts", lang="typescript",
+              purpose="Vite build configuration for React + TypeScript with path alias @/",
+              context_hint="frontend_type"),
+    _FileSpec(path="frontend/tsconfig.json", lang="json",
+              purpose="TypeScript compiler configuration for React + Vite project",
+              context_hint="frontend_type"),
+    _FileSpec(path=".env.example", lang="text",
+              purpose="Environment variables template: DATABASE_URL, SECRET_KEY, CORS_ORIGINS",
+              context_hint="readme"),
+    _FileSpec(path="README.md", lang="markdown",
+              purpose="Project overview, setup instructions, and how to run locally",
+              context_hint="readme"),
 ]
+
+_ESSENTIAL_SPECS_DOTNET: list[_FileSpec] = [
+    _FileSpec(path="App.csproj", lang="xml",
+              purpose=".NET 8 project file (Sdk='Microsoft.NET.Sdk.Web'). TargetFramework net8.0, ImplicitUsings enable, Nullable enable. NuGet packages: Npgsql.EntityFrameworkCore.PostgreSQL 8.0.x, Swashbuckle.AspNetCore 6.x.",
+              context_hint="backend_model"),
+    _FileSpec(path="Program.cs", lang="csharp",
+              purpose="ASP.NET Core entry point. AddControllersWithViews() + AddSwaggerGen(). DbContext registered with Npgsql. Retry loop (up to 10 times, 2s sleep) before EnsureCreated() to wait for Postgres. UseStaticFiles(), UseSwagger(), UseSwaggerUI(c => { c.RoutePrefix='swagger'; c.SwaggerEndpoint('/swagger/v1/swagger.json','API v1'); }). MapControllerRoute default pattern {controller=Home}/{action=Index}/{id?}. MapControllers().",
+              context_hint="backend_route"),
+    _FileSpec(path="Views/_ViewImports.cshtml", lang="csharp",
+              purpose="Razor view imports: @using <RootNamespace>.Models and @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers",
+              context_hint="frontend_page"),
+    _FileSpec(path="Views/_ViewStart.cshtml", lang="csharp",
+              purpose="Razor view start: sets Layout = \"_Layout\"",
+              context_hint="frontend_page"),
+    _FileSpec(path="Views/Shared/_Layout.cshtml", lang="csharp",
+              purpose="Bootstrap 5 main layout with sidebar navigation. Links to all main sections of the app. @RenderBody() in main content area. Bootstrap 5 CDN + Bootstrap Icons CDN in <head>.",
+              context_hint="frontend_page"),
+    _FileSpec(path="appsettings.json", lang="json",
+              purpose="ASP.NET Core app settings: Logging levels and AllowedHosts. No connection string here — connection string built from env vars in Program.cs.",
+              context_hint="backend_model"),
+    _FileSpec(path=".env.example", lang="text",
+              purpose="Environment variables template: DB_HOST, DB_NAME, DB_USER, DB_PASSWORD",
+              context_hint="readme"),
+    _FileSpec(path="README.md", lang="markdown",
+              purpose="Project overview, setup instructions: docker compose up, then open http://localhost",
+              context_hint="readme"),
+]
+
+_ESSENTIAL_SPECS_NODE: list[_FileSpec] = [
+    _FileSpec(path="backend/package.json", lang="json",
+              purpose="Node.js/Express backend package manifest. Dependencies: express, pg, dotenv, jsonwebtoken, bcryptjs, cors. DevDependencies: typescript, ts-node, @types/express, @types/node, nodemon.",
+              context_hint="backend_model"),
+    _FileSpec(path="backend/tsconfig.json", lang="json",
+              purpose="TypeScript compiler config for Node.js backend: target ES2020, module commonjs, outDir dist, strict true",
+              context_hint="backend_model"),
+    _FileSpec(path="frontend/package.json", lang="json",
+              purpose="Frontend package manifest matching the frontend framework (React: react+vite+tailwindcss; Vue: vue+vite; Angular: @angular/core+@angular/cli)",
+              context_hint="frontend_type"),
+    _FileSpec(path="frontend/vite.config.ts", lang="typescript",
+              purpose="Vite build configuration for React or Vue frontend with path alias @/ and proxy /api/ to backend",
+              context_hint="frontend_type"),
+    _FileSpec(path=".env.example", lang="text",
+              purpose="Environment variables template: DATABASE_URL, PORT=3000, JWT_SECRET, NODE_ENV",
+              context_hint="readme"),
+    _FileSpec(path="README.md", lang="markdown",
+              purpose="Project overview, setup instructions, and how to run locally with docker compose",
+              context_hint="readme"),
+]
+
+_ESSENTIAL_SPECS_ANGULAR: list[_FileSpec] = [
+    _FileSpec(path="backend/package.json", lang="json",
+              purpose="Node.js/Express backend package manifest with express, pg, dotenv, jsonwebtoken, cors, typescript",
+              context_hint="backend_model"),
+    _FileSpec(path="backend/tsconfig.json", lang="json",
+              purpose="TypeScript compiler config for Node.js backend: target ES2020, module commonjs, outDir dist",
+              context_hint="backend_model"),
+    _FileSpec(path="frontend/angular.json", lang="json",
+              purpose="Angular CLI workspace configuration. Projects: one app named after project. Build target: browser. Assets: src/assets. Styles: src/styles.scss.",
+              context_hint="frontend_type"),
+    _FileSpec(path="frontend/package.json", lang="json",
+              purpose="Angular project package manifest. Dependencies: @angular/core, @angular/common, @angular/forms, @angular/router, @angular/material. DevDependencies: @angular/cli, typescript.",
+              context_hint="frontend_type"),
+    _FileSpec(path="frontend/tsconfig.json", lang="json",
+              purpose="TypeScript config for Angular project: strict true, target ES2022, module ES2022",
+              context_hint="frontend_type"),
+    _FileSpec(path="frontend/src/main.ts", lang="typescript",
+              purpose="Angular app bootstrap entry point: bootstrapApplication(AppComponent, appConfig)",
+              context_hint="frontend_page"),
+    _FileSpec(path=".env.example", lang="text",
+              purpose="Environment variables template: DATABASE_URL, PORT=3000, JWT_SECRET, NODE_ENV",
+              context_hint="readme"),
+    _FileSpec(path="README.md", lang="markdown",
+              purpose="Project overview and setup instructions for Angular + Node.js project",
+              context_hint="readme"),
+]
+
+_ESSENTIAL_SPECS_VUE: list[_FileSpec] = [
+    _FileSpec(path="backend/package.json", lang="json",
+              purpose="Node.js/Express backend package manifest with express, pg, dotenv, jsonwebtoken, cors, typescript",
+              context_hint="backend_model"),
+    _FileSpec(path="backend/tsconfig.json", lang="json",
+              purpose="TypeScript compiler config for Node.js backend: target ES2020, module commonjs, outDir dist",
+              context_hint="backend_model"),
+    _FileSpec(path="frontend/package.json", lang="json",
+              purpose="Vue 3 frontend package manifest. Dependencies: vue, vue-router, pinia, @vueuse/core. DevDependencies: vite, @vitejs/plugin-vue, typescript, tailwindcss.",
+              context_hint="frontend_type"),
+    _FileSpec(path="frontend/vite.config.ts", lang="typescript",
+              purpose="Vite config for Vue 3 project: @vitejs/plugin-vue(), resolve alias @/ → src/, proxy /api/ to backend",
+              context_hint="frontend_type"),
+    _FileSpec(path="frontend/tsconfig.json", lang="json",
+              purpose="TypeScript config for Vue 3 project: target ESNext, module ESNext, strict true, include vue files",
+              context_hint="frontend_type"),
+    _FileSpec(path="frontend/src/main.ts", lang="typescript",
+              purpose="Vue 3 app entry point: createApp(App).use(router).use(pinia).mount('#app')",
+              context_hint="frontend_page"),
+    _FileSpec(path=".env.example", lang="text",
+              purpose="Environment variables template: DATABASE_URL, PORT=3000, JWT_SECRET, VITE_API_URL",
+              context_hint="readme"),
+    _FileSpec(path="README.md", lang="markdown",
+              purpose="Project overview and setup instructions for Vue 3 + Node.js project",
+              context_hint="readme"),
+]
+
+
+def _detect_stack_type(tech_stack: dict | None) -> str:
+    """Return 'dotnet' | 'angular' | 'vue' | 'node' | 'python' based on project tech_stack."""
+    if not tech_stack:
+        return "python"
+    backend = (tech_stack.get("backend") or "").lower()
+    frontend = (tech_stack.get("frontend") or "").lower()
+    if any(k in backend or k in frontend for k in [".net", "asp.net", "aspnet", "blazor", "razor", "c#"]):
+        return "dotnet"
+    if "angular" in frontend:
+        return "angular"
+    if "vue" in frontend:
+        return "vue"
+    if any(k in backend for k in ["node", "express", "nest", "javascript", "typescript"]):
+        return "node"
+    return "python"
+
+
+def _essential_specs_for_stack(tech_stack: dict | None) -> list[_FileSpec]:
+    t = _detect_stack_type(tech_stack)
+    if t == "dotnet":
+        return _ESSENTIAL_SPECS_DOTNET
+    if t == "angular":
+        return _ESSENTIAL_SPECS_ANGULAR
+    if t == "vue":
+        return _ESSENTIAL_SPECS_VUE
+    if t == "node":
+        return _ESSENTIAL_SPECS_NODE
+    return _ESSENTIAL_SPECS_DEFAULT
+
+
+def _tech_stack_description(tech_stack: dict | None) -> str:
+    """Convert tech_stack JSON to a human-readable description for LLM prompts."""
+    if not tech_stack:
+        return "FastAPI + SQLModel + PostgreSQL for backend; React + TypeScript + Vite + Tailwind for frontend."
+    parts = []
+    for key, label in [
+        ("backend", "Backend"), ("backend_version", "Backend version"),
+        ("frontend", "Frontend"), ("frontend_version", "Frontend version"),
+        ("database", "Database"), ("database_version", "Database version"),
+        ("language", "Language"), ("app_type", "App type"),
+        ("orm", "ORM"), ("auth", "Auth"), ("testing", "Testing"),
+        ("cloud", "Cloud"), ("api_docs", "API docs"),
+        ("cache", "Cache"), ("queue", "Queue"),
+    ]:
+        if tech_stack.get(key):
+            parts.append(f"{label}: {tech_stack[key]}")
+    return "; ".join(parts) + "." if parts else "FastAPI + React + PostgreSQL."
+
+
+def _lang_options_for_stack(tech_stack: dict | None) -> str:
+    t = _detect_stack_type(tech_stack)
+    if t == "dotnet":
+        return '"csharp", "aspx", "xml", "json", "sql", "markdown", "text"'
+    if t in ("node", "angular", "vue"):
+        return '"typescript", "javascript", "json", "sql", "yaml", "markdown", "text"'
+    return '"python", "typescript", "json", "sql", "yaml", "markdown", "text"'
 
 # -- Prompts: fallback LLM planning -------------------------------------------
 
 _PLAN_SYSTEM_PROMPT = """\
 You are a senior software architect in an AI-powered software factory.
 Given technical specification documents, decide which source code files
-to generate for a full-stack web application.
+to generate for the project.
+
+PROJECT TECH STACK: {tech_stack_info}
 
 RULES:
 - Produce a JSON object with a "files" array only.
 - Each file must have: path, lang, purpose, context_hint.
-- path: relative path inside the project (e.g. "backend/app/models/user.py")
-- lang: "python", "typescript", "json", "sql", "yaml", "markdown", or "text"
+- path: relative path inside the project matching the tech stack above.
+- lang: one of {lang_options}
 - purpose: one sentence describing what this file does
 - context_hint: one of "backend_model", "backend_route", "backend_schema",
   "backend_migration", "frontend_type", "frontend_service",
   "frontend_component", "frontend_page", "readme"
 - Generate at most {max_files} files. Focus on the most critical files first.
-- Include: models, routes, schemas, one migration, key frontend pages/types/services.
-- Do NOT include requirements.txt, package.json, vite.config.ts, .env.example,
-  or README.md — those are added automatically.
+- Match the file extensions and structure to the PROJECT TECH STACK above.
+- Do NOT include config/setup files (*.csproj, requirements.txt, package.json,
+  appsettings.json, .env.example, README.md) — those are added automatically.
 - Return ONLY valid JSON. No markdown fences, no explanation.
 """
 
@@ -189,17 +333,33 @@ Schema:
 _FILE_SYSTEM_PROMPT = """\
 You are an expert code generator. You write clean, production-ready code.
 
+PROJECT TECH STACK: {tech_stack_info}
+
 RULES:
 - Output ONLY the file content. No markdown fences. No explanation.
 - Write complete, runnable code -- not stubs or placeholders.
-- Follow the tech stack: FastAPI + SQLModel + PostgreSQL for backend,
-  React + TypeScript + Vite + Tailwind for frontend.
-- Use standard patterns: Pydantic models, SQLModel tables, FastAPI APIRouter,
-  React functional components with hooks.
+- Strictly follow the PROJECT TECH STACK above. Use the correct language,
+  frameworks, and file conventions for that stack.
+- For ASP.NET Web Forms: use .aspx + code-behind .aspx.cs pattern.
+- For ASP.NET Core MVC or Razor Pages:
+    * Controllers inherit ControllerBase (API) or Controller (web views).
+    * Web UI controllers return View(model) and live under Controllers/.
+    * Views use .cshtml Razor syntax with Bootstrap 5.
+    * File-scoped namespaces (namespace App.Controllers;) for .NET 6+.
+    * ImplicitUsings enabled — no need to add 'using System;' or 'using System.Threading.Tasks;'.
+    * Models live under Models/ with file-scoped namespace App.Models;
+    * ApplicationDbContext uses DbSet<T> for each entity, extends DbContext.
+    * Program.cs MUST use AddControllersWithViews() not AddControllers() when Views exist.
+    * Program.cs MUST retry DB connection before EnsureCreated() — use a loop with Thread.Sleep(2000).
+- For Blazor: use .razor components.
+- For React/TypeScript: use functional components, hooks, Tailwind CSS, shadcn/ui components.
+- For Angular: use @Component decorator, standalone components, HttpClient for API calls, Angular Material for UI components, @angular/forms for reactive forms.
+- For Vue 3: use Composition API (<script setup lang="ts">), Pinia for state management, vue-router for routing, PrimeVue or Vuetify for UI components.
+- For Node.js/Express: use TypeScript, async/await, express.Router(), pg or Prisma for DB access.
+- For FastAPI: use Pydantic models, SQLModel tables, APIRouter.
 - When "ALREADY GENERATED FILES" are provided, use the EXACT same class/function
   names and import paths shown there.
-- Never output TODO or pass-only stubs unless the file is intentionally minimal
-  (e.g. __init__.py).
+- Never output TODO or pass-only stubs unless the file is intentionally minimal.
 """
 
 _FILE_TEMPLATE = """\
@@ -254,6 +414,9 @@ def _lang_from_path(path: str) -> str:
         ".js": "javascript", ".jsx": "javascript", ".json": "json",
         ".yaml": "yaml", ".yml": "yaml", ".sql": "sql",
         ".html": "html", ".css": "css", ".md": "markdown",
+        ".cs": "csharp", ".aspx": "aspx", ".cshtml": "csharp",
+        ".razor": "csharp", ".csproj": "xml", ".sln": "text",
+        ".config": "xml", ".resx": "xml", ".vb": "vb",
         ".sh": "text", ".txt": "text", ".toml": "text",
     }.get(ext, "text")
 
@@ -323,7 +486,28 @@ def _lane_key_for_file(spec: _FileSpec) -> str:
     return "platform"
 
 
-def _build_developer_lanes(files: list[_FileSpec], requested_instances: int) -> list[_DeveloperLane]:
+def _backend_focus_for_stack(tech_stack: dict | None) -> str:
+    t = _detect_stack_type(tech_stack)
+    if t == "dotnet":
+        return "ASP.NET Core Controllers, EF Core models and DbContext, Razor Views (.cshtml), service classes, and Program.cs configuration."
+    if t in ("angular", "vue", "node"):
+        backend = (tech_stack or {}).get("backend", "Node.js/Express")
+        return f"{backend} routes, TypeScript models, database queries, middleware, and REST API implementation."
+    return "FastAPI routes, SQLModel models, Pydantic schemas, Alembic migrations, and backend integration."
+
+
+def _frontend_focus_for_stack(tech_stack: dict | None) -> str:
+    t = _detect_stack_type(tech_stack)
+    if t == "angular":
+        return "Angular components, services, modules, routing, Angular Material forms, and API client (HttpClient)."
+    if t == "vue":
+        return "Vue 3 components (Composition API), Pinia stores, vue-router routes, and API client code."
+    if t in ("node", "dotnet"):
+        return "React/Vite pages, TypeScript components, hooks, API client, and Tailwind CSS styling."
+    return "React/Vite pages, TypeScript components, hooks, API client code, and Tailwind CSS styling."
+
+
+def _build_developer_lanes(files: list[_FileSpec], requested_instances: int, tech_stack: dict | None = None) -> list[_DeveloperLane]:
     requested_instances = max(1, min(MAX_DEVELOPER_LANES, requested_instances))
     if requested_instances == 1:
         return [_DeveloperLane(
@@ -337,12 +521,12 @@ def _build_developer_lanes(files: list[_FileSpec], requested_instances: int) -> 
         _DeveloperLane(
             name="developer-agent-backend",
             label="Backend Developer",
-            focus="FastAPI routes, SQLModel models, schemas, migrations, and backend integration.",
+            focus=_backend_focus_for_stack(tech_stack),
         ),
         _DeveloperLane(
             name="developer-agent-frontend",
             label="Frontend Developer",
-            focus="React/Vite pages, components, TypeScript types, and API client code.",
+            focus=_frontend_focus_for_stack(tech_stack),
         ),
     ]
     if requested_instances >= 3:
@@ -477,13 +661,18 @@ class DevAgentRunner:
                 "screen_spec":  screen_doc.content_markdown,
             }
 
+            # Load project tech stack for stack-aware code generation
+            project = self.session.get(Project, run.project_id)
+            tech_stack: dict | None = project.tech_stack if project else None
+            logger.info("DevAgent tech_stack=%s run=%s", tech_stack, run_id)
+
             # Phase 1: resolve file plan (Tech Design output or LLM fallback)
-            files, used_tech_design = self._resolve_file_plan(docs, model, run.project_id)
+            files, used_tech_design = self._resolve_file_plan(docs, model, run.project_id, tech_stack)
             logger.info(
                 "DevAgent file plan: %d files (tech_design=%s) run=%s",
                 len(files), used_tech_design, run_id,
             )
-            lanes = _build_developer_lanes(files, self._recommended_instances(run.project_id))
+            lanes = _build_developer_lanes(files, self._recommended_instances(run.project_id), tech_stack)
             lane_agent_rows = self._get_lane_agent_rows([lane.name for lane in lanes])
             for lane_agent in lane_agent_rows:
                 lane_agent.status = AgentStatus.working
@@ -501,7 +690,7 @@ class DevAgentRunner:
                     lane.name, len(lane.files), run_id,
                 )
                 for spec in lane.files:
-                    content = self._generate_file(spec, docs, model, generated, lane)
+                    content = self._generate_file(spec, docs, model, generated, lane, tech_stack)
                     if content:
                         self._write_file(out_dir, spec.path, content)
                         generated.append((spec, content))
@@ -584,6 +773,7 @@ class DevAgentRunner:
         docs: dict[str, str],
         model: str | None,
         project_id: uuid.UUID,
+        tech_stack: dict | None = None,
     ) -> tuple[list[_FileSpec], bool]:
         """Return (file_list, used_tech_design_flag).
 
@@ -605,18 +795,23 @@ class DevAgentRunner:
 
         if not files:
             logger.info("DevAgent falling back to LLM file planning")
-            plan = self._plan_files_llm(docs, model)
+            plan = self._plan_files_llm(docs, model, tech_stack)
             files = plan.files[:MAX_FILES]
 
-        # Always add essential config files if not already in plan
+        # Always add essential config files (stack-aware)
         existing_paths = {f.path for f in files}
-        for ess in _ESSENTIAL_SPECS:
+        for ess in _essential_specs_for_stack(tech_stack):
             if ess.path not in existing_paths:
                 files.append(ess)
 
         return files, used_tech
 
-    def _plan_files_llm(self, docs: dict[str, str], model: str | None) -> _FilePlan:
+    def _plan_files_llm(
+        self,
+        docs: dict[str, str],
+        model: str | None,
+        tech_stack: dict | None = None,
+    ) -> _FilePlan:
         """Fallback: ask LLM to produce the file plan."""
         prompt = _PLAN_TEMPLATE.format(
             fsd=_esc(_trunc(docs["fsd"], 2500)),
@@ -626,7 +821,11 @@ class DevAgentRunner:
             screen_spec=_esc(_trunc(docs["screen_spec"], 1500)),
         )
         raw = _llm.call_ollama(
-            system_prompt=_PLAN_SYSTEM_PROMPT.format(max_files=MAX_FILES),
+            system_prompt=_PLAN_SYSTEM_PROMPT.format(
+                max_files=MAX_FILES,
+                tech_stack_info=_tech_stack_description(tech_stack),
+                lang_options=_lang_options_for_stack(tech_stack),
+            ),
             user_prompt=prompt,
             model=model,
             timeout=PLAN_TIMEOUT,
@@ -644,6 +843,7 @@ class DevAgentRunner:
         model: str | None,
         generated: list[tuple["_FileSpec", str]],
         lane: _DeveloperLane,
+        tech_stack: dict | None = None,
     ) -> str | None:
         context = self._build_context(spec, docs)
         cross = self._build_cross_context(spec, generated)
@@ -669,7 +869,9 @@ class DevAgentRunner:
         for attempt in range(2):
             try:
                 raw = _llm.call_ollama(
-                    system_prompt=_FILE_SYSTEM_PROMPT,
+                    system_prompt=_FILE_SYSTEM_PROMPT.format(
+                        tech_stack_info=_tech_stack_description(tech_stack),
+                    ),
                     user_prompt=prompt,
                     model=model,
                     timeout=FILE_TIMEOUT,

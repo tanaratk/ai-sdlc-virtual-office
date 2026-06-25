@@ -57,7 +57,7 @@ function ApiKeyField({
   onSave: (key: string) => void;
   isSaving: boolean;
 }) {
-  const [editing, setEditing] = useState(!hasKey);
+  const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
   const [show, setShow] = useState(false);
   const [testState, setTestState] = useState<TestState>("idle");
@@ -355,7 +355,14 @@ function CloudProviderSection({
         <div className="border-t divide-y">
           {/* API Key section */}
           <div className="px-4 py-3">
-            <p className="text-xs font-medium text-muted-foreground mb-2">API Key</p>
+            <div className="flex items-center gap-2 mb-2">
+              <p className="text-xs font-medium text-muted-foreground">API Key</p>
+              {hasApiKey && (
+                <span className="flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700">
+                  <CheckCircle2 className="h-3 w-3" /> Saved &amp; verified
+                </span>
+              )}
+            </div>
             <ApiKeyField
               provider={provider}
               hasKey={hasApiKey}

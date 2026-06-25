@@ -8,10 +8,28 @@ from app.db.models import ProjectStatus
 
 
 class TechStackConfig(BaseModel):
+    # Core
+    preset: Optional[str] = None
     frontend: Optional[str] = None
     backend: Optional[str] = None
     database: Optional[str] = None
     app_type: Optional[str] = None
+    # Language & versions (FR-06, FR-07)
+    language: Optional[str] = None
+    frontend_version: Optional[str] = None
+    backend_version: Optional[str] = None
+    database_version: Optional[str] = None
+    # Infrastructure (FR-09)
+    cloud: Optional[str] = None
+    auth: Optional[str] = None
+    orm: Optional[str] = None
+    container: Optional[str] = None
+    testing: Optional[str] = None
+    logging: Optional[str] = None
+    monitoring: Optional[str] = None
+    api_docs: Optional[str] = None
+    cache: Optional[str] = None
+    queue: Optional[str] = None
     deployment_target: Optional[str] = None
 
 

@@ -566,6 +566,20 @@ export default function AgentConsolePage() {
       activeRun?.status === "running" || activeRun?.status === "waiting_for_user" ? 3000 : false,
   });
 
+  // Force-refetch steps once when run transitions to failed so error_message is picked up
+  const prevRunStatus = useRef(activeRun?.status);
+  useEffect(() => {
+    if (
+      prevRunStatus.current !== activeRun?.status &&
+      activeRun?.status === "failed"
+    ) {
+      queryClient.invalidateQueries({
+        queryKey: ["pipeline-steps", projectId, activeRun.id],
+      });
+    }
+    prevRunStatus.current = activeRun?.status;
+  }, [activeRun?.status, activeRun?.id, projectId, queryClient]);
+
   // Auto-select the current/failed/waiting step
   useEffect(() => {
     if (activeRun?.current_step) setSelectedStep(activeRun.current_step);
