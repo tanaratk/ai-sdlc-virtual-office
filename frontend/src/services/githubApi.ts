@@ -55,6 +55,25 @@ export interface PushAppResponse {
   errors: string[];
 }
 
+export interface CreatePRRequest {
+  head: string;
+  title: string;
+  body?: string;
+}
+
+export interface CreatePRResponse {
+  number: number;
+  url: string;
+  title: string;
+}
+
+export interface PushDocsResponse {
+  branch: string;
+  pr_url: string;
+  pr_number: number;
+  files_pushed: number;
+}
+
 async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
   if (!res.ok) {
@@ -99,4 +118,14 @@ export const githubApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body ?? {}),
     }),
+
+  createPR: (projectId: string, body: CreatePRRequest) =>
+    apiFetch<CreatePRResponse>(`${base(projectId)}/pull-request`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+
+  pushDocs: (projectId: string) =>
+    apiFetch<PushDocsResponse>(`${base(projectId)}/push-docs`, { method: "POST" }),
 };

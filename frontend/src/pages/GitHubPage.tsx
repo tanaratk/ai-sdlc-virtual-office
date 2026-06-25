@@ -7,9 +7,11 @@ import {
   CheckCircle2,
   ExternalLink,
   GitBranch,
+  GitPullRequest,
   Github,
   Loader2,
   RefreshCw,
+  FileText,
 } from "lucide-react";
 import { githubApi, type GitHubSettingUpsert } from "@/services/githubApi";
 
@@ -24,6 +26,8 @@ export default function GitHubPage() {
   const [token, setToken] = useState("");
   const [branchName, setBranchName] = useState("");
   const [showToken, setShowToken] = useState(false);
+  const [prHead, setPrHead] = useState("");
+  const [prTitle, setPrTitle] = useState("");
 
   // ── Queries ──────────────────────────────────────────────────────────────────
   const { data: settings, isLoading: settingsLoading } = useQuery({
@@ -63,6 +67,16 @@ export default function GitHubPage() {
     mutationFn: () =>
       githubApi.createBranch(projectId!, branchName),
     onSuccess: () => setBranchName(""),
+  });
+
+  const prMutation = useMutation({
+    mutationFn: () =>
+      githubApi.createPR(projectId!, { head: prHead, title: prTitle }),
+    onSuccess: () => { setPrHead(""); setPrTitle(""); },
+  });
+
+  const pushDocsMutation = useMutation({
+    mutationFn: () => githubApi.pushDocs(projectId!),
   });
 
   // ── Derived ──────────────────────────────────────────────────────────────────
@@ -263,6 +277,119 @@ export default function GitHubPage() {
                 : "Failed to create branch."}
             </p>
           )}
+        </section>
+      )}
+
+      {/* ── Push SDLC Docs & Create PR ──────────────────────────────────────── */}
+      {isConnected && (
+        <section className="space-y-3 border-t pt-6">
+          <div>
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <FileText className="h-4 w-4" /> Push SDLC Docs & Create PR
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Pushes all AI-generated SDLC documents (BRD, FSD, Architecture, API Spec, etc.)
+              to a new branch and opens a pull request in one click.
+            </p>
+          </div>
+
+          {pushDocsMutation.isSuccess && pushDocsMutation.data && (
+            <div className="rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-800 space-y-1">
+              <p className="font-medium">
+                PR #{pushDocsMutation.data.pr_number} created — {pushDocsMutation.data.files_pushed} files pushed
+              </p>
+              <a
+                href={pushDocsMutation.data.pr_url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1 text-xs underline underline-offset-2"
+              >
+                <ExternalLink className="h-3 w-3" />
+                View Pull Request on GitHub
+              </a>
+            </div>
+          )}
+          {pushDocsMutation.isError && (
+            <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-red-50 p-3 text-sm text-destructive">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              {pushDocsMutation.error instanceof Error
+                ? pushDocsMutation.error.message
+                : "Failed to push docs."}
+            </div>
+          )}
+
+          <button
+            onClick={() => pushDocsMutation.mutate()}
+            disabled={pushDocsMutation.isPending}
+            className="flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {pushDocsMutation.isPending
+              ? <><Loader2 className="h-4 w-4 animate-spin" /> Pushing docs…</>
+              : <><FileText className="h-4 w-4" /> Push All Docs & Open PR</>}
+          </button>
+        </section>
+      )}
+
+      {/* ── Create PR manually ───────────────────────────────────────────────── */}
+      {isConnected && (
+        <section className="space-y-3 border-t pt-6">
+          <h3 className="text-sm font-semibold flex items-center gap-2">
+            <GitPullRequest className="h-4 w-4" /> Create Pull Request
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            Open a PR from any branch to <code className="font-mono">{settings?.default_branch}</code>.
+          </p>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1">
+              <label className="text-xs font-medium">Head Branch</label>
+              <input
+                value={prHead}
+                onChange={(e) => setPrHead(e.target.value)}
+                placeholder="feature/ai-sdlc-sprint-1"
+                className="w-full rounded-md border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium">PR Title</label>
+              <input
+                value={prTitle}
+                onChange={(e) => setPrTitle(e.target.value)}
+                placeholder="feat: add AI-SDLC documents"
+                className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+          </div>
+
+          {prMutation.isSuccess && prMutation.data && (
+            <div className="flex items-center gap-2 text-sm text-green-700">
+              <CheckCircle2 className="h-4 w-4" />
+              PR #{prMutation.data.number} created.{" "}
+              <a
+                href={prMutation.data.url}
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2 flex items-center gap-1"
+              >
+                View on GitHub <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+          )}
+          {prMutation.isError && (
+            <p className="text-sm text-destructive">
+              {prMutation.error instanceof Error ? prMutation.error.message : "Failed to create PR."}
+            </p>
+          )}
+
+          <button
+            onClick={() => prMutation.mutate()}
+            disabled={!prHead.trim() || !prTitle.trim() || prMutation.isPending}
+            className="flex items-center gap-2 rounded-md border px-4 py-2 text-sm hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {prMutation.isPending
+              ? <><Loader2 className="h-4 w-4 animate-spin" /> Creating PR…</>
+              : <><GitPullRequest className="h-4 w-4" /> Create PR</>}
+          </button>
         </section>
       )}
 

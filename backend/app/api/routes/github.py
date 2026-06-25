@@ -17,6 +17,7 @@ from app.services.github_service import (
     build_issue_body,
     create_branch,
     create_issue,
+    create_pull_request,
     create_repo,
     list_issues,
     parse_tasks_from_markdown,
@@ -465,4 +466,178 @@ def push_generated_app(
         repo_full_name=repo_info["full_name"],
         files_pushed=pushed,
         errors=errors,
+    )
+
+
+# ── Create Pull Request ───────────────────────────────────────────────────────
+
+class CreatePRRequest(BaseModel):
+    head:  str = Field(min_length=1, max_length=255, description="Branch with changes")
+    title: str = Field(min_length=1, max_length=500)
+    body:  str = Field(default="")
+
+
+class CreatePRResponse(BaseModel):
+    number: int
+    url:    str
+    title:  str
+
+
+@router.post(
+    "/{project_id}/github/pull-request",
+    response_model=CreatePRResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a GitHub pull request from a branch to the project's default branch",
+)
+def create_github_pr(
+    project_id: uuid.UUID,
+    body: CreatePRRequest,
+    session: Annotated[Session, Depends(get_session)],
+) -> CreatePRResponse:
+    _get_project_or_404(session, project_id)
+    s = _get_settings_or_404(session, project_id)
+    repo = _to_repo(s)
+    try:
+        result = create_pull_request(
+            repo=repo,
+            head=body.head,
+            base=repo.default_branch,
+            title=body.title,
+            body=body.body,
+        )
+    except GitHubServiceError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return CreatePRResponse(**result)
+
+
+# ── Push SDLC Docs → branch → PR ─────────────────────────────────────────────
+
+_DOC_TYPE_FILENAME: dict[str, str] = {
+    "requirement_summary": "01-requirement-summary.md",
+    "gap_analysis_report": "02-gap-analysis-report.md",
+    "brd":                 "03-brd.md",
+    "fsd":                 "04-fsd.md",
+    "user_story":          "05-user-stories.md",
+    "architecture_design": "06-architecture-design.md",
+    "database_design":     "07-database-design.md",
+    "api_spec":            "08-api-spec.md",
+    "screen_spec":         "09-screen-spec.md",
+    "test_case":           "10-test-cases.md",
+    "code_task_list":      "11-code-task-list.md",
+    "technical_design":    "12-technical-design.md",
+    "change_impact_report":"13-change-impact-report.md",
+    "documentation":       "14-documentation.md",
+    "pm_report":           "15-pm-report.md",
+}
+
+
+class PushDocsResponse(BaseModel):
+    branch:       str
+    pr_url:       str
+    pr_number:    int
+    files_pushed: int
+
+
+@router.post(
+    "/{project_id}/github/push-docs",
+    response_model=PushDocsResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Push all AI-generated SDLC documents to a new branch and open a PR",
+)
+def push_docs_to_github(
+    project_id: uuid.UUID,
+    session: Annotated[Session, Depends(get_session)],
+) -> PushDocsResponse:
+    project = _get_project_or_404(session, project_id)
+    s = _get_settings_or_404(session, project_id)
+    repo = _to_repo(s)
+
+    # Load latest version of each document type
+    docs = session.exec(
+        select(Document)
+        .where(Document.project_id == project_id)
+        .order_by(Document.created_at.desc())
+    ).all()
+
+    if not docs:
+        raise HTTPException(
+            status_code=404,
+            detail="No documents found for this project. Run the pipeline first.",
+        )
+
+    # Keep only the latest per document_type
+    seen: set[str] = set()
+    unique_docs: list[Document] = []
+    for doc in docs:
+        dtype = doc.document_type if isinstance(doc.document_type, str) else doc.document_type.value
+        if dtype not in seen:
+            seen.add(dtype)
+            unique_docs.append(doc)
+
+    # Create branch ai-sdlc/docs-{YYYYMMDD-HHMMSS}
+    ts = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+    branch_name = f"ai-sdlc/docs-{ts}"
+    try:
+        create_branch(repo=repo, branch_name=branch_name)
+    except GitHubServiceError as exc:
+        raise HTTPException(status_code=400, detail=f"Branch creation failed: {exc}")
+
+    # Push each document under docs/ai-sdlc/
+    pushed = 0
+    doc_branch_repo = GitHubRepo(
+        owner=repo.owner,
+        name=repo.name,
+        token=repo.token,
+        default_branch=branch_name,
+    )
+    for doc in unique_docs:
+        dtype = doc.document_type if isinstance(doc.document_type, str) else doc.document_type.value
+        filename = _DOC_TYPE_FILENAME.get(dtype, f"{dtype}.md")
+        path = f"docs/ai-sdlc/{filename}"
+        content = (doc.content_markdown or "").encode("utf-8")
+        try:
+            push_file(
+                repo=doc_branch_repo,
+                path=path,
+                content_bytes=content,
+                commit_message=f"docs(ai-sdlc): add {filename}",
+            )
+            pushed += 1
+        except GitHubServiceError:
+            pass  # continue pushing other docs
+
+    # Create PR from the docs branch to default
+    project_name = project.name or "Project"
+    safe_name = re.sub(r"[^\w\-]", "_", project_name)
+    pr_title = f"docs(ai-sdlc): SDLC documents for {project_name} [{ts}]"
+    pr_body = (
+        f"## AI-SDLC Working Office — Generated Documents\n\n"
+        f"**Project:** {project_name}  \n"
+        f"**Generated:** {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}  \n"
+        f"**Documents pushed:** {pushed}\n\n"
+        f"This PR was created automatically by AI-SDLC Working Office.\n\n"
+        f"### Included Documents\n\n"
+        + "\n".join(
+            f"- `docs/ai-sdlc/{_DOC_TYPE_FILENAME.get(doc.document_type if isinstance(doc.document_type, str) else doc.document_type.value, 'unknown.md')}`"
+            for doc in unique_docs
+        )
+        + "\n\n---\n_Review these documents before merging._"
+    )
+
+    try:
+        pr = create_pull_request(
+            repo=repo,
+            head=branch_name,
+            base=repo.default_branch,
+            title=pr_title,
+            body=pr_body,
+        )
+    except GitHubServiceError as exc:
+        raise HTTPException(status_code=400, detail=f"PR creation failed: {exc}")
+
+    return PushDocsResponse(
+        branch=branch_name,
+        pr_url=pr["url"],
+        pr_number=pr["number"],
+        files_pushed=pushed,
     )

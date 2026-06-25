@@ -86,6 +86,7 @@
 | 45 | WebSocket Real-time Agent Status — /ws/office endpoint, AgentStatusWS replaces poller, richer info (status+model+provider), Vite WS proxy | ✅ Done |
 | 46 | Agent Chat Bubbles + Pipeline Activity Feed — step labels shown above agents, Done ✓/Error! bubbles, bottom-left event feed panel, ws.py extended with pipeline_event + current_task | ✅ Done |
 | 47 | MCP Connector Manager — ConnectorSetting model + migration, connector CRUD + test endpoints in settings.py, Connectors tab (3rd tab) in Settings with per-connector token form, Test Connection, Disconnect | ✅ Done |
+| 48 | GitHub Integration — create_pull_request() in github_service, POST /github/pull-request + /push-docs endpoints, GitHubPage: Push All Docs & Open PR (1-click), manual PR form | ✅ Done |
 
 ## Project Status
 

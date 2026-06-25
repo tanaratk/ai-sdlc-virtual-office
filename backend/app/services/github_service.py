@@ -258,6 +258,31 @@ def push_file(
         raise GitHubServiceError(f"Failed to push '{path}': {resp.status_code} {resp.text[:200]}")
 
 
+def create_pull_request(
+    repo: GitHubRepo,
+    head: str,
+    base: str,
+    title: str,
+    body: str = "",
+) -> dict:
+    """Create a pull request from `head` branch to `base` branch."""
+    url = f"{_BASE}/repos/{repo.owner}/{repo.name}/pulls"
+    with httpx.Client(timeout=_TIMEOUT) as client:
+        resp = client.post(url, headers=repo._headers, json={
+            "title": title,
+            "body":  body,
+            "head":  head,
+            "base":  base,
+        })
+    if resp.status_code == 422:
+        msg = resp.json().get("message", resp.text[:200])
+        raise GitHubServiceError(f"PR creation failed: {msg}")
+    if not resp.is_success:
+        raise GitHubServiceError(f"Failed to create PR: {resp.status_code} {resp.text[:200]}")
+    data = resp.json()
+    return {"number": data["number"], "url": data["html_url"], "title": data["title"]}
+
+
 def build_issue_body(task: ParsedTask, project_name: str) -> str:
     req_line = (
         f"**Linked Requirements:** {', '.join(task.requirement_ids)}\n\n"
