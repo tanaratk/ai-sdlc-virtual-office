@@ -112,7 +112,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function Dashboard() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["projects"],
     queryFn: () => projectApi.list(),
   });
@@ -170,6 +170,12 @@ export default function Dashboard() {
           </div>
         </div>
       </section>
+
+      {isError && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          Cannot connect to backend API — project stats unavailable. Start the API server and refresh.
+        </div>
+      )}
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total projects" value={isLoading ? "-" : total} helper="All SDLC workspaces in the system." icon={FolderOpen} />

@@ -123,7 +123,7 @@ export default function PipelineMonitorPage() {
   const queryClient = useQueryClient();
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
-  const { data, isLoading, dataUpdatedAt } = useQuery({
+  const { data, isLoading, isError, dataUpdatedAt } = useQuery({
     queryKey: ["admin-pipeline-active"],
     queryFn: fetchActiveRuns,
     refetchInterval: 5000,
@@ -216,7 +216,13 @@ export default function PipelineMonitorPage() {
           <div className="px-5 py-10 text-sm text-muted-foreground">Loading active runs...</div>
         )}
 
-        {!isLoading && runs.length === 0 && (
+        {isError && (
+          <div className="px-5 py-10 text-sm text-destructive">
+            Cannot connect to backend API. Start the server to monitor pipeline runs.
+          </div>
+        )}
+
+        {!isLoading && !isError && runs.length === 0 && (
           <div className="flex flex-col items-center gap-2 px-6 py-14 text-center">
             <CheckCircle2 className="h-10 w-10 text-emerald-500" />
             <p className="text-sm font-medium">No active pipeline runs</p>

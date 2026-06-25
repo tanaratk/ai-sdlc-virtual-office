@@ -97,7 +97,7 @@ export default function AgentManagerPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
 
-  const { data: agents = [], isLoading } = useQuery({
+  const { data: agents = [], isLoading, isError } = useQuery({
     queryKey: ["agents"],
     queryFn: agentApi.list,
     staleTime: 10_000,
@@ -189,7 +189,10 @@ export default function AgentManagerPage() {
           {isLoading && (
             <p className="text-sm text-muted-foreground py-4 text-center">Loading…</p>
           )}
-          {!isLoading && filtered.length === 0 && (
+          {isError && (
+            <p className="text-sm text-destructive py-4 text-center">Cannot reach backend API. Start the server and refresh.</p>
+          )}
+          {!isLoading && !isError && filtered.length === 0 && (
             <p className="text-sm text-muted-foreground py-4 text-center">No agents match</p>
           )}
           {filtered.map((agent) => (
