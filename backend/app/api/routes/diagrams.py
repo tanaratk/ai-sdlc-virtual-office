@@ -10,6 +10,7 @@ from sqlmodel import Session, select
 from app.db.models import Agent, Document, DocumentStatus, DocumentType, Project
 from app.db.session import get_session
 from app.services.diagram_service import (
+    DiagramGenerationError,
     generate_diagrams,
     mermaid_to_drawio_url,
     wrap_in_markdown,
@@ -138,11 +139,14 @@ def generate_project_diagrams(
         if agent and agent.model_name:
             model = agent.model_name
 
-    diagrams = generate_diagrams(
-        architecture_doc=arch_content,
-        database_doc=db_content,
-        model=model,
-    )
+    try:
+        diagrams = generate_diagrams(
+            architecture_doc=arch_content,
+            database_doc=db_content,
+            model=model,
+        )
+    except DiagramGenerationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
     agent_id = _get_diagram_agent_id(session)
     now = datetime.now(UTC)

@@ -14,7 +14,7 @@ from app.db.models import (
     McpToolCall,
     Project,
 )
-from app.services.mcp_service import run_call
+from app.services.mcp_service import IMPLEMENTED_TOOLS, run_call
 
 # Global tool registry (prefix: none  โ’ /mcp/tools/...)
 tool_router = APIRouter()
@@ -34,6 +34,7 @@ class McpToolResponse(BaseModel):
     requires_approval: bool
     is_enabled: bool
     is_dangerous: bool
+    is_implemented: bool = True
 
     model_config = {"from_attributes": True}
 
@@ -80,7 +81,13 @@ def list_mcp_tools(
     session: Annotated[Session, Depends(get_session)],
 ) -> list[McpToolResponse]:
     tools = session.exec(select(McpTool).order_by(McpTool.category, McpTool.tool_name)).all()
-    return [McpToolResponse.model_validate(t) for t in tools]
+    return [
+        McpToolResponse(
+            **McpToolResponse.model_validate(t).model_dump(exclude={"is_implemented"}),
+            is_implemented=t.tool_name in IMPLEMENTED_TOOLS,
+        )
+        for t in tools
+    ]
 
 
 @tool_router.patch(

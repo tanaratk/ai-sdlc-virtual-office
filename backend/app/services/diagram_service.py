@@ -40,6 +40,10 @@ def _clean_mermaid(code: str) -> str:
     return code.strip()
 
 
+class DiagramGenerationError(Exception):
+    """Raised when the LLM fails to generate valid Mermaid diagrams."""
+
+
 def generate_diagrams(
     architecture_doc: str,
     database_doc: str,
@@ -47,7 +51,7 @@ def generate_diagrams(
 ) -> dict[str, str]:
     """
     Call the LLM and return {architecture_mermaid, erd_mermaid}.
-    Falls back to stub diagrams if LLM fails or produces invalid JSON.
+    Raises DiagramGenerationError if LLM fails or returns invalid Mermaid syntax.
     """
     user_prompt = _USER_PROMPT_TEMPLATE.format(
         architecture=architecture_doc[:4000],
@@ -65,15 +69,22 @@ def generate_diagrams(
         arch = _clean_mermaid(str(data.get("architecture_mermaid", "")))
         erd  = _clean_mermaid(str(data.get("erd_mermaid", "")))
     except Exception as exc:
-        logger.warning("Diagram LLM call failed: %s — using stubs", exc)
-        arch = _stub_architecture()
-        erd  = _stub_erd()
+        logger.error("Diagram LLM call failed: %s", exc)
+        raise DiagramGenerationError(
+            f"LLM failed to generate diagrams: {exc}. "
+            "Check that the LLM service is running and the model is available."
+        ) from exc
 
-    # Validate: must start with a known Mermaid diagram type
     if not _valid_mermaid(arch):
-        arch = _stub_architecture()
+        raise DiagramGenerationError(
+            "LLM returned invalid architecture diagram syntax. "
+            "Try again or check that the Solution Architect documents contain sufficient detail."
+        )
     if not _valid_mermaid(erd):
-        erd = _stub_erd()
+        raise DiagramGenerationError(
+            "LLM returned invalid ERD syntax. "
+            "Try again or check that the database design document is available."
+        )
 
     return {"architecture_mermaid": arch, "erd_mermaid": erd}
 

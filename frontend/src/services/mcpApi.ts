@@ -9,6 +9,7 @@ export interface McpTool {
   requires_approval: boolean;
   is_enabled: boolean;
   is_dangerous: boolean;
+  is_implemented: boolean;
 }
 
 export interface McpToolCall {

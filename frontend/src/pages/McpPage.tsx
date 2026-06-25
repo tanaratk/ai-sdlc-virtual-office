@@ -203,7 +203,12 @@ export default function McpPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 ml-3 shrink-0">
-                      {projectId && tool.is_enabled && (
+                      {!tool.is_implemented && (
+                        <span className="rounded-full border border-muted-foreground/30 bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                          Coming soon
+                        </span>
+                      )}
+                      {projectId && tool.is_enabled && tool.is_implemented && (
                         <button
                           onClick={() => { setInvokeTarget(tool); setInvokeInput("{}"); }}
                           className="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs hover:bg-accent"
@@ -213,16 +218,18 @@ export default function McpPage() {
                       )}
                       <button
                         onClick={() =>
+                          tool.is_implemented &&
                           toggleMutation.mutate({
                             name: tool.tool_name,
                             enabled: !tool.is_enabled,
                           })
                         }
+                        disabled={!tool.is_implemented}
                         className={cn(
-                          "h-5 w-9 rounded-full transition-colors focus:outline-none",
-                          tool.is_enabled ? "bg-primary" : "bg-muted",
+                          "h-5 w-9 rounded-full transition-colors focus:outline-none disabled:cursor-not-allowed disabled:opacity-40",
+                          tool.is_enabled && tool.is_implemented ? "bg-primary" : "bg-muted",
                         )}
-                        title={tool.is_enabled ? "Disable" : "Enable"}
+                        title={!tool.is_implemented ? "Not yet implemented" : tool.is_enabled ? "Disable" : "Enable"}
                       >
                         <span
                           className={cn(

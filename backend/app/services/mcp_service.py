@@ -30,6 +30,13 @@ class McpExecutionError(Exception):
     pass
 
 
+IMPLEMENTED_TOOLS: frozenset[str] = frozenset({
+    "github.create_issue",
+    "github.create_branch",
+    "github.list_issues",
+})
+
+
 def execute_call(call: McpToolCall, session: Session) -> dict[str, Any]:
     """Execute a single approved MCP tool call. Returns output dict."""
     handlers = {
