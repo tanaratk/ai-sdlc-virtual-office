@@ -52,6 +52,51 @@ def get_file_info(file_key: str, token: str) -> dict:
     return {"name": data.get("name", ""), "pages": pages}
 
 
+def get_design_detail(file_key: str, token: str, node_id: str | None = None) -> dict:
+    """
+    Fetch design info from a Figma file.
+    Returns file name, key, pages. If node_id given, also returns node details.
+    """
+    info = get_file_info(file_key, token)
+    result: dict = {
+        "file_name": info["name"],
+        "file_key": file_key,
+        "file_url": f"https://www.figma.com/file/{file_key}",
+        "pages": info["pages"],
+        "page_count": len(info["pages"]),
+    }
+    if node_id:
+        result["node"] = get_node(file_key, node_id, token)
+    return result
+
+
+def get_node(file_key: str, node_id: str, token: str) -> dict:
+    """Fetch a specific node from a Figma file and return its details."""
+    url = f"{_BASE}/files/{file_key}/nodes?ids={node_id}"
+    with httpx.Client(timeout=_TIMEOUT) as client:
+        resp = client.get(url, headers=_headers(token))
+    if resp.status_code == 403:
+        raise FigmaServiceError("Invalid Figma token or insufficient permissions.")
+    if resp.status_code == 404:
+        raise FigmaServiceError(f"Node '{node_id}' not found in Figma file '{file_key}'.")
+    if not resp.is_success:
+        raise FigmaServiceError(f"Figma API error {resp.status_code}: {resp.text[:200]}")
+    nodes = resp.json().get("nodes", {})
+    entry = nodes.get(node_id, {})
+    doc = entry.get("document", {})
+    children = doc.get("children", [])
+    return {
+        "id": doc.get("id", node_id),
+        "name": doc.get("name", ""),
+        "type": doc.get("type", ""),
+        "child_count": len(children),
+        "children": [
+            {"id": c.get("id"), "name": c.get("name"), "type": c.get("type")}
+            for c in children[:20]  # cap to 20 children
+        ],
+    }
+
+
 def push_comment(file_key: str, token: str, message: str) -> dict:
     """Post a root-level comment on a Figma file."""
     url = f"{_BASE}/files/{file_key}/comments"

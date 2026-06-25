@@ -1,8 +1,7 @@
-"""MCP tool executor โ€” runs approved tool calls.
+"""MCP tool executor -- runs approved tool calls.
 
-Each tool either executes real logic (github.* tools via github_service)
+Each tool either executes real logic (github.* / figma.* tools)
 or returns a stub result for tools not yet implemented.
-Agents will be wired to this service when LangGraph is added.
 """
 import logging
 from datetime import UTC, datetime
@@ -11,9 +10,19 @@ from typing import Any
 from sqlmodel import Session, select
 
 from app.db.models import (
+    ConnectorSetting,
+    ConnectorType,
+    FigmaSetting,
     GitHubSetting,
     McpCallStatus,
     McpToolCall,
+)
+from app.services.figma_service import (
+    FigmaServiceError,
+    extract_file_key,
+    get_design_detail,
+    get_node,
+    push_comment,
 )
 from app.services.github_service import (
     GitHubRepo,
@@ -34,15 +43,21 @@ IMPLEMENTED_TOOLS: frozenset[str] = frozenset({
     "github.create_issue",
     "github.create_branch",
     "github.list_issues",
+    "figma.get_design",
+    "figma.get_node",
+    "figma.push_comment",
 })
 
 
 def execute_call(call: McpToolCall, session: Session) -> dict[str, Any]:
     """Execute a single approved MCP tool call. Returns output dict."""
     handlers = {
-        "github.create_issue": _exec_github_create_issue,
+        "github.create_issue":  _exec_github_create_issue,
         "github.create_branch": _exec_github_create_branch,
         "github.list_issues":   _exec_github_list_issues,
+        "figma.get_design":     _exec_figma_get_design,
+        "figma.get_node":       _exec_figma_get_node,
+        "figma.push_comment":   _exec_figma_push_comment,
     }
     handler = handlers.get(call.tool_name)
     if handler:
@@ -50,7 +65,7 @@ def execute_call(call: McpToolCall, session: Session) -> dict[str, Any]:
     return _stub_result(call.tool_name)
 
 
-# โ”€โ”€ GitHub executors โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# -- GitHub executors ---------------------------------------------------------
 
 def _get_github_repo(call: McpToolCall, session: Session) -> GitHubRepo:
     setting = session.exec(
@@ -108,7 +123,94 @@ def _exec_github_list_issues(call: McpToolCall, session: Session) -> dict[str, A
         raise McpExecutionError(str(e))
 
 
-# โ”€โ”€ Stub โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# -- Figma helpers ------------------------------------------------------------
+
+def _get_figma_token(session: Session) -> str:
+    """Retrieve Figma PAT from global connector_settings."""
+    row = session.exec(
+        select(ConnectorSetting).where(ConnectorSetting.connector_type == ConnectorType.figma)
+    ).first()
+    if not row or not row.access_token:
+        raise McpExecutionError(
+            "Figma token not configured. "
+            "Go to Settings -> Connectors -> Figma and save a Personal Access Token first."
+        )
+    return row.access_token
+
+
+def _resolve_figma_file_key(params: dict, call: McpToolCall, session: Session) -> str:
+    """
+    Resolve Figma file key from:
+    1. input_json.file_url or input_json.file_key  (explicit override)
+    2. Project-linked figma_settings               (default)
+    """
+    if file_url := params.get("file_url"):
+        try:
+            return extract_file_key(file_url)
+        except FigmaServiceError as e:
+            raise McpExecutionError(str(e))
+    if file_key := params.get("file_key"):
+        return file_key
+
+    # Fall back to project-linked file
+    setting = session.exec(
+        select(FigmaSetting).where(FigmaSetting.project_id == call.project_id)
+    ).first()
+    if not setting:
+        raise McpExecutionError(
+            "No Figma file linked to this project and no file_url in input. "
+            "Either link a file in the project Figma tab, "
+            "or pass {\"file_url\": \"https://www.figma.com/file/...\"} in the input."
+        )
+    return setting.file_key
+
+
+# -- Figma executors ----------------------------------------------------------
+
+def _exec_figma_get_design(call: McpToolCall, session: Session) -> dict[str, Any]:
+    """Fetch design info: file name, pages, optional node details."""
+    token = _get_figma_token(session)
+    params = call.input_json or {}
+    file_key = _resolve_figma_file_key(params, call, session)
+    node_id = params.get("node_id")
+    try:
+        result = get_design_detail(file_key, token, node_id=node_id)
+        return {"status": "ok", **result}
+    except FigmaServiceError as e:
+        raise McpExecutionError(str(e))
+
+
+def _exec_figma_get_node(call: McpToolCall, session: Session) -> dict[str, Any]:
+    """Fetch a specific Figma node by node_id."""
+    token = _get_figma_token(session)
+    params = call.input_json or {}
+    file_key = _resolve_figma_file_key(params, call, session)
+    node_id = params.get("node_id", "")
+    if not node_id:
+        raise McpExecutionError("node_id is required in input_json for figma.get_node")
+    try:
+        node = get_node(file_key, node_id, token)
+        return {"status": "ok", "file_key": file_key, "node": node}
+    except FigmaServiceError as e:
+        raise McpExecutionError(str(e))
+
+
+def _exec_figma_push_comment(call: McpToolCall, session: Session) -> dict[str, Any]:
+    """Post a comment on a Figma file."""
+    token = _get_figma_token(session)
+    params = call.input_json or {}
+    file_key = _resolve_figma_file_key(params, call, session)
+    message = params.get("message", "")
+    if not message:
+        raise McpExecutionError("message is required in input_json for figma.push_comment")
+    try:
+        result = push_comment(file_key, token, message)
+        return {"status": "posted", "file_key": file_key, **result}
+    except FigmaServiceError as e:
+        raise McpExecutionError(str(e))
+
+
+# -- Stub ---------------------------------------------------------------------
 
 def _stub_result(tool_name: str) -> dict[str, Any]:
     return {
@@ -120,7 +222,7 @@ def _stub_result(tool_name: str) -> dict[str, Any]:
     }
 
 
-# โ”€โ”€ Call lifecycle helper โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+# -- Call lifecycle helper ----------------------------------------------------
 
 def run_call(call: McpToolCall, session: Session) -> McpToolCall:
     """Execute a call and update its status in the DB. Returns updated call."""
