@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, LogOut, User, Shield } from "lucide-react";
+import { Bell, LogOut, User, Shield, Search } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 interface TopbarProps {
@@ -34,11 +34,18 @@ export function Topbar({ title }: TopbarProps) {
   };
 
   return (
-    <header className="flex h-14 items-center justify-between border-b bg-white px-6">
-      <h1 className="text-base font-semibold">{title}</h1>
+    <header className="flex h-16 items-center justify-between border-b bg-white px-6">
+      <div>
+        <h1 className="text-base font-semibold">{title}</h1>
+        <p className="text-xs text-muted-foreground">Monitor projects, agents, approvals, and delivery health.</p>
+      </div>
       <div className="flex items-center gap-3">
+        <div className="hidden items-center gap-2 rounded-md border bg-background px-3 py-2 text-xs text-muted-foreground lg:flex">
+          <Search className="h-3.5 w-3.5" />
+          Search projects, docs, agents
+        </div>
         <button
-          className="rounded-full p-2 text-muted-foreground hover:bg-accent"
+          className="rounded-md border p-2 text-muted-foreground hover:bg-accent"
           aria-label="Notifications"
         >
           <Bell className="h-4 w-4" />

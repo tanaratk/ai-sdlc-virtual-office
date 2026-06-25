@@ -1,14 +1,15 @@
+import { useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 
 const PAGE_TITLES: Record<string, string> = {
-  "/":              "Dashboard",
+  "/":              "Operations Hub",
   "/projects":      "Projects",
   "/intake":        "Requirements",
   "/agents":        "Agents",
   "/documents":     "Documents",
-  "/pipeline-runs": "Pipeline Runs",
+  "/pipeline-runs": "Pipeline Control",
   "/code-workspace":"Code Workspace",
   "/traceability":  "Traceability",
   "/office":        "Virtual Office",
@@ -21,6 +22,7 @@ const PAGE_TITLES: Record<string, string> = {
 };
 
 export function AppLayout() {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { pathname } = useLocation();
   const parts = pathname.split("/").filter(Boolean);
 
@@ -33,7 +35,7 @@ export function AppLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar />
+      <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((c) => !c)} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Topbar title={isProjectRoute ? "Project Workspace" : title} />
 
@@ -48,7 +50,7 @@ export function AppLayout() {
           </div>
         )}
 
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-6 lg:p-8">
           <Outlet />
         </main>
       </div>

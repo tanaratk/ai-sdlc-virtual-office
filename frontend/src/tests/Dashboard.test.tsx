@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import Dashboard from "@/pages/Dashboard";
@@ -21,12 +21,12 @@ function wrapper({ children }: { children: React.ReactNode }) {
 
 describe("Dashboard", () => {
   it("renders heading", () => {
-    render(<Dashboard />, { wrapper });
-    expect(screen.getByText("Projects")).toBeTruthy();
+    const { getByText } = render(<Dashboard />, { wrapper });
+    expect(getByText("Control the SDLC pipeline from requirement intake to deploy-ready output.")).toBeTruthy();
   });
 
   it("shows new project link", () => {
-    render(<Dashboard />, { wrapper });
-    expect(screen.getByText("New Project")).toBeTruthy();
+    const { getByText } = render(<Dashboard />, { wrapper });
+    expect(getByText("New project")).toBeTruthy();
   });
 });
