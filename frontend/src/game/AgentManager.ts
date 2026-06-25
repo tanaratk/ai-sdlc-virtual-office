@@ -32,6 +32,16 @@ export interface AgentInfo {
   status: string;
   model: string;
   provider: string;
+  current_task: string;  // step name currently being executed, "" when idle
+}
+
+export interface PipelineEvent {
+  type: 'pipeline_event';
+  event: 'step_running' | 'step_completed' | 'step_failed' | 'step_skipped';
+  step_name: string;
+  project_name: string;
+  project_id: string;
+  timestamp: string;
 }
 
 /** Simple map used by the legacy poller (role → status string). */

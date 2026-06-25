@@ -46,15 +46,17 @@ interface AgentObj {
   labelBg:   Phaser.GameObjects.Rectangle;
   labelText: Phaser.GameObjects.Text;
   dot:       Phaser.GameObjects.Arc;
+  bubble:    Phaser.GameObjects.Text | null;   // chat bubble shown on status change
   glow:      Phaser.GameObjects.Arc | null;
-  pulseTween: Phaser.Tweens.Tween | null;
-  glowTween:  Phaser.Tweens.Tween | null;
-  walkTween:  Phaser.Tweens.Tween | null;
+  pulseTween:  Phaser.Tweens.Tween | null;
+  glowTween:   Phaser.Tweens.Tween | null;
+  walkTween:   Phaser.Tweens.Tween | null;
+  bubbleTween: Phaser.Tweens.Tween | null;
   walking:    boolean;
   animFrame:  number;
   animDir:    number;
   status:     string;
-  model:      string;   // real-time model name from WebSocket
+  model:      string;
   provider:   string;
 }
 
@@ -68,6 +70,24 @@ const ROLE_ABBR: Record<string, string> = {
   'devops-agent':             'OPS', 'monitoring-agent':         'MON',
   'documentation-agent':      'DOC', 'pm-agent':                 'PM',
   'change-impact-agent':      'CI',
+};
+
+// Human-readable labels for pipeline step names (shown in chat bubbles)
+const STEP_LABELS: Record<string, string> = {
+  requirement_summary: 'Analyzing requirements...',
+  gap_analysis:        'Finding gaps...',
+  ba_documents:        'Writing BRD & User Stories...',
+  architecture:        'Designing architecture...',
+  ux_design:           'Creating screen specs...',
+  technical_design:    'Planning dev tasks...',
+  code_generation:     'Generating code...',
+  code_review:         'Reviewing code...',
+  qa_testing:          'Writing test cases...',
+  devops_pipeline:     'Setting up DevOps...',
+  monitoring:          'Monitoring deployment...',
+  documentation:       'Compiling docs...',
+  pm_summary:          'Writing project report...',
+  change_impact:       'Analyzing impact...',
 };
 
 export type SelectedAgentInfo = { role: string; name: string; status: string; model: string };
@@ -398,7 +418,8 @@ export class OfficeScene extends Phaser.Scene {
         const agentObj: AgentObj = {
           role: cfg.role, spriteKey: cfg.spriteKey, room,
           img, labelBg, labelText, dot,
-          glow: null, pulseTween: null, glowTween: null, walkTween: null,
+          bubble: null, glow: null,
+          pulseTween: null, glowTween: null, walkTween: null, bubbleTween: null,
           walking: false, animFrame: 0, animDir: DIR_DOWN,
           status: 'idle', model: '', provider: '',
         };
@@ -482,16 +503,52 @@ export class OfficeScene extends Phaser.Scene {
         a.model    = entry.model    ?? '';
         a.provider = entry.provider ?? '';
       }
-      if (s === a.status) continue;
-      a.status = s;
-      this.applyStatusDot(a);
-      if (s === 'working') {
-        a.walkTween?.stop(); a.walking = false; a.animDir = DIR_DOWN;
-        this.startGlow(a);
-      } else {
-        this.stopGlow(a);
+      if (s !== a.status) {
+        const prev = a.status;
+        a.status = s;
+        this.applyStatusDot(a);
+        if (s === 'working') {
+          a.walkTween?.stop(); a.walking = false; a.animDir = DIR_DOWN;
+          this.startGlow(a);
+          const task = entry?.current_task ?? '';
+          this.showBubble(a, STEP_LABELS[task] ?? 'Working...', 0x4f46e5);
+        } else {
+          this.stopGlow(a);
+          if (prev === 'working') {
+            const msg = s === 'error' ? 'Error!' : 'Done ✓';
+            const color = s === 'error' ? 0xef4444 : 0x059669;
+            this.showBubble(a, msg, color, 3500);
+          }
+        }
       }
     }
+  }
+
+  private showBubble(a: AgentObj, text: string, bgColor: number, duration = 0) {
+    // Destroy existing bubble
+    a.bubbleTween?.stop(); a.bubbleTween = null;
+    a.bubble?.destroy(); a.bubble = null;
+
+    const bubble = this.add.text(a.img.x, a.img.y - 72, text, {
+      fontSize: '8px',
+      color: '#ffffff',
+      backgroundColor: `#${bgColor.toString(16).padStart(6, '0')}`,
+      padding: { x: 5, y: 3 },
+      wordWrap: { width: 90 },
+      align: 'center',
+    }).setOrigin(0.5, 1).setDepth(20).setAlpha(0.95);
+
+    a.bubble = bubble;
+
+    // Auto-fade out: immediately if duration=0 means indefinite (fade after 6s), else use duration
+    const fadeAfter = duration > 0 ? duration : 6000;
+    a.bubbleTween = this.time.delayedCall(fadeAfter, () => {
+      if (!a.bubble) return;
+      a.bubbleTween = this.tweens.add({
+        targets: a.bubble, alpha: 0, duration: 600, ease: 'Power1',
+        onComplete: () => { a.bubble?.destroy(); a.bubble = null; a.bubbleTween = null; },
+      });
+    }) as unknown as Phaser.Tweens.Tween;
   }
 
   private applyStatusDot(a: AgentObj) {
@@ -550,7 +607,8 @@ export class OfficeScene extends Phaser.Scene {
       a.labelBg.setPosition(ix, iy - 54);
       a.labelText.setPosition(ix, iy - 54);
       a.dot.setPosition(ix + 18, iy - 36);
-      if (a.glow) a.glow.setPosition(ix, iy - 24);  // waist level
+      if (a.glow)   a.glow.setPosition(ix, iy - 24);
+      if (a.bubble) a.bubble.setPosition(ix, iy - 72);
     }
   }
 
@@ -559,7 +617,9 @@ export class OfficeScene extends Phaser.Scene {
   shutdown() {
     this.poller?.stop();
     for (const a of this.agents) {
-      a.walkTween?.stop(); a.pulseTween?.stop(); this.stopGlow(a);
+      a.walkTween?.stop(); a.pulseTween?.stop();
+      this.stopGlow(a);
+      a.bubble?.destroy(); a.bubble = null;
     }
   }
 }

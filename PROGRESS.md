@@ -1,6 +1,6 @@
 # AI-SDLC Virtual Office — Progress Tracker
 
-**Last Updated:** 2026-06-25 (Sprint 45 — WebSocket real-time agent status in Virtual Office)  
+**Last Updated:** 2026-06-25 (Sprint 46 — Agent chat bubbles + Pipeline Activity Feed)  
 **Project:** ai-sdlc-virtual-office  
 **Repo:** https://github.com/tanaratk/ai-sdlc-virtual-office  
 **Working Directory:** D:\AI_Office
@@ -84,6 +84,7 @@
 | 44-fix2 | Virtual Office Iteration 2 — Graphics furniture (desk/computer/chair/plant/server), 48×48 sprite frames, dynamic pixel layout fits viewport (no scroll), corridor between rows | ✅ Done |
 | 44-fix3 + CR-TECH-001 | Sprite fix (16×16 LimeZu), Tech Stack Presets in NewProject, LLM DB key fallback, DevOps docker socket, QA/Deploy routes | ✅ Done |
 | 45 | WebSocket Real-time Agent Status — /ws/office endpoint, AgentStatusWS replaces poller, richer info (status+model+provider), Vite WS proxy | ✅ Done |
+| 46 | Agent Chat Bubbles + Pipeline Activity Feed — step labels shown above agents, Done ✓/Error! bubbles, bottom-left event feed panel, ws.py extended with pipeline_event + current_task | ✅ Done |
 
 ## Project Status
 
