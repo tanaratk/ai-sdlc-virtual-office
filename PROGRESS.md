@@ -1,6 +1,6 @@
 # AI-SDLC Virtual Office — Progress Tracker
 
-**Last Updated:** 2026-06-21 (Virtual Office 44-fix2 — Graphics furniture, 48×48 sprites, dynamic viewport layout)  
+**Last Updated:** 2026-06-25 (Sprint 45 — WebSocket real-time agent status in Virtual Office)  
 **Project:** ai-sdlc-virtual-office  
 **Repo:** https://github.com/tanaratk/ai-sdlc-virtual-office  
 **Working Directory:** D:\AI_Office
@@ -82,6 +82,8 @@
 | 44 | Virtual Office — Phaser.js 2D Pixel Office: 5 rooms, 17 agent sprites, idle walk, status dots, glass drawer, camera (FR-001–004, ADD-001) | ✅ Done |
 | 44-fix | Virtual Office Iteration 1 — solid color floors per room, Room_Builder tileset diagnostic (tile-debug.html), 2-row layout (MAP 64×40 tiles), agent badges with pulse dot | ✅ Done |
 | 44-fix2 | Virtual Office Iteration 2 — Graphics furniture (desk/computer/chair/plant/server), 48×48 sprite frames, dynamic pixel layout fits viewport (no scroll), corridor between rows | ✅ Done |
+| 44-fix3 + CR-TECH-001 | Sprite fix (16×16 LimeZu), Tech Stack Presets in NewProject, LLM DB key fallback, DevOps docker socket, QA/Deploy routes | ✅ Done |
+| 45 | WebSocket Real-time Agent Status — /ws/office endpoint, AgentStatusWS replaces poller, richer info (status+model+provider), Vite WS proxy | ✅ Done |
 
 ## Project Status
 

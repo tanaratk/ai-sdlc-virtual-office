@@ -28,7 +28,94 @@ export const AGENT_CONFIG: AgentConfig[] = [
   { role: 'change-impact-agent',      spriteKey: 'agent_CI',  room: 'Control Room',     startTile: { tx: 50, ty: 11 } },
 ];
 
+export interface AgentInfo {
+  status: string;
+  model: string;
+  provider: string;
+}
+
+/** Simple map used by the legacy poller (role → status string). */
 export type AgentStatusMap = Record<string, string>;
+
+/** Richer map from WebSocket (role → {status, model, provider}). */
+export type AgentInfoMap = Record<string, AgentInfo>;
+
+// ── WebSocket client — replaces the HTTP poller ──────────────────────────────
+
+export class AgentStatusWS {
+  private ws: WebSocket | null = null;
+  private stopped = false;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+  constructor(private onUpdate: (info: AgentInfoMap) => void) {}
+
+  start() {
+    this.stopped = false;
+    this._connect();
+  }
+
+  stop() {
+    this.stopped = true;
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.ws?.close();
+    this.ws = null;
+  }
+
+  private _connect() {
+    if (this.stopped) return;
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    // In dev Vite proxies /ws → ws://localhost:8000, in prod use same host/port
+    const url = `${proto}//${location.host}/ws/office`;
+
+    try {
+      this.ws = new WebSocket(url);
+    } catch (e) {
+      console.warn('[AgentStatusWS] Failed to construct WebSocket:', e);
+      this._scheduleReconnect();
+      return;
+    }
+
+    this.ws.onopen = () => {
+      console.log('[AgentStatusWS] connected');
+    };
+
+    this.ws.onmessage = (event: MessageEvent) => {
+      try {
+        const msg = JSON.parse(event.data as string) as { type: string; data: AgentInfoMap };
+        if (msg.type === 'agent_statuses') {
+          this.onUpdate(msg.data);
+        }
+      } catch {
+        // ignore malformed messages
+      }
+    };
+
+    this.ws.onerror = () => {
+      // Error is followed by onclose — let onclose handle reconnect
+    };
+
+    this.ws.onclose = () => {
+      if (!this.stopped) {
+        console.log('[AgentStatusWS] disconnected — reconnecting in 3s');
+        this._scheduleReconnect();
+      }
+    };
+  }
+
+  private _scheduleReconnect() {
+    if (this.stopped) return;
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this._connect();
+    }, 3000);
+  }
+}
+
+// ── Legacy HTTP poller — kept as fallback reference ──────────────────────────
+// Replaced by AgentStatusWS above. Left here in case WebSocket is unavailable.
 
 export class AgentStatusPoller {
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -50,7 +137,7 @@ export class AgentStatusPoller {
 
   private async poll() {
     try {
-      const res = await fetch('/api/agents');
+      const res = await fetch('/api/v1/agents');
       if (!res.ok) return;
       const agents: { role: string; status: string }[] = await res.json();
       const statuses: AgentStatusMap = {};

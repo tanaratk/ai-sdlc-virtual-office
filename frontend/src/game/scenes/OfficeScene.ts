@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { AGENT_CONFIG, AgentStatusPoller, type AgentStatusMap } from '../AgentManager';
+import { AGENT_CONFIG, AgentStatusWS, type AgentInfoMap } from '../AgentManager';
 
 // ── Layout constants ──────────────────────────────────────────────────────────
 
@@ -54,7 +54,8 @@ interface AgentObj {
   animFrame:  number;
   animDir:    number;
   status:     string;
-  // spriteCols fixed = SPRITE_COLS (56) for 896×656 LimeZu sheet
+  model:      string;   // real-time model name from WebSocket
+  provider:   string;
 }
 
 const ROLE_ABBR: Record<string, string> = {
@@ -76,7 +77,7 @@ export type SelectedAgentInfo = { role: string; name: string; status: string; mo
 export class OfficeScene extends Phaser.Scene {
   private rooms:   RoomLayout[] = [];
   private agents:  AgentObj[]   = [];
-  private poller!: AgentStatusPoller;
+  private poller!: AgentStatusWS;
   private W = 800;
   private H = 600;
   private onAgentSelected: (info: SelectedAgentInfo) => void;
@@ -399,14 +400,14 @@ export class OfficeScene extends Phaser.Scene {
           img, labelBg, labelText, dot,
           glow: null, pulseTween: null, glowTween: null, walkTween: null,
           walking: false, animFrame: 0, animDir: DIR_DOWN,
-          status: 'idle',
+          status: 'idle', model: '', provider: '',
         };
 
         img.on('pointerdown', () => this.onAgentSelected({
           role:   cfg.role,
           name:   cfg.role.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
           status: agentObj.status,
-          model:  'ollama',
+          model:  agentObj.model || agentObj.provider || 'ollama',
         }));
 
         this.agents.push(agentObj);
@@ -473,9 +474,14 @@ export class OfficeScene extends Phaser.Scene {
 
   // ── Status ────────────────────────────────────────────────────────────────
 
-  setAgentStatuses(statuses: AgentStatusMap) {
+  setAgentStatuses(info: AgentInfoMap) {
     for (const a of this.agents) {
-      const s = statuses[a.role] ?? 'idle';
+      const entry = info[a.role];
+      const s = entry?.status ?? 'idle';
+      if (entry) {
+        a.model    = entry.model    ?? '';
+        a.provider = entry.provider ?? '';
+      }
       if (s === a.status) continue;
       a.status = s;
       this.applyStatusDot(a);
@@ -532,7 +538,7 @@ export class OfficeScene extends Phaser.Scene {
   // ── Poller ────────────────────────────────────────────────────────────────
 
   private setupPoller() {
-    this.poller = new AgentStatusPoller((s) => this.setAgentStatuses(s));
+    this.poller = new AgentStatusWS((info) => this.setAgentStatuses(info));
     this.poller.start();
   }
 

@@ -72,7 +72,9 @@ export default function VirtualOfficePage() {
                 </span>
               </Row>
               <Row label="Model">
-                <span className="font-mono text-xs">{selectedAgent.model}</span>
+                <span className="font-mono text-xs">
+                  {selectedAgent.model || '—'}
+                </span>
               </Row>
             </div>
           </div>

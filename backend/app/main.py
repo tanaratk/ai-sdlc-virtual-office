@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
+from app.api.routes import ws as ws_routes
 from app.core.config import settings
 from app.core.logging import setup_logging
 
@@ -73,3 +74,4 @@ app.add_middleware(
 )
 
 app.include_router(api_router, prefix="/api/v1")
+app.include_router(ws_routes.router)  # WebSocket at /ws/office (no api/v1 prefix)
