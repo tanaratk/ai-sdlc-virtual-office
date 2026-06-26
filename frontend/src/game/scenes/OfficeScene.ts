@@ -4,21 +4,23 @@ import { AGENT_CONFIG, AgentStatusWS, type AgentInfoMap } from '../AgentManager'
 const TILE = 16;
 const SCALE = 2;
 const WORLD_TILE_W = 52;
-const WORLD_TILE_H = 32;
+const WORLD_TILE_H = 35;
 const WORLD_W = WORLD_TILE_W * TILE * SCALE;
 const WORLD_H = WORLD_TILE_H * TILE * SCALE;
 const WALK_SPEED = 78;
 
 const FRAME_SIZE = 16;
-const SAFE_WALK_FRAMES = [56, 57, 58, 59];
+const SAFE_WALK_FRAMES = [186, 187, 188, 189];
 const DIR_DOWN = 0;
 const DIR_LEFT = 1;
 const DIR_RIGHT = 2;
 const DIR_UP = 3;
-const AGENT_LABEL_Y_OFFSET = 96;
-const AGENT_BUBBLE_Y_OFFSET = 120;
-const AGENT_DOT_Y_OFFSET = 72;
-const AGENT_GLOW_Y_OFFSET = 42;
+const AGENT_SPRITE_SCALE = 4;
+const AGENT_LABEL_Y_OFFSET = 30;
+const AGENT_BUBBLE_Y_OFFSET = 110;
+const AGENT_DOT_X_OFFSET = -26;
+const AGENT_DOT_Y_OFFSET = -24;
+const AGENT_GLOW_Y_OFFSET = 36;
 
 const ROOM_TILE_COLS = 76;
 
@@ -124,11 +126,6 @@ export class OfficeScene extends Phaser.Scene {
       frameWidth: TILE,
       frameHeight: TILE,
     });
-    this.load.spritesheet('interiors', '/tilesets/Interiors_16x16.png', {
-      frameWidth: TILE,
-      frameHeight: TILE,
-    });
-
     for (const cfg of AGENT_CONFIG) {
       this.load.spritesheet(cfg.spriteKey, `/sprites/${cfg.spriteKey}.png`, {
         frameWidth: FRAME_SIZE,
@@ -197,7 +194,7 @@ export class OfficeScene extends Phaser.Scene {
         x: 2,
         y: 15,
         w: 31,
-        h: 15,
+        h: 18,
         floor: 0xaab7bc,
         wall: 0x1f2933,
         accent: 0x3c74a8,
@@ -215,7 +212,7 @@ export class OfficeScene extends Phaser.Scene {
         x: 35,
         y: 15,
         w: 15,
-        h: 15,
+        h: 18,
         floor: 0xd5e6dd,
         wall: 0x253742,
         accent: 0x46a36c,
@@ -434,108 +431,157 @@ export class OfficeScene extends Phaser.Scene {
   }
 
   private pixelDesk(g: Phaser.GameObjects.Graphics, tx: number, ty: number, tw: number, th: number) {
-    g.fillStyle(0x9b6235);
-    g.fillRect(px(tx), px(ty), px(tw), px(th));
-    g.fillStyle(0x6f4324);
-    g.fillRect(px(tx) + 4, px(ty) + 4, px(tw) - 8, 5);
-    g.fillStyle(0xd8b27c);
-    g.fillRect(px(tx) + px(tw) - 17, px(ty) + 8, 9, 7);
+    const x = px(tx);
+    const y = px(ty);
+    const w = px(tw);
+    const h = px(th);
+    g.fillStyle(0x6b4326);
+    g.fillRect(x - 3, y + h - 5, w + 6, 8);
+    g.fillStyle(0xb97843);
+    g.fillRect(x, y, w, h);
+    g.fillStyle(0xd2965d);
+    g.fillRect(x + 4, y + 4, w - 8, Math.max(5, h * 0.25));
+    g.lineStyle(2, 0x4b2f1d, 0.95);
+    g.strokeRect(x, y, w, h);
+    g.fillStyle(0x5b3822);
+    g.fillRect(x + 6, y + h - 4, 5, 16);
+    g.fillRect(x + w - 11, y + h - 4, 5, 16);
   }
 
   private pixelMonitor(g: Phaser.GameObjects.Graphics, tx: number, ty: number) {
-    g.fillStyle(0x1c2430);
-    g.fillRect(px(tx), px(ty), 34, 24);
-    g.fillStyle(0x67e8f9);
-    g.fillRect(px(tx) + 4, px(ty) + 4, 26, 14);
+    const x = px(tx);
+    const y = px(ty);
+    g.fillStyle(0x151b24);
+    g.fillRoundedRect(x, y, 34, 24, 2);
+    g.fillStyle(0xa7f3ff);
+    g.fillRect(x + 4, y + 4, 26, 14);
     g.fillStyle(0x2f3a48);
-    g.fillRect(px(tx) + 14, px(ty) + 22, 8, 7);
+    g.fillRect(x + 14, y + 22, 8, 7);
+    g.fillRect(x + 8, y + 29, 20, 4);
   }
 
   private pixelChair(g: Phaser.GameObjects.Graphics, tx: number, ty: number) {
-    g.fillStyle(0x2c3e50);
-    g.fillRect(px(tx), px(ty), 24, 21);
-    g.fillStyle(0x415a70);
-    g.fillRect(px(tx) + 4, px(ty) + 4, 16, 9);
+    const x = px(tx);
+    const y = px(ty);
+    g.fillStyle(0x243244);
+    g.fillRoundedRect(x, y, 26, 20, 3);
+    g.fillStyle(0x42556b);
+    g.fillRect(x + 4, y + 4, 18, 9);
+    g.fillStyle(0x1b2532);
+    g.fillRect(x + 5, y + 18, 4, 10);
+    g.fillRect(x + 17, y + 18, 4, 10);
   }
 
   private pixelPlant(g: Phaser.GameObjects.Graphics, tx: number, ty: number, scale = 1) {
     const x = px(tx);
     const y = px(ty);
-    g.fillStyle(0x2f7d32);
-    g.fillCircle(x + 14 * scale, y + 8 * scale, 14 * scale);
-    g.fillStyle(0x59b85f);
-    g.fillCircle(x + 4 * scale, y + 2 * scale, 8 * scale);
-    g.fillCircle(x + 22 * scale, y + 3 * scale, 9 * scale);
-    g.fillStyle(0x7a4a2a);
-    g.fillRect(x + 8 * scale, y + 21 * scale, 12 * scale, 12 * scale);
+    g.fillStyle(0x256b35);
+    g.fillCircle(x + 14 * scale, y + 9 * scale, 13 * scale);
+    g.fillStyle(0x54b867);
+    g.fillCircle(x + 5 * scale, y + 5 * scale, 8 * scale);
+    g.fillCircle(x + 23 * scale, y + 5 * scale, 9 * scale);
+    g.fillCircle(x + 14 * scale, y - 2 * scale, 7 * scale);
+    g.fillStyle(0x8a5632);
+    g.fillRect(x + 8 * scale, y + 21 * scale, 13 * scale, 12 * scale);
   }
 
   private pixelWaterCooler(g: Phaser.GameObjects.Graphics, tx: number, ty: number) {
-    g.fillStyle(0x9be7ff, 0.8);
-    g.fillRect(px(tx), px(ty), 22, 28);
-    g.fillStyle(0xe5edf3);
-    g.fillRect(px(tx) + 2, px(ty) + 26, 18, 30);
+    const x = px(tx);
+    const y = px(ty);
+    g.fillStyle(0xbff3ff, 0.85);
+    g.fillRoundedRect(x + 2, y, 20, 25, 8);
+    g.fillStyle(0xe8eef4);
+    g.fillRoundedRect(x, y + 22, 24, 34, 3);
+    g.fillStyle(0x7ca3b3);
+    g.fillRect(x + 5, y + 32, 14, 3);
   }
 
   private pixelScreen(g: Phaser.GameObjects.Graphics, tx: number, ty: number) {
-    g.fillStyle(0xf8fafc);
-    g.fillRect(px(tx), px(ty), px(4.5), px(2.2));
+    const x = px(tx);
+    const y = px(ty);
+    g.fillStyle(0xe8f2f5);
+    g.fillRoundedRect(x, y, px(4.5), px(2.2), 3);
+    g.lineStyle(2, 0x9fb3bd, 1);
+    g.strokeRoundedRect(x, y, px(4.5), px(2.2), 3);
     g.fillStyle(0x43a047);
-    g.fillCircle(px(tx) + 18, px(ty) + 16, 10);
+    g.fillCircle(x + 18, y + 17, 10);
     g.fillStyle(0xe07a5f);
-    g.fillRect(px(tx) + 34, px(ty) + 10, 28, 8);
+    g.fillRect(x + 36, y + 11, 30, 8);
     g.fillStyle(0x4e79a7);
-    g.fillRect(px(tx) + 34, px(ty) + 22, 42, 8);
+    g.fillRect(x + 36, y + 24, 42, 8);
   }
 
   private pixelWhiteboard(g: Phaser.GameObjects.Graphics, tx: number, ty: number) {
-    g.fillStyle(0xf4f8fb);
-    g.fillRect(px(tx), px(ty), px(4), px(2.4));
-    g.lineStyle(2, 0xb7c2cc);
-    g.strokeRect(px(tx), px(ty), px(4), px(2.4));
+    const x = px(tx);
+    const y = px(ty);
+    g.fillStyle(0xf7fbfd);
+    g.fillRect(x, y, px(4), px(2.3));
+    g.lineStyle(2, 0x9fb0ba, 1);
+    g.strokeRect(x, y, px(4), px(2.3));
+    g.lineStyle(2, 0xd5a05e, 0.8);
+    g.lineBetween(x + 10, y + 28, x + 52, y + 28);
   }
 
   private pixelSofa(g: Phaser.GameObjects.Graphics, tx: number, ty: number) {
-    g.fillStyle(0x6c7a89);
-    g.fillRoundedRect(px(tx), px(ty), px(7), px(2.2), 5);
-    g.fillStyle(0x516170);
-    g.fillRect(px(tx) + 8, px(ty) + 8, px(6), px(1));
+    const x = px(tx);
+    const y = px(ty);
+    g.fillStyle(0x4f5f70);
+    g.fillRoundedRect(x, y + 12, px(7), px(1.5), 6);
+    g.fillStyle(0x718093);
+    g.fillRoundedRect(x + 6, y, px(6.5), px(1.4), 5);
+    g.fillStyle(0x3d4c5c);
+    g.fillRect(x + 10, y + 23, px(6.2), 5);
   }
 
   private pixelCoffeeTable(g: Phaser.GameObjects.Graphics, tx: number, ty: number) {
-    g.fillStyle(0x8b5a2b);
-    g.fillRoundedRect(px(tx), px(ty), px(4), px(2), 4);
+    const x = px(tx);
+    const y = px(ty);
+    g.fillStyle(0x5c351d);
+    g.fillRoundedRect(x - 2, y + 4, px(4) + 4, px(1.5), 4);
+    g.fillStyle(0xa86636);
+    g.fillRoundedRect(x, y, px(4), px(1.35), 4);
     g.fillStyle(0xfff7ed);
-    g.fillRect(px(tx) + 18, px(ty) + 10, 10, 8);
+    g.fillRect(x + 18, y + 10, 10, 8);
   }
 
   private pixelBookshelf(g: Phaser.GameObjects.Graphics, tx: number, ty: number) {
-    g.fillStyle(0x6b4423);
-    g.fillRect(px(tx), px(ty), px(2), px(4.8));
+    const x = px(tx);
+    const y = px(ty);
+    g.fillStyle(0x654321);
+    g.fillRect(x, y, px(2), px(4.8));
+    g.fillStyle(0x3f2917);
+    for (let i = 1; i < 5; i++) g.fillRect(x + 3, y + i * 18, px(1.8), 3);
     for (let i = 0; i < 5; i++) {
-      g.fillStyle([0xe76f51, 0x2a9d8f, 0xe9c46a, 0x8ab17d][i % 4]);
-      g.fillRect(px(tx) + 5, px(ty) + 8 + i * 12, 22, 6);
+      g.fillStyle([0xe76f51, 0x2a9d8f, 0xe9c46a, 0x8ab17d, 0x7c3aed][i]);
+      g.fillRect(x + 7, y + 8 + i * 17, 20, 8);
     }
   }
 
   private pixelArcade(g: Phaser.GameObjects.Graphics, tx: number, ty: number) {
-    g.fillStyle(0x4c1d95);
-    g.fillRect(px(tx), px(ty), px(2.2), px(4));
+    const x = px(tx);
+    const y = px(ty);
+    g.fillStyle(0x39206a);
+    g.fillRoundedRect(x, y, px(2.2), px(4), 3);
     g.fillStyle(0x67e8f9);
-    g.fillRect(px(tx) + 8, px(ty) + 10, 24, 16);
+    g.fillRect(x + 8, y + 10, 24, 16);
     g.fillStyle(0xf472b6);
-    g.fillCircle(px(tx) + 14, px(ty) + 46, 4);
-    g.fillCircle(px(tx) + 24, px(ty) + 46, 4);
+    g.fillCircle(x + 14, y + 46, 4);
+    g.fillStyle(0xfacc15);
+    g.fillCircle(x + 25, y + 46, 4);
   }
 
   private pixelServerRack(g: Phaser.GameObjects.Graphics, tx: number, ty: number) {
-    g.fillStyle(0x17202a);
-    g.fillRect(px(tx), px(ty), px(2.2), px(4.5));
+    const x = px(tx);
+    const y = px(ty);
+    g.fillStyle(0x111827);
+    g.fillRect(x, y, px(2.2), px(4.5));
+    g.lineStyle(2, 0x334155, 1);
+    g.strokeRect(x, y, px(2.2), px(4.5));
     for (let i = 0; i < 4; i++) {
       g.fillStyle(0x2f3a48);
-      g.fillRect(px(tx) + 4, px(ty) + 8 + i * 14, 26, 8);
+      g.fillRect(x + 5, y + 8 + i * 14, 26, 8);
       g.fillStyle(i % 2 ? 0x22c55e : 0x38bdf8);
-      g.fillRect(px(tx) + 8, px(ty) + 10 + i * 14, 5, 4);
+      g.fillRect(x + 9, y + 10 + i * 14, 5, 4);
     }
   }
 
@@ -547,18 +593,20 @@ export class OfficeScene extends Phaser.Scene {
       const cfgs = byRoom[room.name] ?? [];
       cfgs.forEach((cfg, idx) => {
         const { x, y } = this.agentStartPos(room, idx, cfgs.length);
-        const shadow = this.add.ellipse(x, y - 7, 54, 18, 0x000000, 0.26).setDepth(18);
-        const img = this.add.image(x, y, cfg.spriteKey, SAFE_WALK_FRAMES[0]).setOrigin(0.5, 1).setScale(4.5).setDepth(22);
+        const shadow = this.add.ellipse(x, y - 7, 48, 16, 0x000000, 0.26).setDepth(18);
+        const img = this.add.image(x, y, cfg.spriteKey, SAFE_WALK_FRAMES[0]).setOrigin(0.5, 1).setScale(AGENT_SPRITE_SCALE).setDepth(22);
         img.setInteractive({ useHandCursor: true });
 
         const abbr = ROLE_ABBR[cfg.role] ?? cfg.role.slice(0, 3).toUpperCase();
-        const labelBg = this.add.rectangle(x, y - AGENT_LABEL_Y_OFFSET, abbr.length * 10 + 16, 18, 0x101827, 0.88).setDepth(30);
-        const labelText = this.add.text(x, y - AGENT_LABEL_Y_OFFSET, abbr, {
-          fontSize: '11px',
+        const labelBg = this.add.rectangle(x, y + AGENT_LABEL_Y_OFFSET, Math.max(56, abbr.length * 16 + 20), 28, 0x020617, 0.98).setDepth(50);
+        const labelText = this.add.text(x, y + AGENT_LABEL_Y_OFFSET, abbr, {
+          fontSize: '18px',
           color: '#ffffff',
           fontStyle: 'bold',
-        }).setOrigin(0.5, 0.5).setDepth(31);
-        const dot = this.add.arc(x + 31, y - AGENT_DOT_Y_OFFSET, 5, 0, 360, false, 0xffffff, 0.55).setDepth(31);
+          stroke: '#000000',
+          strokeThickness: 4,
+        }).setOrigin(0.5, 0.5).setDepth(51);
+        const dot = this.add.arc(x + AGENT_DOT_X_OFFSET, y + AGENT_DOT_Y_OFFSET, 6, 0, 360, false, 0xffffff, 0.7).setDepth(52);
 
         const agentObj: AgentObj = {
           role: cfg.role,
@@ -607,18 +655,18 @@ export class OfficeScene extends Phaser.Scene {
 
     switch (room.key) {
       case 'requirement':
-        return [t(3.0, 8.2), t(7.0, 8.6), t(10.7, 7.8), t(7.0, 10.2)];
+        return [t(2.4, 8.7), t(3.6, 5.3), t(10.9, 5.3), t(11.0, 8.6)];
       case 'meeting':
-        return [t(3.1, 8.9), t(6.5, 8.8), t(11.8, 8.8), t(13.0, 5.2), t(7.7, 10.0)];
+        return [t(2.8, 8.5), t(6.0, 8.6), t(10.6, 8.6), t(13.0, 8.4), t(7.8, 4.7)];
       case 'control':
-        return [t(3.0, 8.5), t(6.8, 8.9), t(10.4, 8.1), t(9.2, 10.0), t(6.5, 10.1)];
+        return [t(2.4, 8.4), t(6.3, 8.8), t(10.3, 8.4), t(11.0, 5.8), t(6.8, 10.0)];
       case 'developer':
         return [
-          t(2.4, 13.1), t(7.2, 7.6), t(16.5, 7.6), t(25.8, 7.6),
-          t(7.2, 13.0), t(16.5, 13.0), t(25.8, 13.0), t(14.5, 14.1),
+          t(2.6, 13.4), t(6.8, 7.2), t(16.1, 7.2), t(25.4, 7.2),
+          t(6.8, 13.4), t(16.1, 13.4), t(25.4, 13.4), t(14.5, 15.2),
         ];
       case 'qa':
-        return [t(2.4, 13.1), t(5.2, 7.7), t(5.2, 13.0), t(9.6, 7.6), t(9.2, 12.6)];
+        return [t(2.5, 13.7), t(5.4, 7.8), t(5.4, 13.0), t(9.4, 7.7), t(9.2, 12.8)];
       default:
         return [t(room.w / 2, room.h / 2)];
     }
@@ -854,9 +902,9 @@ export class OfficeScene extends Phaser.Scene {
       const ix = a.img.x;
       const iy = a.img.y;
       a.shadow.setPosition(ix, iy - 8);
-      a.labelBg.setPosition(ix, iy - AGENT_LABEL_Y_OFFSET);
-      a.labelText.setPosition(ix, iy - AGENT_LABEL_Y_OFFSET);
-      a.dot.setPosition(ix + 31, iy - AGENT_DOT_Y_OFFSET);
+      a.labelBg.setPosition(ix, iy + AGENT_LABEL_Y_OFFSET);
+      a.labelText.setPosition(ix, iy + AGENT_LABEL_Y_OFFSET);
+      a.dot.setPosition(ix + AGENT_DOT_X_OFFSET, iy + AGENT_DOT_Y_OFFSET);
       if (a.glow) a.glow.setPosition(ix, iy - AGENT_GLOW_Y_OFFSET);
       if (a.bubble) a.bubble.setPosition(ix, iy - AGENT_BUBBLE_Y_OFFSET);
     }

@@ -4,23 +4,23 @@
 
 @layer base {
   :root {
-    --background: 220 23% 97%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --primary: 221 83% 53%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 214 32% 91%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 214 95% 93%;
-    --accent-foreground: 221 83% 35%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214 32% 88%;
-    --input: 214 32% 88%;
-    --ring: 221 83% 53%;
+    --background: 222 47% 4%;
+    --foreground: 142 70% 88%;
+    --card: 222 44% 7%;
+    --card-foreground: 142 70% 88%;
+    --primary: 142 76% 45%;
+    --primary-foreground: 222 47% 4%;
+    --secondary: 220 30% 12%;
+    --secondary-foreground: 142 70% 86%;
+    --muted: 220 28% 12%;
+    --muted-foreground: 142 20% 62%;
+    --accent: 142 35% 14%;
+    --accent-foreground: 142 85% 70%;
+    --destructive: 0 72% 52%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 142 25% 20%;
+    --input: 142 25% 20%;
+    --ring: 142 76% 45%;
     --radius: 0.5rem;
   }
 
@@ -30,11 +30,105 @@
 
   body {
     @apply bg-background text-foreground;
+    background:
+      radial-gradient(circle at top left, hsl(142 76% 18% / 0.18), transparent 26rem),
+      linear-gradient(180deg, hsl(222 47% 5%), hsl(222 47% 3%));
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 
   a,
   button {
     @apply outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+  }
+}
+
+@layer components {
+  .terminal-surface {
+    @apply border border-border bg-card text-card-foreground shadow-sm;
+    box-shadow: 0 0 0 1px hsl(var(--border) / 0.35), 0 18px 60px hsl(0 0% 0% / 0.35);
+  }
+}
+
+@layer utilities {
+  .bg-white,
+  .bg-gray-50,
+  .bg-slate-50,
+  .bg-neutral-50,
+  .bg-zinc-50 {
+    background-color: hsl(var(--card)) !important;
+  }
+
+  .bg-gray-100,
+  .bg-slate-100,
+  .bg-neutral-100,
+  .bg-zinc-100 {
+    background-color: hsl(var(--muted)) !important;
+  }
+
+  .text-gray-400,
+  .text-gray-500,
+  .text-gray-600,
+  .text-slate-400,
+  .text-slate-500,
+  .text-slate-600,
+  .text-zinc-500,
+  .text-zinc-600 {
+    color: hsl(var(--muted-foreground)) !important;
+  }
+
+  .text-gray-700,
+  .text-gray-800,
+  .text-gray-900,
+  .text-slate-700,
+  .text-slate-800,
+  .text-slate-900 {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .border-gray-100,
+  .border-gray-200,
+  .border-slate-100,
+  .border-slate-200,
+  .border-zinc-200 {
+    border-color: hsl(var(--border)) !important;
+  }
+}
+
+@layer base {
+  input,
+  select,
+  textarea {
+    @apply border-input bg-background text-foreground placeholder:text-muted-foreground;
+  }
+
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus {
+    -webkit-text-fill-color: hsl(var(--foreground));
+    box-shadow: 0 0 0 1000px hsl(var(--background)) inset;
+    caret-color: hsl(var(--foreground));
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.35);
+    color: hsl(var(--foreground));
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--primary) / 0.65);
   }
 }
