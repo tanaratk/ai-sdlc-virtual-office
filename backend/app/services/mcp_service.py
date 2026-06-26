@@ -17,6 +17,8 @@ from app.db.models import (
     McpCallStatus,
     McpToolCall,
 )
+from app.db.models import Document, DocumentType
+from app.services.diagram_service import extract_mermaid, mermaid_to_drawio_xml
 from app.services.figma_service import (
     FigmaServiceError,
     extract_file_key,
@@ -46,6 +48,8 @@ IMPLEMENTED_TOOLS: frozenset[str] = frozenset({
     "figma.get_design",
     "figma.get_node",
     "figma.push_comment",
+    "drawio.export_diagram",
+    "drawio.list_diagrams",
 })
 
 
@@ -58,6 +62,8 @@ def execute_call(call: McpToolCall, session: Session) -> dict[str, Any]:
         "figma.get_design":     _exec_figma_get_design,
         "figma.get_node":       _exec_figma_get_node,
         "figma.push_comment":   _exec_figma_push_comment,
+        "drawio.export_diagram": _exec_drawio_export_diagram,
+        "drawio.list_diagrams":  _exec_drawio_list_diagrams,
     }
     handler = handlers.get(call.tool_name)
     if handler:
@@ -208,6 +214,66 @@ def _exec_figma_push_comment(call: McpToolCall, session: Session) -> dict[str, A
         return {"status": "posted", "file_key": file_key, **result}
     except FigmaServiceError as e:
         raise McpExecutionError(str(e))
+
+
+# -- Draw.io executors --------------------------------------------------------
+
+def _exec_drawio_list_diagrams(call: McpToolCall, session: Session) -> dict[str, Any]:
+    """List generated diagram documents for the project."""
+    docs = session.exec(
+        select(Document).where(
+            Document.project_id == call.project_id,
+            Document.document_type == DocumentType.diagram_spec,
+        ).order_by(Document.created_at.desc())
+    ).all()
+    return {
+        "status": "ok",
+        "count": len(docs),
+        "diagrams": [
+            {"id": str(d.id), "title": d.title, "created_at": d.created_at.isoformat()}
+            for d in docs
+        ],
+    }
+
+
+def _exec_drawio_export_diagram(call: McpToolCall, session: Session) -> dict[str, Any]:
+    """Export a project's Mermaid diagram as Draw.io XML."""
+    params = call.input_json or {}
+    diagram_title = params.get("title", "")
+
+    query = select(Document).where(
+        Document.project_id == call.project_id,
+        Document.document_type == DocumentType.diagram_spec,
+    ).order_by(Document.created_at.desc())
+    docs = session.exec(query).all()
+
+    if not docs:
+        raise McpExecutionError(
+            "No diagrams found for this project. "
+            "Generate diagrams first from the Diagrams tab in the project workspace."
+        )
+
+    # Filter by title keyword if given
+    doc = next(
+        (d for d in docs if diagram_title.lower() in d.title.lower()),
+        docs[0],
+    )
+
+    mermaid_code = extract_mermaid(doc.content_markdown)
+    xml = mermaid_to_drawio_xml(mermaid_code)
+    filename = doc.title.lower().replace(" ", "_").replace("(", "").replace(")", "") + ".drawio"
+
+    return {
+        "status": "ok",
+        "diagram_id": str(doc.id),
+        "title": doc.title,
+        "filename": filename,
+        "drawio_xml": xml,
+        "instructions": (
+            "Save the 'drawio_xml' content as a .drawio file, "
+            "then open it in https://app.diagrams.net or the Draw.io desktop app."
+        ),
+    }
 
 
 # -- Stub ---------------------------------------------------------------------

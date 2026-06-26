@@ -139,3 +139,101 @@ def mermaid_to_drawio_url(mermaid_code: str) -> str:
 
 def wrap_in_markdown(mermaid_code: str) -> str:
     return f"```mermaid\n{mermaid_code}\n```"
+
+
+def extract_mermaid(content: str) -> str:
+    """Extract raw Mermaid code from a fenced markdown block."""
+    m = re.search(r"```(?:mermaid)?\s*\n?([\s\S]+?)\n?```", content)
+    return m.group(1).strip() if m else content.strip()
+
+
+def mermaid_to_drawio_xml(mermaid_code: str) -> str:
+    """Convert basic Mermaid flowchart / erDiagram to Draw.io XML (mxGraphModel)."""
+    import re
+
+    lines = [l.strip() for l in mermaid_code.strip().splitlines() if l.strip()]
+    nodes: dict[str, str] = {}   # id -> label
+    edges: list[tuple[str, str, str]] = []  # (src, tgt, label)
+    is_er = lines[0].lower().startswith("erdiagram") if lines else False
+
+    if is_er:
+        # erDiagram: entity names are words followed by { block, or on relation lines
+        for line in lines[1:]:
+            # Entity block: EntityName {
+            m = re.match(r"^([A-Z][A-Za-z0-9_]*)\s*\{", line)
+            if m:
+                nodes[m.group(1)] = m.group(1)
+                continue
+            # Relation: EntityA ||--o{ EntityB : "label"
+            m = re.match(r'^([A-Z][A-Za-z0-9_]+)\s+[|o}{]+[-–]+[|o}{]+\s+([A-Z][A-Za-z0-9_]+)\s*:\s*"?([^"]*)"?', line)
+            if m:
+                src, tgt, lbl = m.group(1), m.group(2), m.group(3).strip()
+                if src not in nodes:
+                    nodes[src] = src
+                if tgt not in nodes:
+                    nodes[tgt] = tgt
+                edges.append((src, tgt, lbl))
+    else:
+        for line in lines[1:]:
+            # Edge with label: A -->|label| B  or  A -- label --> B
+            m = re.match(r'^(\w+)\s*--+>?\|([^|]*)\|\s*(\w+)', line)
+            if m:
+                src, lbl, tgt = m.group(1), m.group(2).strip(), m.group(3)
+                edges.append((src, tgt, lbl))
+                for n in (src, tgt):
+                    if n not in nodes:
+                        nodes[n] = n
+                continue
+            # Simple edge: A --> B or A --- B
+            m = re.match(r'^(\w+)\s*[-]+>?\s*(\w+)', line)
+            if m:
+                src, tgt = m.group(1), m.group(2)
+                edges.append((src, tgt, ""))
+                for n in (src, tgt):
+                    if n not in nodes:
+                        nodes[n] = n
+                continue
+            # Node with label: A[Label] B(Label) C{Label} D[(Label)]
+            m = re.match(r'^(\w+)\s*[\[\(\{]+\(?(.+?)\)?\s*[\]\)\}]+$', line)
+            if m:
+                nodes[m.group(1)] = m.group(2).strip()
+
+    cell_w, cell_h = 130, 60
+    gap_x, gap_y = 50, 80
+    cols = 4
+
+    xml_parts = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<mxGraphModel><root>',
+        '<mxCell id="0"/>',
+        '<mxCell id="1" parent="0"/>',
+    ]
+
+    node_cell: dict[str, int] = {}
+    for i, (nid, label) in enumerate(nodes.items()):
+        col = i % cols
+        row = i // cols
+        x = col * (cell_w + gap_x) + 40
+        y = row * (cell_h + gap_y) + 40
+        cnum = i + 2
+        node_cell[nid] = cnum
+        style = "shape=table;" if is_er else "rounded=1;whiteSpace=wrap;html=1;"
+        safe_label = label.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        xml_parts.append(
+            f'<mxCell id="{cnum}" value="{safe_label}" style="{style}" vertex="1" parent="1">'
+            f'<mxGeometry x="{x}" y="{y}" width="{cell_w}" height="{cell_h}" as="geometry"/></mxCell>'
+        )
+
+    for i, (src, tgt, lbl) in enumerate(edges):
+        s = node_cell.get(src)
+        t = node_cell.get(tgt)
+        if s and t:
+            cnum = len(nodes) + 2 + i
+            safe_lbl = lbl.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            xml_parts.append(
+                f'<mxCell id="{cnum}" value="{safe_lbl}" edge="1" source="{s}" target="{t}" parent="1">'
+                f'<mxGeometry relative="1" as="geometry"/></mxCell>'
+            )
+
+    xml_parts.append("</root></mxGraphModel>")
+    return "\n".join(xml_parts)

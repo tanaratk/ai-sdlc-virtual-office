@@ -466,6 +466,7 @@ class McpToolCategory(str, Enum):
     github = "github"
     database = "database"
     design = "design"
+    drawio = "drawio"
     browser = "browser"
     document = "document"
     testing = "testing"

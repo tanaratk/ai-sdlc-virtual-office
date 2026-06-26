@@ -1,6 +1,6 @@
 # AI-SDLC Virtual Office — Progress Tracker
 
-**Last Updated:** 2026-06-25 (Sprint 46 — Agent chat bubbles + Pipeline Activity Feed)  
+**Last Updated:** 2026-06-25 (Session: Figma MCP real impl + Draw.io MCP tools)  
 **Project:** ai-sdlc-virtual-office  
 **Repo:** https://github.com/tanaratk/ai-sdlc-virtual-office  
 **Working Directory:** D:\AI_Office
@@ -89,6 +89,8 @@
 | 48 | GitHub Integration — create_pull_request() in github_service, POST /github/pull-request + /push-docs endpoints, GitHubPage: Push All Docs & Open PR (1-click), manual PR form | ✅ Done |
 | 49 | Figma Integration — FigmaSetting model + migration, figma_service (extract_file_key/get_file_info/push_comment/parse_screens), figma.py routes (GET/PUT/DELETE settings + /screens + /push-screens), figmaApi.ts, FigmaPage.tsx (link file, screen cards, Push to Figma button, iframe embed) | ✅ Done |
 | 50 | Diagram Agent — diagram_spec DocumentType + migration 0022, diagram_service (LLM Mermaid generation with stub fallback, mermaid_to_drawio_url), diagrams.py (GET /diagrams + POST /generate + GET /{id}), mermaid npm install, MermaidChart.tsx (async render), DiagramPage.tsx (generate button, rendered SVG, Copy + Open in Mermaid Live, Draw.io paste hint) | ✅ Done |
+| 51 | Figma MCP real impl — figma_service.py (get_design_detail, get_node, push_comment), mcp_service.py rewrite (_exec_figma_get_design/get_node/push_comment, _get_figma_token, _resolve_figma_file_key), migration 0023 (enable figma.get_design, add figma.get_node + figma.push_comment), settings.py fix (use handle field for Figma user display name). Tested: token save OK, connection test "Connected as Tanarat Kittanaseri" | ✅ Done |
+| 52 | Draw.io MCP tools — diagram_service.py (extract_mermaid + mermaid_to_drawio_xml: Mermaid flowchart/erDiagram → Draw.io XML), mcp_service.py (drawio.list_diagrams + drawio.export_diagram executors), migration 0024 (ALTER TYPE mcp_tool_category ADD VALUE 'drawio', insert 2 tools), models.py (McpToolCategory.drawio), McpPage.tsx (drawio category label) | ✅ Done |
 
 ## Project Status
 

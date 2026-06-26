@@ -264,8 +264,9 @@ def _test_connector(ctype: str, token: Optional[str], extra: Optional[dict]) -> 
                     headers={"X-Figma-Token": token},
                 )
                 if resp.status_code == 200:
-                    name = resp.json().get("name", "unknown")
-                    return ConnectorTestResponse(ok=True, message=f"Connected as {name}")
+                    data = resp.json()
+                    handle = data.get("handle") or data.get("name") or data.get("email") or "unknown"
+                    return ConnectorTestResponse(ok=True, message=f"Connected as {handle}")
                 if resp.status_code == 403:
                     return ConnectorTestResponse(ok=False, message="Invalid token — authentication failed.")
                 return ConnectorTestResponse(ok=False, message=f"Figma returned {resp.status_code}")
